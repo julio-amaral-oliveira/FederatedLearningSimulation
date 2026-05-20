@@ -16,6 +16,12 @@ class Client:
 
         self.local_model = type(model)().to(get_device())
         set_model_weights(self.local_model, get_model_weights(model))
+        self.optimizer = torch.optim.Adam(
+            self.local_model.parameters(),
+            lr=0.001,
+            betas=(0.9, 0.999),
+            eps=1e-7,
+        )
 
     def perform_fit(self, round_start_weights, local_epochs, batch_size):
         from utils.models import get_model_weights, set_model_weights
@@ -32,16 +38,15 @@ class Client:
         dataset = TensorDataset(torch.from_numpy(x), torch.from_numpy(y))
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
         self.local_model.train()
-        optimizer = torch.optim.Adam(self.local_model.parameters())
         criterion = nn.CrossEntropyLoss()
         for _ in range(local_epochs):
             for batch_x, batch_y in loader:
                 batch_x, batch_y = batch_x.to(device), batch_y.to(device)
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 outputs = self.local_model(batch_x)
                 loss = criterion(outputs, batch_y)
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
 
     def get_dataset_size(self):
         return len(self.dataset[0])
