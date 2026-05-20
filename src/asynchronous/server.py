@@ -7,14 +7,9 @@ import time
 import torch
 import torch.nn as nn
 from constants import (
-    ACCURACY_STABILITY_DELTA,
-    ACCURACY_STABILITY_PATIENCE,
     MAX_CONNECTION_TIME,
     MIN_CONNECTION_TIME,
     SIMULATION_SEED,
-    STABILITY_EMA_ALPHA,
-    STABILITY_EVAL_EVERY,
-    STABILITY_MIN_ROUNDS,
 )
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -35,13 +30,6 @@ class Server:
         base_alpha,
         decay_of_base_alpha,
         tardiness_sensivity,
-        stop_on_stability=False,
-        target_accuracy=None,
-        stability_delta=ACCURACY_STABILITY_DELTA,
-        stability_patience=ACCURACY_STABILITY_PATIENCE,
-        stability_ema_alpha=STABILITY_EMA_ALPHA,
-        stability_eval_every=STABILITY_EVAL_EVERY,
-        stability_min_rounds=STABILITY_MIN_ROUNDS,
         evaluation_frequency=1,
     ):
         self.clients = clients
@@ -58,13 +46,6 @@ class Server:
         self.base_alpha = base_alpha
         self.decay_of_base_alpha = decay_of_base_alpha
         self.tardiness_sensitivity = tardiness_sensivity
-        self.stop_on_stability = stop_on_stability
-        self.target_accuracy = target_accuracy
-        self.stability_delta = stability_delta
-        self.stability_patience = stability_patience
-        self.stability_ema_alpha = stability_ema_alpha
-        self.stability_eval_every = stability_eval_every
-        self.stability_min_rounds = stability_min_rounds
         self.evaluation_frequency = max(1, evaluation_frequency)
 
     def setup_clients(self):
@@ -129,12 +110,8 @@ class Server:
             heapq.heappush(pq, (duration, seq, idx, 0, initial_weights))
             seq += 1
 
-        best_accuracy = 0.0
-        smoothed_accuracy = None
-        patience_counter = 0
         last_accuracy = 0.0
         last_loss = None
-        early_stop = self.stop_on_stability or self.target_accuracy is not None
         final_virtual_time = 0.0
 
         while pq:
@@ -163,7 +140,6 @@ class Server:
             should_eval = (
                 next_version == 1
                 or next_version % self.evaluation_frequency == 0
-                or (early_stop and next_version % self.stability_eval_every == 0)
             )
 
             if should_eval:
@@ -188,45 +164,7 @@ class Server:
                     f"staleness={staleness} | acc={accuracy:.4f}"
                 )
 
-            if (
-                self.target_accuracy is not None
-                and should_eval
-                and accuracy >= self.target_accuracy
-            ):
-                print(
-                    f"Acurácia alvo {self.target_accuracy:.4f} atingida: {accuracy:.4f}. "
-                    f"Parando treinamento."
-                )
-                break
             final_virtual_time = finish_time
-
-            if self.stop_on_stability and should_eval:
-                if smoothed_accuracy is None:
-                    smoothed_accuracy = accuracy
-                else:
-                    smoothed_accuracy = (
-                        self.stability_ema_alpha * accuracy
-                        + (1 - self.stability_ema_alpha) * smoothed_accuracy
-                    )
-
-                if smoothed_accuracy > best_accuracy + self.stability_delta:
-                    best_accuracy = smoothed_accuracy
-                    patience_counter = 0
-                else:
-                    patience_counter += 1
-
-                if (
-                    self.version >= self.stability_min_rounds
-                    and patience_counter >= self.stability_patience
-                ):
-                    print(
-                        f"Acurácia estabilizada (EMA alpha={self.stability_ema_alpha}). "
-                        f"Melhor suavizada: {best_accuracy:.4f}, "
-                        f"últimas {patience_counter} avaliações sem melhora "
-                        f"> {self.stability_delta} (avaliando a cada {self.stability_eval_every} rounds). "
-                        f"Parando treinamento."
-                    )
-                    break
 
             if client.completed_updates < self.number_of_updates:
                 next_duration = self._sample_round_duration(client, rng)
