@@ -6,19 +6,14 @@ import time
 
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader
-
 from constants import (
-    ACCURACY_STABILITY_DELTA,
-    ACCURACY_STABILITY_PATIENCE,
     MAX_CONNECTION_TIME,
     MIN_CONNECTION_TIME,
     SIMULATION_SEED,
-    STABILITY_EMA_ALPHA,
-    STABILITY_EVAL_EVERY,
-    STABILITY_MIN_ROUNDS,
 )
-from utils.models import get_model, get_device, get_model_weights, set_model_weights
+from torch.utils.data import DataLoader, TensorDataset
+
+from utils.models import get_device, get_model, get_model_weights, set_model_weights
 
 
 class Server:
@@ -35,13 +30,7 @@ class Server:
         base_alpha,
         decay_of_base_alpha,
         tardiness_sensivity,
-        stop_on_stability=False,
-        target_accuracy=None,
-        stability_delta=ACCURACY_STABILITY_DELTA,
-        stability_patience=ACCURACY_STABILITY_PATIENCE,
-        stability_ema_alpha=STABILITY_EMA_ALPHA,
-        stability_eval_every=STABILITY_EVAL_EVERY,
-        stability_min_rounds=STABILITY_MIN_ROUNDS,
+        evaluation_frequency=1,
     ):
         self.clients = clients
         self.number_of_clients = num_clients
@@ -57,13 +46,7 @@ class Server:
         self.base_alpha = base_alpha
         self.decay_of_base_alpha = decay_of_base_alpha
         self.tardiness_sensitivity = tardiness_sensivity
-        self.stop_on_stability = stop_on_stability
-        self.target_accuracy = target_accuracy
-        self.stability_delta = stability_delta
-        self.stability_patience = stability_patience
-        self.stability_ema_alpha = stability_ema_alpha
-        self.stability_eval_every = stability_eval_every
-        self.stability_min_rounds = stability_min_rounds
+        self.evaluation_frequency = max(1, evaluation_frequency)
 
     def setup_clients(self):
         for client in self.clients:
@@ -127,22 +110,22 @@ class Server:
             heapq.heappush(pq, (duration, seq, idx, 0, initial_weights))
             seq += 1
 
-        best_accuracy = 0.0
-        smoothed_accuracy = None
-        patience_counter = 0
         last_accuracy = 0.0
         last_loss = None
-        early_stop = self.stop_on_stability or self.target_accuracy is not None
+        final_virtual_time = 0.0
 
         while pq:
             finish_time, _, client_idx, base_version, base_weights = heapq.heappop(pq)
             client = self.clients[client_idx]
 
             if finish_time > self.timeout:
+                final_virtual_time = self.timeout
                 late_ids = [client.client_id]
-                late_ids.extend(self.clients[ci].client_id for _, _, ci, _, _ in pq)
-                for cid in late_ids:
-                    print(f"Cliente {cid} excedeu o tempo limite virtual.")
+                late_ids.extend(
+                    self.clients[c_idx].client_id for _, _, c_idx, _, _ in pq
+                )
+                for c_idx in late_ids:
+                    print(f"Cliente {c_idx} excedeu o tempo limite virtual.")
                 break
 
             updated_weights = client.perform_fit(
@@ -155,8 +138,8 @@ class Server:
 
             next_version = self.version + 1
             should_eval = (
-                not early_stop
-                or next_version % self.stability_eval_every == 0
+                next_version == 1
+                or next_version % self.evaluation_frequency == 0
             )
 
             if should_eval:
@@ -167,7 +150,8 @@ class Server:
                 accuracy = last_accuracy
                 loss = last_loss
 
-            self.accuracy_history.append((loss, accuracy, finish_time))
+            if should_eval:
+                self.accuracy_history.append((loss, accuracy, finish_time))
 
             staleness = self.version - base_version
             self.version += 1
@@ -180,40 +164,7 @@ class Server:
                     f"staleness={staleness} | acc={accuracy:.4f}"
                 )
 
-            if self.target_accuracy is not None and should_eval and accuracy >= self.target_accuracy:
-                print(
-                    f"Acurácia alvo {self.target_accuracy:.4f} atingida: {accuracy:.4f}. "
-                    f"Parando treinamento."
-                )
-                break
-
-            if self.stop_on_stability and should_eval:
-                if smoothed_accuracy is None:
-                    smoothed_accuracy = accuracy
-                else:
-                    smoothed_accuracy = (
-                        self.stability_ema_alpha * accuracy
-                        + (1 - self.stability_ema_alpha) * smoothed_accuracy
-                    )
-
-                if smoothed_accuracy > best_accuracy + self.stability_delta:
-                    best_accuracy = smoothed_accuracy
-                    patience_counter = 0
-                else:
-                    patience_counter += 1
-
-                if (
-                    self.version >= self.stability_min_rounds
-                    and patience_counter >= self.stability_patience
-                ):
-                    print(
-                        f"Acurácia estabilizada (EMA alpha={self.stability_ema_alpha}). "
-                        f"Melhor suavizada: {best_accuracy:.4f}, "
-                        f"últimas {patience_counter} avaliações sem melhora "
-                        f"> {self.stability_delta} (avaliando a cada {self.stability_eval_every} rounds). "
-                        f"Parando treinamento."
-                    )
-                    break
+            final_virtual_time = finish_time
 
             if client.completed_updates < self.number_of_updates:
                 next_duration = self._sample_round_duration(client, rng)
@@ -230,9 +181,16 @@ class Server:
                 seq += 1
 
         loss, accuracy = self.evaluate()
+        if (
+            not self.accuracy_history
+            or self.accuracy_history[-1][2] != final_virtual_time
+        ):
+            self.accuracy_history.append((loss, accuracy, final_virtual_time))
         wall_clock = time.time() - self.start_time
         print("Treinamento federado assíncrono (DES) concluído.")
         print(f"Perda final do modelo global: {loss:.4f}")
         print(f"Acurácia final do modelo global: {accuracy:.4f}")
-        print(f"Wall-clock real: {wall_clock:.1f}s | Total de agregacoes: {self.version}")
+        print(
+            f"Wall-clock real: {wall_clock:.1f}s | Total de agregacoes: {self.version}"
+        )
         return self.accuracy_history

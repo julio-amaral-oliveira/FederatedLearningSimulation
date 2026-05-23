@@ -15,8 +15,6 @@ import numpy as np
 import torch
 from client import Client
 from constants import (
-    ACCURACY_STABILITY_DELTA,
-    ACCURACY_STABILITY_PATIENCE,
     BATCH_SIZE,
     LOCAL_EPOCHS,
     MAX_CONNECTION_TIME,
@@ -26,9 +24,6 @@ from constants import (
     PERCENTILE_LIST,
     SPEED_TIER_SEED,
     SPEED_TIERS,
-    STABILITY_EMA_ALPHA,
-    STABILITY_EVAL_EVERY,
-    STABILITY_MIN_ROUNDS,
 )
 from monte_carlo import get_percentiles_timeout
 from server import Server
@@ -73,19 +68,10 @@ def main(
     dataset="cifar10",
     output_prefix="",
     single_percentile=None,
-    stop_on_stability=False,
-    target_accuracy=None,
-    stability_delta=ACCURACY_STABILITY_DELTA,
-    stability_patience=ACCURACY_STABILITY_PATIENCE,
-    stability_ema_alpha=STABILITY_EMA_ALPHA,
-    stability_eval_every=STABILITY_EVAL_EVERY,
-    stability_min_rounds=STABILITY_MIN_ROUNDS,
+    evaluation_frequency=1,
 ):
     accuracy_history = []
-    if stop_on_stability or target_accuracy is not None:
-        percentile_list = [single_percentile] if single_percentile else [50]
-    else:
-        percentile_list = [single_percentile] if single_percentile else PERCENTILE_LIST
+    percentile_list = [single_percentile] if single_percentile else PERCENTILE_LIST
     number_of_clients = num_clients
     number_of_updates = num_updates
     local_epochs = epochs
@@ -117,19 +103,7 @@ def main(
         timeout = percentiles_timeout[i]
         percentile = percentile_list[i]
 
-        if stop_on_stability or target_accuracy is not None:
-            timeout = float("inf")
-            number_of_updates = float("inf")
-            reason = []
-            if stop_on_stability:
-                reason.append("estabilidade")
-            if target_accuracy is not None:
-                reason.append(f"acurácia alvo ({target_accuracy:.4f})")
-            print(
-                f"Timeout do montecarlo e limite de updates ignorados. Parada por: {', '.join(reason)}"
-            )
-        else:
-            print(f"Timeout definido para {percentile}%: {timeout}")
+        print(f"Timeout definido para {percentile}%: {timeout}")
 
         clients = [
             Client(
@@ -153,13 +127,7 @@ def main(
             base_alpha,
             decay_of_base_alpha,
             tardiness_sensivity,
-            stop_on_stability=stop_on_stability,
-            target_accuracy=target_accuracy,
-            stability_delta=stability_delta,
-            stability_patience=stability_patience,
-            stability_ema_alpha=stability_ema_alpha,
-            stability_eval_every=stability_eval_every,
-            stability_min_rounds=stability_min_rounds,
+            evaluation_frequency=evaluation_frequency,
         )
 
         server.setup_clients()
@@ -202,47 +170,7 @@ if __name__ == "__main__":
     parser.add_argument("--tardiness-sensivity", type=float, default=0.075)
     parser.add_argument("--output-prefix", type=str, default="")
     parser.add_argument("--percentile", type=int, default=None, help="Percentil unico (ex: 50). Padrao: todos de PERCENTILE_LIST")
-    parser.add_argument(
-        "--stop-on-stability",
-        action="store_true",
-        help="Para o treinamento quando a acurácia estabilizar (ignora timeout do montecarlo)",
-    )
-    parser.add_argument(
-        "--target-accuracy",
-        type=float,
-        default=None,
-        help="Acurácia alvo para parada do treinamento (ignora timeout do montecarlo)",
-    )
-    parser.add_argument(
-        "--stability-delta",
-        type=float,
-        default=ACCURACY_STABILITY_DELTA,
-        help=f"Delta mínimo de melhoria de acurácia para resetar patience (default: {ACCURACY_STABILITY_DELTA})",
-    )
-    parser.add_argument(
-        "--stability-patience",
-        type=int,
-        default=ACCURACY_STABILITY_PATIENCE,
-        help=f"Número de avaliações sem melhoria para considerar estabilizado (default: {ACCURACY_STABILITY_PATIENCE})",
-    )
-    parser.add_argument(
-        "--stability-ema-alpha",
-        type=float,
-        default=STABILITY_EMA_ALPHA,
-        help=f"Fator de suavização exponencial (EMA) da acurácia (default: {STABILITY_EMA_ALPHA})",
-    )
-    parser.add_argument(
-        "--stability-eval-every",
-        type=int,
-        default=STABILITY_EVAL_EVERY,
-        help=f"Avaliar estabilidade a cada N rounds (default: {STABILITY_EVAL_EVERY})",
-    )
-    parser.add_argument(
-        "--stability-min-rounds",
-        type=int,
-        default=STABILITY_MIN_ROUNDS,
-        help=f"Mínimo de rounds antes de considerar parada (default: {STABILITY_MIN_ROUNDS})",
-    )
+    parser.add_argument("--eval-every", type=int, default=1)
     args = parser.parse_args()
 
     if args.non_iid:
@@ -265,11 +193,5 @@ if __name__ == "__main__":
             tardiness_sensivity=args.tardiness_sensivity,
             output_prefix=args.output_prefix,
             single_percentile=args.percentile,
-            stop_on_stability=args.stop_on_stability,
-            target_accuracy=args.target_accuracy,
-            stability_delta=args.stability_delta,
-            stability_patience=args.stability_patience,
-            stability_ema_alpha=args.stability_ema_alpha,
-            stability_eval_every=args.stability_eval_every,
-            stability_min_rounds=args.stability_min_rounds,
+            evaluation_frequency=args.eval_every,
         )

@@ -1,22 +1,16 @@
-# server.py
-
+import random
 import time
-import heapq
 
 import torch
 import torch.nn as nn
-from torch.utils.data import TensorDataset, DataLoader
-import random
+from torch.utils.data import DataLoader, TensorDataset
 
 from constants import (
     MAX_CONNECTION_TIME,
     MIN_CONNECTION_TIME,
-    MIN_TRAIN_TIME,
-    MAX_TRAIN_TIME,
     SIMULATION_SEED,
 )
-
-from utils.models import get_model, get_device, get_model_weights, set_model_weights
+from utils.models import get_device, get_model, get_model_weights, set_model_weights
 
 
 class Server:
@@ -24,43 +18,63 @@ class Server:
         self,
         clients,
         num_clients,
-        round_num,
+        num_rounds,
         timeout,
         local_epochs,
         batch_size,
         testing_data,
         model_name,
+        evaluation_frequency=1,
     ):
         self.clients = clients
-        self.number_of_clients = num_clients
-        self.number_of_rounds = round_num
+        self.total_clients = num_clients
+        self.total_rounds = num_rounds
         self.start_time = 0
+        self.virtual_time = 0.0
         self.timeout = timeout
         self.local_epochs = local_epochs
         self.batch_size = batch_size
         self.global_model = get_model(model_name)
         self.testing_data = testing_data  # tuple (x_test, y_test)
         self.accuracy_history = []
+        self.rng = random.Random(SIMULATION_SEED)
+        self.evaluation_frequency = max(1, evaluation_frequency)
 
     def setup_clients(self):
         for client in self.clients:
             client.setup_client(self.global_model)
 
-    def aggregate_round(self, client_weights, client_sizes, round_num):
-        if len(client_weights) == 0:
-            print("Não houve resposta de nenhum cliente, o modelo não foi modificado")
+    def aggregate_round(
+        self,
+        participating_client_weights,
+        participating_client_sizes,
+        round_index,
+        should_record_metrics=True,
+    ):
+        if len(participating_client_weights) == 0:
+            print("Nao houve resposta de nenhum cliente, o modelo nao foi modificado")
             return
-        print(f"Gerando novo modelo global. Rodada {round_num + 1}.")
-        total_size = sum(client_sizes)
+        print(f"Gerando novo modelo global. Rodada {round_index + 1}.")
+        total_participating_samples = sum(participating_client_sizes)
         weighted_weights = []
-        for weight_idx in range(len(client_weights[0])):
-            aggregated = torch.zeros_like(client_weights[0][weight_idx])
-            for i in range(len(client_weights)):
-                aggregated += client_weights[i][weight_idx] * (client_sizes[i] / total_size)
-            weighted_weights.append(aggregated)
+        for weight_index in range(len(participating_client_weights[0])):
+            aggregated_weight = torch.zeros_like(
+                participating_client_weights[0][weight_index]
+            )
+            for client_index in range(len(participating_client_weights)):
+                client_sample_fraction = (
+                    participating_client_sizes[client_index]
+                    / total_participating_samples
+                )
+                aggregated_weight += (
+                    participating_client_weights[client_index][weight_index]
+                    * client_sample_fraction
+                )
+            weighted_weights.append(aggregated_weight)
         set_model_weights(self.global_model, weighted_weights)
-        loss, accuracy, time_stamp = self.evaluate()
-        self.accuracy_history.append((loss, accuracy, time_stamp))
+        if should_record_metrics:
+            loss, accuracy, time_stamp = self.evaluate()
+            self.accuracy_history.append((loss, accuracy, time_stamp))
 
     def evaluate(self):
         device = get_device()
@@ -83,64 +97,98 @@ class Server:
                 total += batch_y.size(0)
         avg_loss = total_loss / total if total > 0 else 0.0
         accuracy = correct / total if total > 0 else 0.0
-        now = time.time()
-        return avg_loss, accuracy, now - self.start_time
+        return avg_loss, accuracy, self.virtual_time
 
-    def distribute_weights(self):
-        global_weights = get_model_weights(self.global_model)
-        for client in self.clients:
-            client.set_model_weights(global_weights)
-
-    def _sample_round_duration(self, rng):
-        connection = rng.uniform(MIN_CONNECTION_TIME, MAX_CONNECTION_TIME)
-        train = rng.uniform(MIN_TRAIN_TIME,MAX_TRAIN_TIME)
+    def _sample_round_duration(self, client):
+        connection = self.rng.uniform(MIN_CONNECTION_TIME, MAX_CONNECTION_TIME)
+        train = self.rng.uniform(*client.train_time_range)
         return connection + train
 
-    def train_clients(self, round_num):
-        client_weights = []
-        client_sizes = []
-        pq = []
+    def train_clients(self, round_index, round_start_weights):
+        participating_client_weights = []
+        participating_client_sizes = []
+        sampled_client_durations = []
 
-        for idx,client in enumerate(self.clients):
-            duration = self._sample_round_duration(self.rng)
-            heapq.heappush(pq,(duration,idx))
+        for client in self.clients:
+            client_virtual_duration = self._sample_round_duration(client)
+            sampled_client_durations.append(client_virtual_duration)
+            if client_virtual_duration <= self.timeout:
+                print(
+                    f"Tempo virtual do cliente {client.client_id} "
+                    f"({client.speed_tier_name}): {client_virtual_duration:.2f}s"
+                )
+                participating_client_weights.append(
+                    client.perform_fit(
+                        round_start_weights, self.local_epochs, self.batch_size
+                    )
+                )
+                participating_client_sizes.append(client.get_dataset_size())
+            else:
+                print(
+                    f"Cliente {client.client_id} excedeu o tempo limite virtual "
+                    f"na rodada {round_index} "
+                    f"({client_virtual_duration:.2f}s > {self.timeout:.2f}s)."
+                )
 
-        while pq:
-            finish_time,client_idx = heapq.heappop(pq)
-            client = self.clients[client_idx]
-
-            if finish_time > self.timeout:
-                late_ids = [client.client_id]
-                late_ids.extend(self.clients[ci].client_id for _, ci in pq)
-                for cid in late_ids:
-                    print(f"Cliente {cid} excedeu o tempo limite na rodada {round_num}.")
-                break
-
-            client.train(self.local_epochs, self.batch_size,finish_time)
-            client_weights.append(client.get_model_weights())
-            client_sizes.append(client.get_dataset_size())
-
-        print(
-            f"Percentual de clientes na rodada {round_num + 1}: {100 * len(client_weights) / self.number_of_clients}%"
+        effective_round_duration = min(
+            self.timeout, max(sampled_client_durations, default=0.0)
         )
-        return client_weights, client_sizes
+        print(
+            f"Percentual de clientes na rodada {round_index + 1}: "
+            f"{100 * len(participating_client_weights) / self.total_clients}%"
+        )
+        print(
+            f"Tempo virtual da rodada {round_index + 1}: "
+            f"{effective_round_duration:.2f}s"
+        )
+        return (
+            participating_client_weights,
+            participating_client_sizes,
+            effective_round_duration,
+        )
 
     def start_training(self):
-        """Simulacao por eventos discretos: O tempo de cada cliente eh amostrado
-        em cada rodada para estimar se haverá timeout ou não (sem threads, sem sleeps, sem lock). 
-        ."""
         self.start_time = time.time()
+        self.virtual_time = 0.0
         self.rng = random.Random(SIMULATION_SEED)
+        for round_index in range(self.total_rounds):
+            print(f"\nRodada {round_index + 1}")
+            round_start_weights = get_model_weights(self.global_model)
+            (
+                participating_client_weights,
+                participating_client_sizes,
+                effective_round_duration,
+            ) = self.train_clients(
+                round_index,
+                round_start_weights,
+            )
+            self.virtual_time += effective_round_duration
+            should_record_metrics = (
+                round_index == 0
+                or (round_index + 1) % self.evaluation_frequency == 0
+                or round_index == self.total_rounds - 1
+            )
+            self.aggregate_round(
+                participating_client_weights,
+                participating_client_sizes,
+                round_index,
+                should_record_metrics=should_record_metrics,
+            )
 
-        for round_num in range(self.number_of_rounds):
-            print(f"\nRodada {round_num + 1}")
-            self.distribute_weights()
-            client_weights, client_sizes = self.train_clients(round_num)
-            self.aggregate_round(client_weights, client_sizes, round_num)
-        print("Treinamento concluído. Novo modelo global gerado.")
+        wall_clock = time.time() - self.start_time
+        print("Treinamento concluido. Novo modelo global gerado.")
         loss, accuracy, _ = self.evaluate()
+        if (
+            not self.accuracy_history
+            or self.accuracy_history[-1][2] != self.virtual_time
+        ):
+            self.accuracy_history.append((loss, accuracy, self.virtual_time))
 
-        print("Treinamento federado síncrono concluído.")
+        print("Treinamento federado sincrono (tempo virtual) concluido.")
         print(f"Perda final do modelo global: {loss:.4f}")
-        print(f"Acurácia final do modelo global: {accuracy:.4f}")
+        print(f"Acuracia final do modelo global: {accuracy:.4f}")
+        print(
+            f"Tempo virtual total: {self.virtual_time:.1f}s | "
+            f"Wall-clock real: {wall_clock:.1f}s"
+        )
         return self.accuracy_history
