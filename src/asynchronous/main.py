@@ -9,8 +9,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import argparse
 import json
-import random as _stdlib_random
-
 import numpy as np
 import torch
 from client import Client
@@ -28,28 +26,12 @@ from constants import (
 from monte_carlo import get_percentiles_timeout
 from server import Server
 
-
-def assign_speed_tiers(num_clients, speed_tiers, seed):
-    """Distribui os clientes nos tiers respeitando as proporcoes e embaralha
-    deterministicamente para evitar correlacao com o client_id."""
-    counts = []
-    cumulative = 0
-    for i, (_, _, _, prop) in enumerate(speed_tiers):
-        if i < len(speed_tiers) - 1:
-            count = int(round(num_clients * prop))
-            counts.append(count)
-            cumulative += count
-        else:
-            counts.append(num_clients - cumulative)
-    assignments = []
-    for (name, lo, hi, _), count in zip(speed_tiers, counts):
-        assignments.extend([(name, lo, hi)] * count)
-    rng = _stdlib_random.Random(seed)
-    rng.shuffle(assignments)
-    return assignments
-
 from utils.data_loader import get_dataset_info, load_dataset
-from utils.data_split import split_iid_data, split_non_iid_data
+from utils.experiment_runner import (
+    assign_speed_tiers,
+    prepare_client_data,
+    save_accuracy_json,
+)
 from utils.plot_accuracy import generate_all_plots
 
 np.random.seed(42)
@@ -79,12 +61,9 @@ def main(
 
     dataset_info = get_dataset_info(dataset)
     training_data, testing_data = load_dataset(dataset)
-    if is_non_iid:
-        print("Usando dados não IID")
-        training_data_clients = split_non_iid_data(training_data, number_of_clients, dataset_info["num_classes"])
-    else:
-        print("Usando dados IID")
-        training_data_clients = split_iid_data(training_data, number_of_clients, dataset_info["num_classes"])
+    training_data_clients = prepare_client_data(
+        training_data, number_of_clients, dataset_info["num_classes"], is_non_iid
+    )
     percentiles_timeout = get_percentiles_timeout(
         percentile_list,
         number_of_updates,
@@ -133,22 +112,12 @@ def main(
         server.setup_clients()
         local_history = server.start_training()
         accuracy_history.append(local_history)
-    # Salvar dados em arquivo JSON para gerar gráficos depois
-    data = {}
-    for i, percentile in enumerate(percentile_list):
-        data[str(percentile)] = [
-            {"loss": p[0], "accuracy": p[1], "time": p[2]} for p in accuracy_history[i]
-        ]
-
+    labels = [str(p) for p in percentile_list]
     tipo_dist = "non_iid" if is_non_iid else "iid"
-    prefix_str = f"_{output_prefix}" if output_prefix else ""
-    accuracy_data_name = f"accuracy_data_{tipo_dist}{prefix_str}.json"
-
-    output_dir = dataset_info["output_dir"]
-    os.makedirs(output_dir, exist_ok=True)
-    with open(f"{output_dir}/{accuracy_data_name}", "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"Dados salvos em {output_dir}/{accuracy_data_name}")
+    save_accuracy_json(
+        accuracy_history, labels, dataset_info["output_dir"],
+        tipo_dist, output_prefix
+    )
 
     if not output_prefix:
         generate_all_plots(

@@ -25,6 +25,7 @@ class Server:
         testing_data,
         model_name,
         evaluation_frequency=1,
+        group_masks=None,
     ):
         self.clients = clients
         self.total_clients = num_clients
@@ -39,6 +40,7 @@ class Server:
         self.accuracy_history = []
         self.rng = random.Random(SIMULATION_SEED)
         self.evaluation_frequency = max(1, evaluation_frequency)
+        self.group_masks = group_masks
 
     def setup_clients(self):
         for client in self.clients:
@@ -73,8 +75,12 @@ class Server:
             weighted_weights.append(aggregated_weight)
         set_model_weights(self.global_model, weighted_weights)
         if should_record_metrics:
-            loss, accuracy, time_stamp = self.evaluate()
-            self.accuracy_history.append((loss, accuracy, time_stamp))
+            if self.group_masks:
+                result = self.evaluate_per_group()
+            else:
+                loss, accuracy, time_stamp = self.evaluate()
+                result = {"loss": loss, "accuracy": accuracy, "time": time_stamp}
+            self.accuracy_history.append(result)
 
     def evaluate(self):
         device = get_device()
@@ -98,6 +104,49 @@ class Server:
         avg_loss = total_loss / total if total > 0 else 0.0
         accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy, self.virtual_time
+
+    def evaluate_per_group(self):
+        device = get_device()
+        self.global_model.eval()
+        x, y = self.testing_data
+        dataset = TensorDataset(torch.from_numpy(x), torch.from_numpy(y))
+        loader = DataLoader(dataset, batch_size=self.batch_size)
+        criterion = nn.CrossEntropyLoss()
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        per_group_correct = {name: 0 for name in self.group_masks}
+        per_group_total = {name: 0 for name in self.group_masks}
+        with torch.no_grad():
+            for batch_x, batch_y in loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                outputs = self.global_model(batch_x)
+                loss = criterion(outputs, batch_y)
+                total_loss += loss.item() * batch_x.size(0)
+                _, predicted = outputs.max(1)
+                correct += predicted.eq(batch_y).sum().item()
+                total += batch_y.size(0)
+                for group_name, classes in self.group_masks.items():
+                    class_tensor = torch.tensor(classes, device=device)
+                    mask = torch.isin(batch_y, class_tensor)
+                    if mask.any():
+                        per_group_correct[group_name] += (
+                            predicted[mask].eq(batch_y[mask]).sum().item()
+                        )
+                        per_group_total[group_name] += mask.sum().item()
+        avg_loss = total_loss / total if total > 0 else 0.0
+        accuracy = correct / total if total > 0 else 0.0
+        result = {
+            "loss": avg_loss,
+            "accuracy": accuracy,
+            "time": self.virtual_time,
+        }
+        for group_name in self.group_masks:
+            gt = per_group_total[group_name]
+            result[f"accuracy_{group_name}"] = (
+                per_group_correct[group_name] / gt if gt > 0 else 0.0
+            )
+        return result
 
     def _sample_round_duration(self, client):
         connection = self.rng.uniform(MIN_CONNECTION_TIME, MAX_CONNECTION_TIME)
@@ -147,7 +196,7 @@ class Server:
             effective_round_duration,
         )
 
-    def start_training(self):
+    def start_training(self, stop_time=None):
         self.start_time = time.time()
         self.virtual_time = 0.0
         self.rng = random.Random(SIMULATION_SEED)
@@ -174,21 +223,28 @@ class Server:
                 round_index,
                 should_record_metrics=should_record_metrics,
             )
+            if stop_time is not None and self.virtual_time >= stop_time:
+                break
 
         wall_clock = time.time() - self.start_time
+        final_timestamp = stop_time if stop_time is not None else self.virtual_time
         print("Treinamento concluido. Novo modelo global gerado.")
-        loss, accuracy, _ = self.evaluate()
-        if (
-            not self.accuracy_history
-            or self.accuracy_history[-1][2] != self.virtual_time
-        ):
-            self.accuracy_history.append((loss, accuracy, self.virtual_time))
+        if self.group_masks:
+            result = self.evaluate_per_group()
+            result["time"] = final_timestamp
+        else:
+            loss, accuracy, _ = self.evaluate()
+            result = {"loss": loss, "accuracy": accuracy, "time": final_timestamp}
+
+        last_time = self.accuracy_history[-1]["time"] if self.accuracy_history else None
+        if last_time is None or last_time != final_timestamp:
+            self.accuracy_history.append(result)
 
         print("Treinamento federado sincrono (tempo virtual) concluido.")
-        print(f"Perda final do modelo global: {loss:.4f}")
-        print(f"Acuracia final do modelo global: {accuracy:.4f}")
+        print(f"Perda final do modelo global: {result['loss']:.4f}")
+        print(f"Acuracia final do modelo global: {result['accuracy']:.4f}")
         print(
-            f"Tempo virtual total: {self.virtual_time:.1f}s | "
+            f"Tempo virtual total: {final_timestamp:.1f}s | "
             f"Wall-clock real: {wall_clock:.1f}s"
         )
         return self.accuracy_history

@@ -1,0 +1,501 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{parskip}
+\usepackage{xcolor}
+\usepackage{multirow}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{6pt}
+
+\graphicspath{{../output/drift/}}
+
+\title{\large\textbf{FL Síncrono vs.\ Assíncrono sob Drift Temporal Sazonal}}
+\author{Júlio}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+Este relatório compara o desempenho dos modos síncrono (FedAvg) e assíncrono
+(on-the-fly) no dataset CIFAR-10 com drift temporal sazonal --- cenário em que
+a distribuição de dados alterna entre grupos de classes ao longo do tempo
+virtual. O objetivo é investigar como a duração de cada fase ($T_{\text{drift}}$)
+afeta o \textit{trade-off} entre plasticidade (aprender o novo) e estabilidade
+(reter o aprendido) nos dois modos.
+
+% ============================================================================
+\section{Configuração Experimental}
+
+\subsection{Protocolo de Drift}
+
+O CIFAR-10 foi particionado em dois grupos disjuntos de classes:
+
+\begin{itemize}
+    \item \textbf{Grupo A}: classes 0--4
+    \item \textbf{Grupo B}: classes 5--9
+\end{itemize}
+
+Cada fase expõe os clientes exclusivamente a um dos grupos (protocolo 100/0),
+alternando entre A e B a cada $T_{\text{drift}}$ segundos de tempo virtual:
+
+\[
+\text{Fase 1 (A)} \to \text{Fase 2 (B)} \to \text{Fase 3 (A)} \to \dots
+\]
+
+O teste é sempre o conjunto completo de 10 classes, permitindo medir
+simultaneamente a acurácia no grupo ativo e o esquecimento no grupo inativo.
+
+\subsection{Valores de $T_{\text{drift}}$}
+
+Foram testados 9 valores cobrindo o espectro de durações:
+
+\begin{table}[H]
+\centering
+\caption{Valores de $T_{\text{drift}}$ testados.}
+\label{tab:T_values}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{cccc}
+\toprule
+$T_{\text{drift}}$ (s) & Fases & Tempo total (s) & Regime \\
+\midrule
+20  & 10 & 200  & Ultra-curto \\
+40  & 10 & 400  & Ultra-curto \\
+80  & 10 & 800  & Curto \\
+100 & 30 & 3\,000 & Curto-médio \\
+200 & 15 & 3\,000 & Médio \\
+300 & 10 & 3\,000 & Médio-longo \\
+400 &  8 & 3\,200 & Longo \\
+500 &  6 & 3\,000 & Longo \\
+1\,000 &  5 & 5\,000 & Muito longo \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Demais Parâmetros}
+
+\begin{table}[H]
+\centering
+\caption{Parâmetros comuns a todos os experimentos de drift.}
+\label{tab:params}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Parâmetro} & \textbf{Síncrono} & \textbf{Assíncrono} \\
+\midrule
+Dataset                        & CIFAR-10          & CIFAR-10 \\
+Distribuição (intra-fase)      & IID               & IID \\
+Número de clientes             & 40                & 40 \\
+Épocas locais                  & 1                 & 1 \\
+\textit{Batch size}            & 32                & 32 \\
+Timeout (percentil)            & P75               & -- \\
+$\alpha_0$                     & --                & $0{,}8$ \\
+$\delta$                       & --                & $0{,}999$ \\
+$\lambda$                      & --                & $0{,}075$ \\
+Avaliação a cada               & 10~s virtuais     & 10~s virtuais \\
+Semente de simulação           & 42                & 42 \\
+Otimizador                     & Adam (reset por fase) & Adam (reset por fase) \\
+\textit{Version} (async)       & --                & Reset por fase \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O otimizador Adam é recriado a cada transição de fase para evitar
+contaminação de momento entre distribuições diferentes. No modo assíncrono, o
+contador de versão do servidor (\texttt{self.version}) também é zerado a cada
+fase, para evitar que $\delta^{v_t}$ reduza o $\gamma_t$ a valores
+desprezíveis ao longo de múltiplas fases.
+
+% ============================================================================
+\section{Métricas Utilizadas}
+
+Além das métricas padrão do projeto, foram adicionadas métricas específicas
+para drift:
+
+\begin{itemize}
+    \item \textbf{max\_acc}: acurácia máxima no teste completo (10 classes).
+    \item \textbf{acc\_final}: acurácia na última avaliação.
+    \item \textbf{sustained\_acc}: média da acurácia ao longo de toda a
+    simulação --- penaliza vales prolongados pós-drift.
+    \item \textbf{loss\_final}: \textit{cross-entropy} na última avaliação.
+    \item \textbf{tail\_std}: desvio-padrão das últimas 10 avaliações
+    (estabilidade).
+    \item \textbf{area\_under}: área integrada sob a curva acurácia $\times$
+    tempo.
+    \item \textbf{max\_acc\_A / max\_acc\_B}: pico de acurácia restrita ao
+    grupo A ou B (plasticidade por grupo).
+    \item \textbf{sustained\_acc\_A / sustained\_acc\_B}: acurácia média por
+    grupo ao longo do tempo.
+    \item \textbf{t\_40 / t\_50}: tempo virtual para atingir 40\% ou 50\% de
+    acurácia no teste completo.
+    \item \textbf{recovery\_t50}: tempo desde o início da fase 2 (grupo B)
+    até o modelo atingir 50\% da acurácia máxima do grupo B naquela fase ---
+    mede velocidade de adaptação ao novo grupo.
+\end{itemize}
+
+% ============================================================================
+\section{Resultados por $T_{\text{drift}}$}
+
+\subsection{Visão Geral}
+
+A Tabela~\ref{tab:all_metrics} consolida as métricas principais para todos os
+9 valores de $T_{\text{drift}}$. A Tabela~\ref{tab:winners} sumariza o
+vencedor por métrica em cada cenário.
+
+\begin{table}[H]
+\centering
+\caption{Métricas comparativas --- Sync vs.\ Async para cada $T_{\text{drift}}$.}
+\label{tab:all_metrics}
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{c|cccccc|cccc}
+\toprule
+\multirow{2}{*}{$T_{\text{drift}}$} &
+  \multicolumn{3}{c}{Sync} &
+  \multicolumn{3}{c|}{Async} &
+  \multirow{2}{*}{\textbf{Vence}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+& max\_acc & sust\_acc & tail\_std & max\_acc & sust\_acc & tail\_std \\
+\midrule
+20   & 0{,}268 & 0{,}210 & 0{,}0334 & 0{,}338 & 0{,}254 & 0{,}0026 & Async \\
+40   & 0{,}321 & 0{,}248 & 0{,}0179 & 0{,}416 & 0{,}329 & 0{,}0008 & Async \\
+80   & 0{,}395 & 0{,}298 & 0{,}0375 & 0{,}520 & 0{,}368 & 0{,}0004 & Async \\
+100  & 0{,}446 & 0{,}362 & 0{,}0223 & 0{,}592 & 0{,}417 & 0{,}0007 & Async \\
+200  & 0{,}449 & 0{,}374 & 0{,}0249 & 0{,}606 & 0{,}422 & 0{,}0004 & Async \\
+300  & 0{,}453 & 0{,}394 & 0{,}0284 & 0{,}559 & 0{,}421 & 0{,}0003 & Async \\
+400  & 0{,}453 & 0{,}389 & 0{,}0276 & 0{,}579 & 0{,}422 & 0{,}0003 & Async \\
+500  & 0{,}458 & 0{,}397 & 0{,}0286 & 0{,}463 & 0{,}412 & 0{,}0002 & Misto \\
+1\,000 & 0{,}455 & 0{,}404 & 0{,}0285 & 0{,}505 & 0{,}412 & 0{,}0001 & Misto \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Vencedor por métrica em cada $T_{\text{drift}}$.
+  S = Sync vence; A = Async vence; $-$ = nenhum atinge.}
+\label{tab:winners}
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{c|cccccccc}
+\toprule
+$T_{\text{drift}}$ & max\_acc & acc\_final & sust\_acc & loss\_final & tail\_std & t\_40 & t\_50 & area \\
+\midrule
+20   & A & A & A & A & A & $-$ & $-$ & A \\
+40   & A & A & A & A & A & A & $-$ & A \\
+80   & A & A & A & S & A & A & A & A \\
+100  & A & A & A & S & A & A & A & A \\
+200  & A & A & A & S & A & A & A & A \\
+300  & A & A & A & S & A & A & A & A \\
+400  & A & A & A & S & A & A & A & A \\
+500  & A & S & A & S & A & A & $-$ & A \\
+1\,000 & A & S & A & S & A & S & A & A \\
+\midrule
+\textbf{Totais} & 0--9 & 2--7 & 0--9 & 7--2 & 0--9 & 1--7 & 0--6 & 0--9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Análise por Grupo de Classes}
+
+A Tabela~\ref{tab:per_group} mostra a acurácia máxima por grupo (A e B) e
+a acurácia sustentada por grupo. Essas métricas revelam a plasticidade
+(capacidade de aprender cada grupo) independentemente do arraste do grupo
+inativo. Valores em negrito indicam o vencedor da métrica naquele
+$T_{\text{drift}}$.
+
+\begin{table}[H]
+\centering
+\caption{Métricas por grupo --- max\_acc e sustained\_acc para os grupos A e B.}
+\label{tab:per_group}
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{c|cccc|cccc}
+\toprule
+\multirow{2}{*}{$T_{\text{drift}}$} &
+  \multicolumn{2}{c}{Sync} &
+  \multicolumn{2}{c|}{Async} &
+  \multicolumn{2}{c}{Sync} &
+  \multicolumn{2}{c}{Async} \\
+& max\_A & max\_B & max\_A & max\_B & sust\_A & sust\_B & sust\_A & sust\_B \\
+\midrule
+20   & 0{,}536 & 0{,}504 & \textbf{0{,}611} & \textbf{0{,}676} & 0{,}203 & 0{,}217 & \textbf{0{,}246} & \textbf{0{,}262} \\
+40   & 0{,}584 & 0{,}642 & \textbf{0{,}727} & \textbf{0{,}832} & 0{,}242 & 0{,}253 & \textbf{0{,}308} & \textbf{0{,}350} \\
+80   & 0{,}695 & 0{,}791 & \textbf{0{,}804} & \textbf{0{,}886} & 0{,}298 & 0{,}299 & \textbf{0{,}350} & \textbf{0{,}387} \\
+100  & 0{,}807 & 0{,}891 & \textbf{0{,}849} & \textbf{0{,}914} & 0{,}343 & 0{,}381 & \textbf{0{,}398} & \textbf{0{,}436} \\
+200  & 0{,}825 & 0{,}897 & \textbf{0{,}849} & \textbf{0{,}919} & 0{,}386 & 0{,}362 & \textbf{0{,}433} & \textbf{0{,}412} \\
+300  & 0{,}831 & 0{,}905 & \textbf{0{,}849} & \textbf{0{,}913} & 0{,}371 & 0{,}417 & \textbf{0{,}402} & \textbf{0{,}440} \\
+400  & 0{,}834 & 0{,}904 & \textbf{0{,}845} & \textbf{0{,}920} & 0{,}368 & 0{,}411 & \textbf{0{,}402} & \textbf{0{,}443} \\
+500  & \textbf{0{,}830} & \textbf{0{,}916} & 0{,}829 & 0{,}904 & 0{,}374 & 0{,}420 & \textbf{0{,}389} & \textbf{0{,}435} \\
+1\,000 & \textbf{0{,}842} & \textbf{0{,}910} & 0{,}830 & 0{,}896 & 0{,}467 & 0{,}340 & \textbf{0{,}477} & \textbf{0{,}348} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Recuperação Pós-Drift}
+
+A Tabela~\ref{tab:recovery} mostra o tempo de recuperação na fase 2 --- o
+intervalo desde o início da fase (transição A $\to$ B) até o modelo atingir
+50\% da acurácia máxima do grupo B naquela fase. Este tempo mede diretamente
+a velocidade de adaptação ao novo grupo após o drift.
+
+\begin{table}[H]
+\centering
+\caption{Tempo de recuperação na fase 2 (recovery\_t50 para grupo B, em segundos).}
+\label{tab:recovery}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{ccc}
+\toprule
+$T_{\text{drift}}$ (s) & Sync (s) & Async (s) \\
+\midrule
+20   & 15{,}7 & 3{,}5 \\
+40   & 15{,}7 & 5{,}9 \\
+80   & 31{,}4 & 6{,}2 \\
+100  & 100{,}0 & 10{,}3 \\
+200  & 157{,}1 & 15{,}1 \\
+300  & 157{,}1 & 13{,}1 \\
+400  & 157{,}1 & 6{,}2 \\
+500  & 157{,}1 & 15{,}1 \\
+1\,000 & 157{,}1 & 15{,}1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O sync precisa de aproximadamente uma rodada de FedAvg ($\approx 15{,}7$~s)
+para $T \leq 40$~s, subindo para 2 rodadas ($\approx 31{,}4$~s) em $T = 80$~s.
+A partir de $T \geq 200$~s, o tempo de recuperação estabiliza em
+$\approx 157{,}1$~s --- correspondente a $\approx 10$ rodadas de FedAvg. O
+assíncrono mantém recuperação consistentemente mais rápida: tipicamente
+$10$--$15$~s para $T \geq 100$~s, com razão de $10{\times}$ a $25{\times}$
+sobre o sync.
+
+% ============================================================================
+\section{Análise Transversal}
+
+\subsection{Como as Métricas Evoluem com $T_{\text{drift}}$}
+
+A Figura~\ref{fig:all_compare} sobrepõe as curvas de acurácia dos modos síncrono
+e assíncrono nos 9 valores de $T_{\text{drift}}$ testados (azul = async,
+laranja = sync). As linhas tracejadas verticais marcam as transições de fase.
+
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{ccc}
+        \includegraphics[width=0.32\textwidth]{T_20/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_40/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_80/drift_compare_overall.png} \\
+        (a) $T = 20$~s & (b) $T = 40$~s & (c) $T = 80$~s \\[6pt]
+        \includegraphics[width=0.32\textwidth]{T_100/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_200/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_300/drift_compare_overall.png} \\
+        (d) $T = 100$~s & (e) $T = 200$~s & (f) $T = 300$~s \\[6pt]
+        \includegraphics[width=0.32\textwidth]{T_400/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_500/drift_compare_overall.png} &
+        \includegraphics[width=0.32\textwidth]{T_1000/drift_compare_overall.png} \\
+        (g) $T = 400$~s & (h) $T = 500$~s & (i) $T = 1\,000$~s \\
+    \end{tabular}
+    \caption{Curvas Sync vs.\ Async para todos os valores de $T_{\text{drift}}$.
+      Linhas tracejadas verticais marcam transições de fase.}
+    \label{fig:all_compare}
+\end{figure}
+
+\subsection{Tendências Principais}
+
+\begin{enumerate}
+    \item \textbf{Acurácia máxima (max\_acc)}: o assíncrono vence em todos os
+    9 cenários. A vantagem é maior em $T$ curto ($+7{,}0$~p.p.\ em $T = 20$)
+    e diminui com $T$ crescente ($+0{,}5$~p.p.\ em $T = 500$). Em
+    $T = 1\,000$, volta a $+5{,}0$~p.p., sugerindo que o sync não atinge
+    saturação completa mesmo com fases de 1\,000~s.
+
+    \item \textbf{Acurácia sustentada (sustained\_acc)}: o assíncrono também
+    vence em todos os cenários. A diferença segue uma tendência geral de
+    queda à medida que $T$ cresce:
+    $+4{,}4 \to 8{,}1 \to 7{,}0 \to 5{,}5 \to 4{,}8$~p.p.\ at\'e
+    $T = 200$, depois oscila em $2{,}7 \to 3{,}3 \to 1{,}5 \to
+    0{,}9$~p.p.\ até $T = 1\,000$. A inversão em $T = 400$ (sync
+    sustained cai de $0{,}394$ para $0{,}389$) sugere que o sincrono
+    não se beneficia linearmente de fases mais longas --- possivelmente
+    porque o n\'umero de fases também muda entre cenários.
+
+    \item \textbf{Estabilidade (tail\_std)}: vitória do assíncrono em todos os
+    cenários --- tipicamente 1--3 ordens de grandeza menor. O sync sofre
+    oscilações significativas ($\sigma \approx 0{,}02$--$0{,}04$) que não
+    diminuem com $T$ crescente.
+
+    \item \textbf{Perda final (loss\_final)}: o síncrono vence em 7 de 9
+    cenários ($T \geq 80$), com perda consistentemente menor, apesar da
+    acurácia inferior.
+
+    \item \textbf{Métricas por grupo}: o assíncrono atinge pico mais alto em
+    ambos os grupos para $T \leq 400$~s. A partir de $T = 500$~s, o síncrono
+    assume a dianteira (ex: max\_B = $0{,}916$ vs.\ $0{,}904$ em $T = 500$;
+    max\_A = $0{,}842$ vs.\ $0{,}830$ em $T = 1\,000$). Com fases mais longas,
+    o FedAvg consegue extrair mais acurácia de cada grupo individualmente.
+
+    \item \textbf{Recuperação}: o assíncrono é consistentemente $10$--$25{\times}$
+    mais rápido que o síncrono para $T \geq 100$~s. O sync estabiliza em
+    $\approx 157$~s (10 rodadas), enquanto o async mantém $\approx 10$--$15$~s
+    independentemente de $T$.
+
+    \item \textbf{Área integrada}: o assíncrono vence em todos os cenários,
+    com diferença que diminui de $+39\%$ em $T = 40$ para $+1\%$ em
+    $T = 1\,000$.
+\end{enumerate}
+
+\subsection{Impacto do Protocolo 100/0 na Acurácia Global}
+
+O protocolo 100/0 impõe uma forte penalidade à acurácia no teste completo de 10
+classes: quando o grupo ativo atinge $\approx 90\%$, o grupo inativo está em
+$\approx 0\%$, o que limitaria a acurácia global a $\approx 45\%$ se não
+houvesse nenhuma sobreposição entre o aprendizado do novo grupo e o
+esquecimento do anterior. O assíncrono registra picos acima de 50\% em alguns
+cenários --- $52{,}0\%$ em $T = 80$~s (aos 722~s), $57{,}9\%$ em
+$T = 400$~s e $50{,}5\%$ em $T = 1\,000$~s --- mas esses momentos são
+pontuais e a acurácia logo recua, consistente com um modelo que ainda não
+retém os dois grupos simultaneamente de forma estável. O síncrono permanece
+abaixo de 50\% em todos os $T$ testados.
+
+Para referência, o cenário estático (sem drift, 5\,000~s) atinge $78{,}0\%$
+(sync) e $74{,}8\%$ (async). O drift reduz o teto em $\approx 33$~p.p.\ para
+ambos os modos.
+
+Parte da vantagem do assíncrono vem da densidade de avaliações, que reflete
+indiretamente a densidade de atualizações. A Tabela~\ref{tab:eval_density}
+mostra que o async produz de $22$ a $89{\times}$ mais pontos de avaliação que
+o sync no mesmo intervalo de tempo virtual.
+
+\begin{table}[H]
+\centering
+\caption{Densidade de avaliações: número de pontos de avaliação por modo.
+  O async tem $\approx 22$--$89{\times}$ mais pontos que o sync.}
+\label{tab:eval_density}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{cccc}
+\toprule
+$T_{\text{drift}}$ (s) & Sync evals & Async evals & Razão \\
+\midrule
+20   & 30   & 650   & $21{,}7{\times}$ \\
+40   & 30   & 1\,360 & $45{,}3{\times}$ \\
+80   & 50   & 2\,750 & $55{,}0{\times}$ \\
+100  & 60   & 2\,130 & $35{,}5{\times}$ \\
+200  & 45   & 2\,130 & $47{,}3{\times}$ \\
+300  & 40   & 2\,130 & $53{,}3{\times}$ \\
+400  & 32   & 2\,280 & $71{,}3{\times}$ \\
+500  & 30   & 2\,130 & $71{,}0{\times}$ \\
+1\,000 & 40   & 3\,565 & $89{,}1{\times}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================================
+\section{Discussão}
+
+\subsection{Hipóteses do Experimento}
+
+O desenho experimental postulou 4 hipóteses. Quatro foram avaliadas neste
+relatório:
+
+\begin{description}
+    \item[H1 -- ``Async tem menor recovery time'':] \textbf{Confirmada.}
+    Para $T \geq 100$~s, o async recupera $\approx 10$--$25{\times}$ mais
+    rápido que o sync após cada drift (Tabela~\ref{tab:recovery}). A
+    plasticidade do assíncrono é consistentemente superior.
+
+    \item[H2 -- ``Com T curto, async domina em sustained accuracy'':]
+    \textbf{Confirmada.} Para $T \leq 400$~s, a vantagem em sustained\_acc é
+    de $2{,}7$--$8{,}1$~p.p.\ a favor do async.
+
+    \item[H3 -- ``Com T longo, sync empata ou supera em sustained accuracy'':]
+    \textbf{Parcialmente confirmada.} Embora a diferença encolha para apenas
+    $0{,}9$~p.p.\ em $T = 1\,000$~s, o async ainda mantém vantagem numérica.
+    A tendência sugere que o ponto de equiparação ocorreria em $T \approx
+    1\,500$--$2\,000$~s, além do maior valor testado. Vale notar que aumentar
+    o número de fases (mantendo $T$ fixo) também poderia ampliar a acurácia
+    sustentada --- o modelo teria mais oportunidades de revisitar cada grupo e
+    consolidar o aprendizado, o que potencialmente beneficiaria mais o sync
+    (que atinge picos mais altos por fase quando tem tempo suficiente).
+
+    \item[H4 -- ``O ponto de equiparação sync/async se desloca para a direita
+    com drift'':] \textbf{Confirmada.} No cenário estático, o sync ultrapassa
+    o async em $\approx 942$~s. Com drift, o sync não ultrapassa o async em
+    sustained\_acc nem em $T = 1\,000$~s --- ou seja, um deslocamento de ao
+    menos $58$~s à direita. Extrapolando a tendência observada nas curvas
+    (Fig.~\ref{fig:all_compare}), o crossover ocorreria acima de $1\,000$~s,
+    mas esse valor não foi testado diretamente.
+\end{description}
+
+\subsection{Resumo Geral}
+
+\begin{table}[H]
+\centering
+\caption{Vitórias por métrica nos 9 cenários de $T_{\text{drift}}$.}
+\label{tab:summary}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Métrica} & \textbf{Sync} & \textbf{Async} \\
+\midrule
+max\_acc             & 0 & 9 \\
+acc\_final           & 2 & 7 \\
+sustained\_acc       & 0 & 9 \\
+loss\_final (menor)  & 7 & 2 \\
+tail\_std (menor)    & 0 & 9 \\
+t\_40 (menor)        & 1 & 7 \\
+t\_50 (menor)        & 0 & 6 \\
+area\_under          & 0 & 9 \\
+\midrule
+\textbf{Total}       & 10 & 58 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O assíncrono domina amplamente em cenários com drift temporal (58--10 no
+agregado). As únicas vitórias do síncrono concentram-se em loss\_final (7 de
+9) e em acc\_final nos $T$ mais longos ($T \geq 500$). O drift penaliza o
+síncrono de forma desproporcional porque:
+\begin{enumerate}
+    \item \textbf{Densidade de atualizações}: o assíncrono produz
+    $22$--$89{\times}$ mais atualizações por unidade de tempo virtual
+    (Tabela~\ref{tab:eval_density}). Cada fase é uma ``corrida'' para aprender
+    o novo grupo --- e o async acumula muito mais passos de gradiente nessa
+    janela.
+    \item \textbf{Agregação adaptativa}: o $\gamma_t$ sensível a
+    \textit{staleness} dá mais peso a atualizações recentes, favorecendo
+    a adaptação quando a distribuição muda.
+    \item \textbf{Reset de versão}: zerar \texttt{self.version} a cada fase
+    rejuvenesce o $\gamma_t$, permitindo que o servidor ``recomece a ouvir''.
+\end{enumerate}
+
+% ============================================================================
+\section{Conclusão}
+
+Sob drift temporal sazonal no CIFAR-10, o FL assíncrono consistentemente
+supera o síncrono em velocidade de adaptação (recovery time $\approx
+10$--$25{\times}$ menor para $T \geq 100$~s), estabilidade (tail\_std ordens
+de grandeza menor) e acurácia sustentada. A vantagem diminui à medida que
+$T_{\text{drift}}$ aumenta --- a diferença em sustained\_acc cai de
+$+4{,}4$~p.p.\ ($T = 20$) para $+0{,}9$~p.p.\ ($T = 1\,000$) --- mas não
+chega a inverter dentro do intervalo testado.
+
+O síncrono só começa a disputar em $T \geq 500$~s, vencendo em acc\_final e
+métricas por grupo. O ponto de equiparação sync/async, que no cenário estático
+ocorria em $\approx 942$~s, se desloca para a direita em ao menos $+58$~s
+sob drift --- e a extrapolação da tendência sugere que o cruzamento ocorreria
+acima de $1\,000$~s. Isso é consistente com a hipótese de que
+mudanças de distribuição penalizam mais o modo síncrono (que acumula menos
+atualizações por fase e sofre oscilações mais severas).
+
+Sendo assim, o modelo assíncrono se mostra superior para cenários de drift temporal em comparação ao modelo síncrono em praticamente todos os cenários.
+\end{document}
