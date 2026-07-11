@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from utils.data_split import split_iid_data
+from utils.data_split import split_iid_data, split_non_iid_data
 
 
 @dataclass
@@ -64,14 +64,15 @@ def filter_by_classes(x, y, active_classes):
     return x[mask], y[mask], np.where(mask)[0]
 
 
-def precompute_phase_indices(y_train, num_clients, schedule):
+def precompute_phase_indices(y_train, num_clients, schedule, is_non_iid=False):
     phase_indices = []
     for phase in range(schedule.num_phases):
         active_classes = schedule.get_active_classes(phase)
         _, y_filtered, original_indices = filter_by_classes(
             np.arange(len(y_train)), y_train, active_classes
         )
-        client_splits = split_iid_data(
+        splitter = split_non_iid_data if is_non_iid else split_iid_data
+        client_splits = splitter(
             (original_indices, y_filtered),
             num_clients,
             len(active_classes),

@@ -199,6 +199,35 @@ def area_under_accuracy_time(entries: list[dict]) -> float:
     return area
 
 
+def compute_downtime(
+    entries: list[dict], acc_threshold: float, *, end_time: float
+) -> float:
+    end_time = float(end_time)
+    if end_time < 0:
+        raise ValueError("end_time must be non-negative")
+
+    sorted_entries = _sort_entries(entries)
+    if not sorted_entries:
+        return 0.0
+    if end_time < float(sorted_entries[-1]["time"]):
+        raise ValueError("end_time must not be before the final measurement")
+
+    downtime = 0.0
+    for previous, current in zip(sorted_entries, sorted_entries[1:]):
+        previous_time = float(previous["time"])
+        current_time = float(current["time"])
+        width = current_time - previous_time
+        if width < 0:
+            raise ValueError("entries must be sorted by non-decreasing time")
+        if float(previous["accuracy"]) < acc_threshold:
+            downtime += width
+
+    final_entry = sorted_entries[-1]
+    if float(final_entry["accuracy"]) < acc_threshold:
+        downtime += end_time - float(final_entry["time"])
+    return float(downtime)
+
+
 def write_csv(rows: list[dict], output_path: Path) -> None:
     fieldnames = _ordered_fieldnames(rows)
     with output_path.open("w", newline="", encoding="utf-8") as file:

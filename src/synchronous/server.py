@@ -39,12 +39,15 @@ class Server:
         self.testing_data = testing_data  # tuple (x_test, y_test)
         self.accuracy_history = []
         self.rng = random.Random(SIMULATION_SEED)
+        self.next_round_index = 0
+        self._clients_are_setup = False
         self.evaluation_frequency = max(1, evaluation_frequency)
         self.group_masks = group_masks
 
     def setup_clients(self):
         for client in self.clients:
             client.setup_client(self.global_model)
+        self._clients_are_setup = True
 
     def aggregate_round(
         self,
@@ -104,6 +107,17 @@ class Server:
         avg_loss = total_loss / total if total > 0 else 0.0
         accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy, self.virtual_time
+
+    def evaluate_dataset(self, testing_data):
+        previous_testing_data = self.testing_data
+        was_training = self.global_model.training
+        try:
+            self.testing_data = testing_data
+            loss, accuracy, _ = self.evaluate()
+            return loss, accuracy
+        finally:
+            self.testing_data = previous_testing_data
+            self.global_model.train(was_training)
 
     def evaluate_per_group(self):
         device = get_device()
@@ -196,32 +210,56 @@ class Server:
             effective_round_duration,
         )
 
+    def run_one_round(self, *, record_default_metrics=False):
+        if not self._clients_are_setup:
+            raise RuntimeError("setup_clients() must be called before running rounds")
+
+        round_index = self.next_round_index
+        started_time = self.virtual_time
+        print(f"\nRodada {round_index + 1}")
+        round_start_weights = get_model_weights(self.global_model)
+        (
+            participating_client_weights,
+            participating_client_sizes,
+            effective_round_duration,
+        ) = self.train_clients(round_index, round_start_weights)
+        self.virtual_time += effective_round_duration
+        aggregated = bool(participating_client_weights)
+        self.aggregate_round(
+            participating_client_weights,
+            participating_client_sizes,
+            round_index,
+            should_record_metrics=record_default_metrics,
+        )
+        self.next_round_index += 1
+        return {
+            "round": round_index + 1,
+            "started_time": started_time,
+            "completed_time": self.virtual_time,
+            "aggregated": aggregated,
+        }
+
+    def run_rounds(self, num_rounds, *, record_default_metrics=False):
+        if num_rounds < 1:
+            raise ValueError("num_rounds must be at least 1")
+        return [
+            self.run_one_round(record_default_metrics=record_default_metrics)
+            for _ in range(num_rounds)
+        ]
+
     def start_training(self, stop_time=None):
         self.start_time = time.time()
         self.virtual_time = 0.0
         self.rng = random.Random(SIMULATION_SEED)
+        self.next_round_index = 0
         for round_index in range(self.total_rounds):
-            print(f"\nRodada {round_index + 1}")
-            round_start_weights = get_model_weights(self.global_model)
-            (
-                participating_client_weights,
-                participating_client_sizes,
-                effective_round_duration,
-            ) = self.train_clients(
-                round_index,
-                round_start_weights,
-            )
-            self.virtual_time += effective_round_duration
             should_record_metrics = (
                 round_index == 0
                 or (round_index + 1) % self.evaluation_frequency == 0
                 or round_index == self.total_rounds - 1
             )
-            self.aggregate_round(
-                participating_client_weights,
-                participating_client_sizes,
-                round_index,
-                should_record_metrics=should_record_metrics,
+            self.run_one_round(
+                record_default_metrics=should_record_metrics,
             )
             if stop_time is not None and self.virtual_time >= stop_time:
                 break
