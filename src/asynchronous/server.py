@@ -31,10 +31,10 @@ class Server:
         decay_of_base_alpha,
         tardiness_sensivity,
         evaluation_frequency=1,
+        group_masks=None,
     ):
         self.clients = clients
         self.number_of_clients = num_clients
-        self.number_of_updates = num_updates
         self.timeout = timeout
         self.local_epochs = local_epochs
         self.batch_size = batch_size
@@ -47,6 +47,7 @@ class Server:
         self.decay_of_base_alpha = decay_of_base_alpha
         self.tardiness_sensitivity = tardiness_sensivity
         self.evaluation_frequency = max(1, evaluation_frequency)
+        self.group_masks = group_masks
 
     def setup_clients(self):
         for client in self.clients:
@@ -66,6 +67,51 @@ class Server:
             * (self.decay_of_base_alpha**self.version)
             * (1 / (1 + self.tardiness_sensitivity * staleness))
         )
+
+    def evaluate_per_group(self):
+        device = get_device()
+        self.global_model.eval()
+        x, y = self.testing_data
+        dataset = TensorDataset(torch.from_numpy(x), torch.from_numpy(y))
+        loader = DataLoader(dataset, batch_size=self.batch_size)
+        criterion = nn.CrossEntropyLoss()
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        per_group_correct = {name: 0 for name in self.group_masks}
+        per_group_total = {name: 0 for name in self.group_masks}
+        with torch.no_grad():
+            for batch_x, batch_y in loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                outputs = self.global_model(batch_x)
+                loss = criterion(outputs, batch_y)
+                total_loss += loss.item() * batch_x.size(0)
+                _, predicted = outputs.max(1)
+                correct += predicted.eq(batch_y).sum().item()
+                total += batch_y.size(0)
+                for group_name, classes in self.group_masks.items():
+                    class_tensor = torch.tensor(classes, device=device)
+                    mask = torch.isin(batch_y, class_tensor)
+                    if mask.any():
+                        per_group_correct[group_name] += (
+                            predicted[mask].eq(batch_y[mask]).sum().item()
+                        )
+                        per_group_total[group_name] += mask.sum().item()
+        avg_loss = total_loss / total if total > 0 else 0.0
+        accuracy = correct / total if total > 0 else 0.0
+        result = {
+            "loss": avg_loss,
+            "accuracy": accuracy,
+        }
+        for group_name in self.group_masks:
+            gt = per_group_total[group_name]
+            result[f"accuracy_{group_name}"] = (
+                per_group_correct[group_name] / gt if gt > 0 else 0.0
+            )
+        return result
+
+    def reset_version(self):
+        self.version = 0
 
     def _sample_round_duration(self, client, rng):
         connection = rng.uniform(MIN_CONNECTION_TIME, MAX_CONNECTION_TIME)
@@ -95,12 +141,14 @@ class Server:
         accuracy = correct / total if total > 0 else 0.0
         return avg_loss, accuracy
 
-    def start_training(self):
+    def start_training(self, stop_time=None):
         """Simulacao por eventos discretos: cada update do cliente eh um
         evento agendado em tempo virtual. O heap garante processamento em
         ordem cronologica (sem threads, sem sleeps, sem lock)."""
         self.start_time = time.time()
         rng = random.Random(SIMULATION_SEED)
+
+        effective_timeout = stop_time if stop_time is not None else self.timeout
 
         pq = []
         seq = 0
@@ -118,8 +166,8 @@ class Server:
             finish_time, _, client_idx, base_version, base_weights = heapq.heappop(pq)
             client = self.clients[client_idx]
 
-            if finish_time > self.timeout:
-                final_virtual_time = self.timeout
+            if finish_time > effective_timeout:
+                final_virtual_time = effective_timeout
                 late_ids = [client.client_id]
                 late_ids.extend(
                     self.clients[c_idx].client_id for _, _, c_idx, _, _ in pq
@@ -143,7 +191,12 @@ class Server:
             )
 
             if should_eval:
-                loss, accuracy = self.evaluate()
+                if self.group_masks:
+                    result = self.evaluate_per_group()
+                    loss = result["loss"]
+                    accuracy = result["accuracy"]
+                else:
+                    loss, accuracy = self.evaluate()
                 last_loss = loss
                 last_accuracy = accuracy
             else:
@@ -151,11 +204,16 @@ class Server:
                 loss = last_loss
 
             if should_eval:
-                self.accuracy_history.append((loss, accuracy, finish_time))
+                if self.group_masks:
+                    result["time"] = finish_time
+                    self.accuracy_history.append(result)
+                else:
+                    self.accuracy_history.append(
+                        {"loss": loss, "accuracy": accuracy, "time": finish_time}
+                    )
 
             staleness = self.version - base_version
             self.version += 1
-            client.completed_updates += 1
 
             if should_eval:
                 print(
@@ -166,30 +224,35 @@ class Server:
 
             final_virtual_time = finish_time
 
-            if client.completed_updates < self.number_of_updates:
-                next_duration = self._sample_round_duration(client, rng)
-                heapq.heappush(
-                    pq,
-                    (
-                        finish_time + next_duration,
-                        seq,
-                        client_idx,
-                        self.version,
-                        get_model_weights(self.global_model),
-                    ),
-                )
-                seq += 1
+            next_duration = self._sample_round_duration(client, rng)
+            heapq.heappush(
+                pq,
+                (
+                    finish_time + next_duration,
+                    seq,
+                    client_idx,
+                    self.version,
+                    get_model_weights(self.global_model),
+                ),
+            )
+            seq += 1
 
-        loss, accuracy = self.evaluate()
-        if (
-            not self.accuracy_history
-            or self.accuracy_history[-1][2] != final_virtual_time
-        ):
-            self.accuracy_history.append((loss, accuracy, final_virtual_time))
+        final_timestamp = stop_time if stop_time is not None else final_virtual_time
+        if self.group_masks:
+            result = self.evaluate_per_group()
+            result["time"] = final_timestamp
+        else:
+            loss, accuracy = self.evaluate()
+            result = {"loss": loss, "accuracy": accuracy, "time": final_timestamp}
+
+        last_time = self.accuracy_history[-1]["time"] if self.accuracy_history else None
+        if last_time is None or last_time != final_timestamp:
+            self.accuracy_history.append(result)
+
         wall_clock = time.time() - self.start_time
         print("Treinamento federado assíncrono (DES) concluído.")
-        print(f"Perda final do modelo global: {loss:.4f}")
-        print(f"Acurácia final do modelo global: {accuracy:.4f}")
+        print(f"Perda final do modelo global: {result['loss']:.4f}")
+        print(f"Acurácia final do modelo global: {result['accuracy']:.4f}")
         print(
             f"Wall-clock real: {wall_clock:.1f}s | Total de agregacoes: {self.version}"
         )

@@ -10,18 +10,25 @@ class Client:
         self.client_id = client_id
         self.train_time_range = train_time_range
         self.speed_tier_name = speed_tier_name
+        self.detector = None
 
-    def setup_client(self, model):
-        from utils.models import get_device, get_model_weights, set_model_weights
-
-        self.local_model = type(model)().to(get_device())
-        set_model_weights(self.local_model, get_model_weights(model))
+    def _create_optimizer(self):
         self.optimizer = torch.optim.Adam(
             self.local_model.parameters(),
             lr=0.001,
             betas=(0.9, 0.999),
             eps=1e-7,
         )
+
+    def setup_client(self, model):
+        from utils.models import get_device, get_model_weights, set_model_weights
+
+        self.local_model = type(model)().to(get_device())
+        set_model_weights(self.local_model, get_model_weights(model))
+        self._create_optimizer()
+
+    def reset_optimizer(self):
+        self._create_optimizer()
 
     def perform_fit(self, round_start_weights, local_epochs, batch_size):
         from utils.models import get_model_weights, set_model_weights
@@ -60,3 +67,30 @@ class Client:
         from utils.models import get_model_weights
 
         return get_model_weights(self.local_model)
+
+    def infer_with_uncertainty(self, x_batch, T=5):
+        from utils.models import get_device
+
+        device = get_device()
+        x = x_batch.to(device)
+        was_training = self.local_model.training
+        self.local_model.train()
+        try:
+            probs_sum = None
+            with torch.no_grad():
+                for _ in range(T):
+                    logits = self.local_model(x)
+                    probs = torch.softmax(logits, dim=-1)
+                    probs_sum = probs if probs_sum is None else probs_sum + probs
+
+            avg_probs = probs_sum / T
+            pred = avg_probs.argmax(dim=-1)
+
+            if self.detector is not None:
+                drift_flag, score = self.detector.update(x_batch)
+            else:
+                drift_flag, score = False, None
+
+            return pred, drift_flag, score
+        finally:
+            self.local_model.train(was_training)

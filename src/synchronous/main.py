@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import random as _stdlib_random
 import sys
 
 import numpy as np
@@ -25,36 +24,15 @@ from constants import (
 from monte_carlo import get_percentiles_timeout
 from server import Server
 from utils.data_loader import get_dataset_info, load_dataset
-from utils.data_split import split_iid_data, split_non_iid_data
+from utils.experiment_runner import (
+    assign_speed_tiers,
+    prepare_client_data,
+    save_accuracy_json,
+)
 from utils.plot_accuracy import generate_all_plots
 
 np.random.seed(42)
 torch.manual_seed(42)
-
-
-def assign_speed_tiers(num_clients, speed_tier_definitions, seed):
-    """Distribui os clientes nos tiers e embaralha por client_id."""
-    clients_per_tier = []
-    assigned_client_count = 0
-    for tier_index, (_, _, _, tier_proportion) in enumerate(speed_tier_definitions):
-        if tier_index < len(speed_tier_definitions) - 1:
-            tier_client_count = int(round(num_clients * tier_proportion))
-            clients_per_tier.append(tier_client_count)
-            assigned_client_count += tier_client_count
-        else:
-            clients_per_tier.append(num_clients - assigned_client_count)
-
-    speed_tier_assignments = []
-    for (tier_name, min_train_time, max_train_time, _), tier_client_count in zip(
-        speed_tier_definitions, clients_per_tier
-    ):
-        speed_tier_assignments.extend(
-            [(tier_name, min_train_time, max_train_time)] * tier_client_count
-        )
-
-    rng = _stdlib_random.Random(seed)
-    rng.shuffle(speed_tier_assignments)
-    return speed_tier_assignments
 
 
 def main(
@@ -75,16 +53,9 @@ def main(
 
     dataset_info = get_dataset_info(dataset)
     training_data, testing_data = load_dataset(dataset)
-    if is_non_iid:
-        print("Usando dados nao IID")
-        training_data_clients = split_non_iid_data(
-            training_data, num_clients, dataset_info["num_classes"]
-        )
-    else:
-        print("Usando dados IID")
-        training_data_clients = split_iid_data(
-            training_data, num_clients, dataset_info["num_classes"]
-        )
+    training_data_clients = prepare_client_data(
+        training_data, num_clients, dataset_info["num_classes"], is_non_iid
+    )
 
     timeout_by_percentile = get_percentiles_timeout(
         selected_percentiles,
@@ -138,21 +109,12 @@ def main(
         local_history = server.start_training()
         accuracy_history.append(local_history)
 
-    data = {}
-    for run_index, (timeout_label, _) in enumerate(timeout_runs):
-        data[timeout_label] = [
-            {"loss": p[0], "accuracy": p[1], "time": p[2]}
-            for p in accuracy_history[run_index]
-        ]
+    labels = [label for label, _ in timeout_runs]
     distribution_name = "non_iid" if is_non_iid else "iid"
-    output_prefix_suffix = f"_{output_prefix}" if output_prefix else ""
-    accuracy_data_name = f"accuracy_data_{distribution_name}{output_prefix_suffix}.json"
-
-    output_dir = dataset_info["output_dir"]
-    os.makedirs(output_dir, exist_ok=True)
-    with open(f"{output_dir}/{accuracy_data_name}", "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"Dados salvos em {output_dir}/{accuracy_data_name}")
+    save_accuracy_json(
+        accuracy_history, labels, dataset_info["output_dir"],
+        distribution_name, output_prefix
+    )
 
     if not output_prefix:
         generate_all_plots(

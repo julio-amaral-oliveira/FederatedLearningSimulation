@@ -1,12 +1,30 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def _resolve_device():
+    """Resolve the best available PyTorch device.
+
+    Order of preference: CUDA > MPS (Apple Silicon) > CPU.  The choice can be
+    overridden with the ``FLS_DEVICE`` environment variable (e.g.
+    ``FLS_DEVICE=cpu``) for reproducible/debug runs or to work around MPS
+    ops that are not yet implemented.
+    """
+    forced = os.environ.get("FLS_DEVICE")
+    if forced:
+        return torch.device(forced)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def get_device():
-    return DEVICE
+    return _resolve_device()
 
 
 def get_model_weights(model):
@@ -170,5 +188,5 @@ def get_model(model_name) -> nn.Module:
         )
     model = options[model_name]()
     _apply_keras_style_initialization(model)
-    model.to(DEVICE)
+    model.to(get_device())
     return model

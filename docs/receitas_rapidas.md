@@ -65,6 +65,30 @@ python src/asynchronous/main.py --dataset cifar10 --non-iid --stop-on-stability 
 python src/asynchronous/main.py --dataset cifar10 --iid --target-accuracy 0.70 --output-prefix target_70
 ```
 
+## Temporal Drift
+
+Experimento de concept drift: a cada `T_drift` segundos virtuais, as classes
+ativas alternam entre Grupo A (0-4) e Grupo B (5-9). O modelo precisa
+reaprender o grupo ativo a cada fase.
+
+```bash
+# Fase longa: 200s por fase, 15 fases (3000s total)
+python experiments/temporal_drift.py --mode both --T-drift 200 --num-phases 15 --eval-every 10
+
+# Fases curtas variadas: 3 cenarios com T=10,40,70, 10 fases cada
+python experiments/temporal_drift.py --mode both --T-drift "10,40,70" --num-phases "10,10,10" --eval-every 10
+```
+
+### Gerar graficos do drift
+
+```bash
+# Um cenario (single)
+python experiments/plot_drift.py --mode single --json output-cifar-10/accuracy_data_iid_T200_sync.json --target-accuracy 0.50,0.60
+
+# Comparacao sync vs async
+python experiments/plot_drift.py --mode compare --sync-json output-cifar-10/accuracy_data_iid_T200_sync.json --async-json output-cifar-10/accuracy_data_iid_T200_async.json --target-accuracy 0.50,0.60 --title "Sync vs Async T=200"
+```
+
 ## Estudo de ablacao
 
 ```bash
