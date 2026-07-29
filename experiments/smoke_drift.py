@@ -54,6 +54,7 @@ class DriftEpisodeConfig:
     seed: int = 42
     output_dir: str = "output/cifar-10/drift-agent"
     baseline: bool = False
+    production_horizon_seconds: float | None = None
     end_time_seconds: float | None = None
 
 
@@ -150,6 +151,7 @@ def _new_result(config: DriftEpisodeConfig) -> dict:
             "end_time_seconds": None,
             "retrain_rounds_configured": config.retrain_rounds,
             "monitor_tick_seconds": config.monitor_tick_seconds,
+            "production_horizon_seconds": config.production_horizon_seconds,
         },
         "corrupted_accuracy_history": [],
         "clean_evaluations": [],
@@ -160,7 +162,8 @@ def _new_result(config: DriftEpisodeConfig) -> dict:
         "metrics": {
             "downtime_seconds": 0.0,
             "detection_delay_seconds": None,
-            "recovery_duration_seconds": None,
+            "retraining_duration_seconds": None,
+            "time_to_recovery_seconds": None,
         },
     }
 
@@ -331,9 +334,20 @@ def _finish_result(result: dict, server, clean_test, config: DriftEpisodeConfig)
         result["metrics"]["detection_delay_seconds"] = (
             decision_time - float(result["metadata"]["production_start_time"])
         )
-        result["metrics"]["recovery_duration_seconds"] = (
+        result["metrics"]["retraining_duration_seconds"] = (
             float(result["retrain_round_events"][-1]["completed_time"]) - decision_time
         )
+        recovery_time = next(
+            (
+                float(entry["time"])
+                for entry in result["corrupted_accuracy_history"]
+                if float(entry["time"]) > decision_time
+                and float(entry["accuracy"]) >= config.tau
+            ),
+            None,
+        )
+        if recovery_time is not None:
+            result["metrics"]["time_to_recovery_seconds"] = recovery_time - decision_time
     del result["_monitor"]
     del result["_corrupted_test"]
     return result
@@ -358,6 +372,11 @@ def run_drift_episode(
         raise ValueError("warmup_ticks must be at least 20 for ADWIN")
     if config.monitor_tick_seconds <= 0:
         raise ValueError("monitor_tick_seconds must be positive")
+    if (
+        config.production_horizon_seconds is not None
+        and config.production_horizon_seconds <= 0
+    ):
+        raise ValueError("production_horizon_seconds must be positive")
 
     server = server or _build_server(config)
     monitor = monitor or _make_monitor(server, config)
@@ -395,7 +414,11 @@ def run_drift_episode(
 
     tick = 0
     retrained = False
-    target_time = config.end_time_seconds
+    target_time = (
+        production_start + config.production_horizon_seconds
+        if config.production_horizon_seconds is not None
+        else config.end_time_seconds
+    )
     while True:
         if target_time is None:
             if tick >= config.monitor_ticks or retrained:
@@ -417,7 +440,7 @@ def run_drift_episode(
         )
         _record_evaluation(result["corrupted_accuracy_history"], server, corrupted_test, "monitor_tick")
         tick += 1
-        if outcome.should_retrain and not config.baseline:
+        if outcome.should_retrain and not config.baseline and not retrained:
             _run_retraining(
                 result,
                 server,

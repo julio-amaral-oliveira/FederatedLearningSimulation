@@ -36,6 +36,7 @@ class _FakeServer:
         round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0),
         rng_seed=123,
         global_model=None,
+        evaluation_accuracies=None,
     ):
         self.clients = [_FakeClient(0), _FakeClient(1), _FakeClient(2)]
         self.testing_data = (
@@ -49,6 +50,8 @@ class _FakeServer:
         self.run_round_calls = []
         self.run_one_round_calls = 0
         self.evaluation_states = []
+        self.evaluation_accuracies = iter(evaluation_accuracies or [0.25])
+        self.last_evaluation_accuracy = 0.25
         if global_model is not None:
             self.global_model = global_model
 
@@ -78,7 +81,10 @@ class _FakeServer:
                 "rng_state": self.rng.getstate(),
             }
         )
-        return 0.25, 0.25
+        self.last_evaluation_accuracy = next(
+            self.evaluation_accuracies, self.last_evaluation_accuracy
+        )
+        return 1.0 - self.last_evaluation_accuracy, self.last_evaluation_accuracy
 
 
 class _ScriptedMonitor:
@@ -192,6 +198,75 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(server.run_one_round_calls, 6)
         self.assertEqual(len(result["retrain_decisions"]), 1)
         self.assertEqual(len(result["retrain_round_events"]), 5)
+
+    def test_fixed_production_horizon_continues_after_retraining_and_reports_distinct_recovery_metrics(self):
+        config = _config(production_horizon_seconds=100.0)
+        server = _FakeServer(
+            round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0),
+            evaluation_accuracies=[
+                0.9,  # pre-drift clean evaluation
+                0.2,  # drift onset
+                0.2, 0.2, 0.2,  # monitor ticks before decision
+                0.2, 0.2, 0.2, 0.2, 0.4,  # five retraining rounds
+                0.6, 0.6, 0.6, 0.6,  # production ticks after retraining
+                0.6, 0.9,  # episode end and final clean evaluation
+            ],
+        )
+
+        agent = run_drift_episode(
+            config,
+            server=server,
+            monitor=_ScriptedMonitor([False, False, True]),
+            corruption_fn=_identity,
+        )
+        baseline = run_drift_episode(
+            _config(baseline=True, production_horizon_seconds=100.0),
+            server=_FakeServer(),
+            monitor=_ScriptedMonitor([False, False, True]),
+            corruption_fn=_identity,
+        )
+
+        decision_time = agent["retrain_decisions"][0]["time"]
+        last_round_end = agent["retrain_round_events"][-1]["completed_time"]
+        first_recovery_time = 81.0
+        self.assertEqual(
+            agent["metadata"]["end_time_seconds"],
+            agent["metadata"]["production_start_time"] + config.production_horizon_seconds,
+        )
+        self.assertEqual(
+            agent["metadata"]["end_time_seconds"],
+            baseline["metadata"]["end_time_seconds"],
+        )
+        self.assertEqual(
+            agent["metrics"]["time_to_recovery_seconds"],
+            first_recovery_time - decision_time,
+        )
+        self.assertEqual(
+            agent["metrics"]["retraining_duration_seconds"],
+            last_round_end - decision_time,
+        )
+        self.assertNotIn("recovery_duration_seconds", agent["metrics"])
+
+    def test_time_to_recovery_is_none_without_a_post_decision_accuracy_at_tau(self):
+        result = run_drift_episode(
+            _config(production_horizon_seconds=100.0),
+            server=_FakeServer(
+                evaluation_accuracies=[0.2] * 20,
+            ),
+            monitor=_ScriptedMonitor([False, False, True]),
+            corruption_fn=_identity,
+        )
+
+        self.assertIsNone(result["metrics"]["time_to_recovery_seconds"])
+
+    def test_non_positive_production_horizon_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "production_horizon_seconds must be positive"):
+            run_drift_episode(
+                _config(production_horizon_seconds=0.0),
+                server=_FakeServer(),
+                monitor=_ScriptedMonitor([]),
+                corruption_fn=_identity,
+            )
 
     def test_baseline_uses_the_given_horizon_without_retraining(self):
         agent = run_drift_episode(
