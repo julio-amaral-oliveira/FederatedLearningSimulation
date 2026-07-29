@@ -239,6 +239,44 @@ def _make_monitor(server, config: DriftEpisodeConfig):
     )
 
 
+def _mps_rng_api():
+    backend = getattr(torch.backends, "mps", None)
+    mps = getattr(torch, "mps", None)
+    if (
+        backend is not None
+        and backend.is_available()
+        and mps is not None
+        and hasattr(mps, "get_rng_state")
+        and hasattr(mps, "set_rng_state")
+    ):
+        return mps
+    return None
+
+
+def capture_random_state() -> dict:
+    """Capture every active random generator used by a paired episode."""
+    mps = _mps_rng_api()
+    return {
+        "python": random.getstate(),
+        "numpy": np.random.get_state(),
+        "torch_cpu": torch.get_rng_state(),
+        "torch_cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+        "torch_mps": mps.get_rng_state() if mps is not None else None,
+    }
+
+
+def restore_random_state(state: dict) -> None:
+    """Restore a state captured by :func:`capture_random_state`."""
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch_cpu"])
+    if state["torch_cuda"] is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state["torch_cuda"])
+    mps = _mps_rng_api()
+    if state["torch_mps"] is not None and mps is not None:
+        mps.set_rng_state(state["torch_mps"])
+
+
 def _snapshot_clean_checkpoint(server) -> dict:
     """Capture the post-warm-start state used by both comparison arms."""
     checkpoint = {
@@ -246,9 +284,7 @@ def _snapshot_clean_checkpoint(server) -> dict:
         "virtual_time": float(server.virtual_time),
         "next_round_index": getattr(server, "next_round_index", None),
         "server_rng": copy.deepcopy(server.rng.getstate()) if hasattr(server, "rng") else None,
-        "python_rng": random.getstate(),
-        "numpy_rng": np.random.get_state(),
-        "torch_rng": torch.get_rng_state(),
+        "random_state": capture_random_state(),
     }
     if hasattr(server, "global_model"):
         from utils.models import get_model_weights
@@ -266,9 +302,7 @@ def _restore_clean_checkpoint(server, checkpoint: dict) -> None:
         server.next_round_index = checkpoint["next_round_index"]
     if checkpoint["server_rng"] is not None:
         server.rng.setstate(copy.deepcopy(checkpoint["server_rng"]))
-    random.setstate(checkpoint["python_rng"])
-    np.random.set_state(checkpoint["numpy_rng"])
-    torch.set_rng_state(checkpoint["torch_rng"])
+    restore_random_state(checkpoint["random_state"])
     if "global_weights" in checkpoint:
         from utils.models import set_model_weights
 
@@ -286,6 +320,7 @@ def _finish_result(result: dict, server, clean_test, config: DriftEpisodeConfig)
     result["drift_events"] = list(result["_monitor"].drift_events)
     result["retrain_decisions"] = list(result["_monitor"].retrain_decisions)
     result["counterfactual_triggers"] = list(result["_monitor"].counterfactual_triggers)
+    result["tick_history"] = copy.deepcopy(getattr(result["_monitor"], "tick_history", []))
     end_time = float(server.virtual_time)
     result["metadata"]["end_time_seconds"] = end_time
     result["metrics"]["downtime_seconds"] = compute_downtime(

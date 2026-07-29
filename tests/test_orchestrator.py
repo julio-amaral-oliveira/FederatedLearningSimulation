@@ -79,14 +79,54 @@ class TestDriftMonitor(unittest.TestCase):
         self.assertEqual(monitor.retrain_decisions, [])
         self.assertEqual(monitor.counterfactual_triggers, [{"time": 123, "flagged_fraction": 0.30}])
 
+    def test_tick_history_records_each_client_score_and_flag(self):
+        monitor = DriftMonitor(
+            self.model,
+            trigger_threshold=0.50,
+            detectors={
+                "a": _MockDetector(True, 0.2),
+                "b": _MockDetector(False, 0.3),
+                "c": _MockDetector(False, 0.4),
+            },
+        )
+
+        monitor.observe_tick(
+            {"a": torch.ones(1, 4), "b": torch.ones(1, 4), "c": torch.ones(1, 4)},
+            virtual_time=10.0,
+        )
+
+        self.assertEqual(
+            monitor.tick_history[-1],
+            {
+                "time": 10.0,
+                "warmup": False,
+                "clients": {
+                    "a": {"score": 0.2, "flag": True},
+                    "b": {"score": 0.3, "flag": False},
+                    "c": {"score": 0.4, "flag": False},
+                },
+                "flagged_fraction": 1 / 3,
+            },
+        )
+
     def test_warmup_suppresses_false_alarms_without_latching_first_production_action(self):
         monitor = self._monitor({f"client_{i}": i < 3 for i in range(10)})
 
         warmup = monitor.observe_tick(self.batches, virtual_time=1, warmup=True)
+        warmup_trace = monitor.tick_history[-1]
         production = monitor.observe_tick(self.batches, virtual_time=2)
 
         self.assertFalse(warmup.should_retrain)
         self.assertEqual(warmup.flagged_fraction, 0.0)
+        self.assertTrue(warmup_trace["warmup"])
+        self.assertEqual(warmup_trace["flagged_fraction"], 0.0)
+        self.assertEqual(
+            warmup_trace["clients"],
+            {
+                f"client_{i}": {"score": 0.42, "flag": i < 3}
+                for i in range(10)
+            },
+        )
         self.assertEqual(monitor.drift_events[0]["time"], 2)
         self.assertTrue(production.should_retrain)
         self.assertEqual(monitor.retrain_decisions[0]["time"], 2)

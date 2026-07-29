@@ -4,13 +4,17 @@ from types import SimpleNamespace
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 from experiments.comparison_core import compute_downtime
 from experiments.smoke_drift import (
     DriftEpisodeConfig,
+    capture_random_state,
+    restore_random_state,
     run_drift_comparison,
     run_drift_episode,
 )
+from src.orchestrator.orchestrator import DriftMonitor
 
 
 class _FakeClient:
@@ -27,7 +31,12 @@ class _FakeClient:
 
 
 class _FakeServer:
-    def __init__(self, round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0), rng_seed=123):
+    def __init__(
+        self,
+        round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0),
+        rng_seed=123,
+        global_model=None,
+    ):
         self.clients = [_FakeClient(0), _FakeClient(1), _FakeClient(2)]
         self.testing_data = (
             np.zeros((6, 1, 2, 2), dtype=np.float32),
@@ -40,6 +49,8 @@ class _FakeServer:
         self.run_round_calls = []
         self.run_one_round_calls = 0
         self.evaluation_states = []
+        if global_model is not None:
+            self.global_model = global_model
 
     def run_rounds(self, count, *, record_default_metrics=False):
         self.run_round_calls.append(count)
@@ -134,7 +145,41 @@ def _identity(batch, _kind, _severity, seed=None):
     return batch.clone()
 
 
+class _DropoutTraceModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dropout = nn.Dropout(p=0.5)
+        self.anchor = nn.Parameter(torch.zeros(()))
+
+    def forward(self, x):
+        dropout_mean = self.dropout(x).mean(dim=(1, 2, 3))
+        uncertain = (dropout_mean > 0.5).float()
+        certainty = 10.0 * (1.0 - uncertain) + self.anchor * 0.0
+        return torch.stack((certainty, -certainty), dim=1)
+
+
 class TestDriftEpisode(unittest.TestCase):
+    def test_dropout_trace_model_logits_depend_on_dropout_output(self):
+        model = _DropoutTraceModel().train()
+        x = torch.ones(4, 1, 2, 2)
+
+        torch.manual_seed(1)
+        first = model(x)
+        torch.manual_seed(2)
+        second = model(x)
+
+        self.assertFalse(torch.equal(first, second))
+
+    def test_restore_random_state_replays_active_dropout_sequence(self):
+        dropout = torch.nn.Dropout(p=0.5).train()
+        state = capture_random_state()
+
+        first = dropout(torch.ones(32))
+        restore_random_state(state)
+        replayed = dropout(torch.ones(32))
+
+        self.assertTrue(torch.equal(first, replayed))
+
     def test_agent_executes_exactly_one_five_round_retraining_block(self):
         server = _FakeServer()
         monitor = _ScriptedMonitor([False, False, True])
@@ -272,6 +317,37 @@ class TestDriftEpisode(unittest.TestCase):
             created_servers[0].round_durations[0],
         )
         self.assertEqual(agent_server.evaluation_states[0]["next_round_index"], 1)
+
+    def test_comparison_replays_real_dropout_detector_trace_until_first_trigger(self):
+        config = _config(monitor_ticks=12, batch_size=4)
+        results = run_drift_comparison(
+            config,
+            corruption_fn=lambda x, *_args, **_kwargs: x + 1,
+            server_factory=lambda: _FakeServer(global_model=_DropoutTraceModel()),
+        )
+
+        self.assertTrue(results["agent"]["retrain_decisions"])
+        self.assertEqual(
+            results["agent"]["tick_history"],
+            results["baseline"]["tick_history"][: len(results["agent"]["tick_history"])],
+        )
+
+    def test_result_tick_history_does_not_alias_monitor_trace(self):
+        server = _FakeServer(global_model=_DropoutTraceModel())
+        monitor = DriftMonitor(server.global_model)
+        result = run_drift_episode(
+            _config(monitor_ticks=1),
+            server=server,
+            monitor=monitor,
+            corruption_fn=lambda x, *_args, **_kwargs: x + 1,
+        )
+
+        result["tick_history"][0]["clients"]["0"]["score"] = -1.0
+
+        self.assertNotEqual(
+            result["tick_history"][0]["clients"]["0"]["score"],
+            monitor.tick_history[0]["clients"]["0"]["score"],
+        )
 
 
 if __name__ == "__main__":

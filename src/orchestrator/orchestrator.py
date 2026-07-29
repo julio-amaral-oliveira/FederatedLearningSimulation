@@ -58,6 +58,7 @@ class DriftMonitor:
         self.drift_events: list[dict[str, float | str]] = []
         self.retrain_decisions: list[dict[str, float]] = []
         self.counterfactual_triggers: list[dict[str, float]] = []
+        self.tick_history: list[dict] = []
 
     def _get_or_create_detector(self, client_id: str) -> _Detector:
         if client_id not in self._detectors:
@@ -82,6 +83,7 @@ class DriftMonitor:
         consuming the monitor's one permitted retraining action.
         """
         flag_map: dict[str, bool] = {}
+        clients: dict[str, dict[str, float | bool]] = {}
         for client_id, x_batch in batches_by_client.items():
             if not isinstance(x_batch, torch.Tensor):
                 raise TypeError("batches_by_client values must be torch.Tensor")
@@ -89,6 +91,7 @@ class DriftMonitor:
                 x_batch
             )
             flag_map[client_id] = bool(drift_flag)
+            clients[client_id] = {"score": float(score), "flag": bool(drift_flag)}
             if drift_flag and not warmup:
                 self.drift_events.append(
                     {
@@ -99,6 +102,14 @@ class DriftMonitor:
                 )
 
         if warmup:
+            self.tick_history.append(
+                {
+                    "time": virtual_time,
+                    "warmup": True,
+                    "clients": clients,
+                    "flagged_fraction": 0.0,
+                }
+            )
             return TickOutcome(
                 should_retrain=False,
                 flagged_fraction=0.0,
@@ -114,6 +125,14 @@ class DriftMonitor:
         }
         client_count = len(batches_by_client)
         flagged_fraction = len(flagged_clients) / client_count if client_count else 0.0
+        self.tick_history.append(
+            {
+                "time": virtual_time,
+                "warmup": False,
+                "clients": clients,
+                "flagged_fraction": flagged_fraction,
+            }
+        )
         trigger = flagged_fraction >= self.trigger_threshold
         should_retrain = trigger and not self._action_latched
 
