@@ -1,13 +1,14 @@
 """Calibrate corruption severities from one clean federated checkpoint."""
 
 import argparse
-import json
 import random
 from pathlib import Path
 from typing import Callable, Iterable
 
 import numpy as np
 import torch
+
+from experiments.result_io import atomic_write_json
 
 
 CORRUPTIONS = ["gaussian_noise", "frosted_glass_blur", "motion_blur", "fog"]
@@ -136,11 +137,8 @@ def calibrate_clean_checkpoint(
 
 def save_calibration(result: dict, output_dir: str) -> str:
     """Persist the complete calibration table and its shared checkpoint ID."""
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    path = output_path / "severity_calibration.json"
-    with path.open("w", encoding="utf-8") as output:
-        json.dump(result, output, indent=2)
+    path = Path(output_dir) / "severity_calibration.json"
+    atomic_write_json(path, result)
     return str(path)
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import statistics
 from collections import Counter, defaultdict
@@ -12,12 +11,11 @@ from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
 from experiments.drift_controls import OracleMonitor, identity_corruption
-from experiments.drift_results import validate_pair
+from experiments.result_io import atomic_write_json, save_validated_pair
 from experiments.smoke_drift import (
     DEFAULT_PRODUCTION_HORIZON_SECONDS,
     DriftEpisodeConfig,
     run_drift_comparison,
-    save_drift_result,
 )
 
 
@@ -103,11 +101,11 @@ def _result_directory(
 
 
 def _write_pair(results: dict[str, dict], output_path: Path) -> tuple[Path, Path]:
-    validate_pair(results["agent"], results["baseline"])
-    output_path.mkdir(parents=True, exist_ok=True)
-    agent_path = Path(save_drift_result(results["agent"], str(output_path), "agent.json"))
-    baseline_path = Path(save_drift_result(results["baseline"], str(output_path), "baseline.json"))
-    return agent_path, baseline_path
+    return save_validated_pair(
+        output_path,
+        results["agent"],
+        results["baseline"],
+    )
 
 
 def run_matrix(
@@ -157,7 +155,7 @@ def run_matrix(
         "agent": aggregate_runs(agent_results),
         "baseline": aggregate_runs(baseline_results),
     }
-    (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    atomic_write_json(root / "summary.json", summary)
     return output_paths
 
 

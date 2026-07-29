@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
-import json
 import os
 import random
 import sys
@@ -626,10 +625,10 @@ def run_drift_comparison(
 
 def save_drift_result(result: dict, output_dir: str, filename: str = "smoke_drift.json") -> str:
     """Persist a complete schema-v3 result only after metrics are computed."""
-    os.makedirs(output_dir, exist_ok=True)
+    from experiments.result_io import atomic_write_json
+
     path = os.path.join(output_dir, filename)
-    with open(path, "w", encoding="utf-8") as output:
-        json.dump(result, output, indent=2)
+    atomic_write_json(path, result)
     return path
 
 
@@ -658,8 +657,15 @@ def main() -> None:
         production_horizon_seconds=args.production_horizon_seconds,
     )
     results = run_drift_comparison(config, corruption_fn=apply_corruption)
-    for name, result in results.items():
-        print(f"{name}: {save_drift_result(result, config.output_dir, f'{name}.json')}")
+    from experiments.result_io import save_validated_pair
+
+    agent_path, baseline_path = save_validated_pair(
+        config.output_dir,
+        results["agent"],
+        results["baseline"],
+    )
+    print(f"agent: {agent_path}")
+    print(f"baseline: {baseline_path}")
 
 
 if __name__ == "__main__":

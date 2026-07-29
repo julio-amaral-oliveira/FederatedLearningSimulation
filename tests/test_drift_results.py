@@ -1,8 +1,10 @@
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from experiments.drift_results import (
     DriftResult,
@@ -10,9 +12,18 @@ from experiments.drift_results import (
     summarize_pair,
     validate_pair,
 )
+from experiments.result_io import (
+    atomic_write_json,
+    load_persisted_pair,
+    save_validated_pair,
+)
 from experiments.plot_smoke_drift import plot_drift_pair
 from experiments.run_smoke_drift import run_matrix
-from experiments.smoke_drift import DriftEpisodeConfig
+from experiments.smoke_drift import (
+    DriftEpisodeConfig,
+    main as smoke_drift_main,
+    save_drift_result,
+)
 
 
 def _trace(time, flagged_fraction):
@@ -515,6 +526,203 @@ class TestDriftPairValidation(unittest.TestCase):
                 )
 
             self.assertEqual(list(Path(directory).rglob("*.json")), [])
+
+
+class TestDriftResultPersistence(unittest.TestCase):
+    def test_atomic_write_failure_preserves_existing_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "result.json"
+            destination.write_text('{"previous": true}', encoding="utf-8")
+
+            with mock.patch(
+                "experiments.result_io.os.fsync",
+                side_effect=OSError("injected write failure"),
+            ):
+                with self.assertRaisesRegex(OSError, "injected write failure"):
+                    atomic_write_json(destination, {"replacement": True})
+
+            self.assertEqual(
+                destination.read_text(encoding="utf-8"),
+                '{"previous": true}',
+            )
+            self.assertEqual(list(Path(directory).glob(".result.json.*.tmp")), [])
+
+    def test_standalone_result_write_failure_preserves_existing_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "smoke_drift.json"
+            destination.write_text('{"previous": true}', encoding="utf-8")
+
+            with mock.patch(
+                "experiments.result_io.os.fsync",
+                side_effect=OSError("injected standalone write failure"),
+            ):
+                with self.assertRaisesRegex(
+                    OSError,
+                    "injected standalone write failure",
+                ):
+                    save_drift_result(_v3_payload(), directory)
+
+            self.assertEqual(
+                destination.read_text(encoding="utf-8"),
+                '{"previous": true}',
+            )
+
+    def test_pair_publication_failure_invalidates_existing_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            save_validated_pair(
+                output_dir,
+                _v3_payload(),
+                _v3_payload(baseline=True),
+            )
+            real_replace = __import__("os").replace
+
+            def fail_baseline_publication(source, destination):
+                if Path(destination).name == "baseline.json":
+                    raise OSError("injected baseline publication failure")
+                return real_replace(source, destination)
+
+            with mock.patch(
+                "experiments.result_io.os.replace",
+                side_effect=fail_baseline_publication,
+            ):
+                with self.assertRaisesRegex(
+                    OSError,
+                    "injected baseline publication failure",
+                ):
+                    save_validated_pair(
+                        output_dir,
+                        _v3_payload(),
+                        _v3_payload(baseline=True),
+                    )
+
+            self.assertFalse((output_dir / "pair-manifest.json").exists())
+            with self.assertRaisesRegex(ValueError, "manifest"):
+                load_persisted_pair(output_dir)
+
+    def test_pair_manifest_is_last_and_detects_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            published = []
+            real_replace = __import__("os").replace
+
+            def record_publication(source, destination):
+                published.append(Path(destination).name)
+                return real_replace(source, destination)
+
+            with mock.patch(
+                "experiments.result_io.os.replace",
+                side_effect=record_publication,
+            ):
+                agent_path, baseline_path = save_validated_pair(
+                    output_dir,
+                    _v3_payload(),
+                    _v3_payload(baseline=True),
+                )
+
+            self.assertEqual(agent_path.name, "agent.json")
+            self.assertEqual(baseline_path.name, "baseline.json")
+            self.assertEqual(published[-1], "pair-manifest.json")
+            manifest = json.loads(
+                (output_dir / "pair-manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["schema_version"], 1)
+            self.assertTrue(manifest["generation_id"])
+            self.assertEqual(
+                manifest["artifacts"]["agent"]["sha256"],
+                hashlib.sha256(agent_path.read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                manifest["artifacts"]["baseline"]["sha256"],
+                hashlib.sha256(baseline_path.read_bytes()).hexdigest(),
+            )
+            agent, baseline = load_persisted_pair(output_dir)
+            self.assertFalse(agent.metadata["baseline"])
+            self.assertTrue(baseline.metadata["baseline"])
+
+            agent_path.write_bytes(agent_path.read_bytes() + b"\n")
+
+            with self.assertRaisesRegex(ValueError, "digest"):
+                load_persisted_pair(output_dir)
+
+    def test_matrix_runner_publishes_canonical_manifested_pairs(self):
+        def runner(_config, **_kwargs):
+            return {
+                "agent": _v3_payload(),
+                "baseline": _v3_payload(baseline=True),
+            }
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = run_matrix(
+                [DriftEpisodeConfig(corruption="gaussian_noise", severity=3)],
+                output_dir=directory,
+                runner=runner,
+                corruption_fn=lambda value, *_args, **_kwargs: value,
+            )
+            pair_directory = paths[0][0].parent
+
+            self.assertEqual(paths[0][0].name, "agent.json")
+            self.assertEqual(paths[0][1].name, "baseline.json")
+            self.assertTrue((pair_directory / "pair-manifest.json").is_file())
+            load_persisted_pair(pair_directory)
+
+    def test_single_run_cli_publishes_one_manifested_pair(self):
+        results = {
+            "agent": _v3_payload(),
+            "baseline": _v3_payload(baseline=True),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with (
+                mock.patch(
+                    "experiments.smoke_drift.run_drift_comparison",
+                    return_value=results,
+                ),
+                mock.patch(
+                    "sys.argv",
+                    ["smoke_drift", "--output-dir", directory],
+                ),
+            ):
+                smoke_drift_main()
+
+            self.assertTrue((Path(directory) / "pair-manifest.json").is_file())
+            load_persisted_pair(directory)
+
+    def test_summary_write_failure_preserves_existing_destination(self):
+        def runner(_config, **_kwargs):
+            return {
+                "agent": _v3_payload(),
+                "baseline": _v3_payload(baseline=True),
+            }
+
+        with tempfile.TemporaryDirectory() as directory:
+            summary_path = Path(directory) / "summary.json"
+            summary_path.write_text('{"previous": true}', encoding="utf-8")
+            real_replace = __import__("os").replace
+
+            def fail_summary_publication(source, destination):
+                if Path(destination).name == "summary.json":
+                    raise OSError("injected summary publication failure")
+                return real_replace(source, destination)
+
+            with mock.patch(
+                "experiments.result_io.os.replace",
+                side_effect=fail_summary_publication,
+            ):
+                with self.assertRaisesRegex(
+                    OSError,
+                    "injected summary publication failure",
+                ):
+                    run_matrix(
+                        [DriftEpisodeConfig(corruption="gaussian_noise", severity=3)],
+                        output_dir=directory,
+                        runner=runner,
+                        corruption_fn=lambda value, *_args, **_kwargs: value,
+                    )
+
+            self.assertEqual(
+                summary_path.read_text(encoding="utf-8"),
+                '{"previous": true}',
+            )
 
 
 class TestDriftPlot(unittest.TestCase):

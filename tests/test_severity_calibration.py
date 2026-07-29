@@ -1,14 +1,36 @@
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 import torch
 
-from experiments.severity_calibration import calibrate_severities
+from experiments.severity_calibration import calibrate_severities, save_calibration
 
 
 class TestCalibrateSeverities(unittest.TestCase):
+    def test_calibration_write_failure_preserves_existing_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "severity_calibration.json"
+            destination.write_text('{"previous": true}', encoding="utf-8")
+
+            with patch(
+                "experiments.result_io.os.fsync",
+                side_effect=OSError("injected calibration write failure"),
+            ):
+                with self.assertRaisesRegex(
+                    OSError,
+                    "injected calibration write failure",
+                ):
+                    save_calibration({"replacement": True}, directory)
+
+            self.assertEqual(
+                destination.read_text(encoding="utf-8"),
+                '{"previous": true}',
+            )
+
     def test_materializes_iterables_to_keep_the_cartesian_product_complete(self):
         result = calibrate_severities(
             iter(["noise", "fog"]),
