@@ -80,6 +80,50 @@ def _identity_corruption(batch, _kind, _severity, *, seed):
 
 
 class TestDriftWorkflowEndToEndSmoke(unittest.TestCase):
+    def test_matrix_control_uses_identity_zero_and_persists_a_schema_v3_pair(self):
+        config = DriftEpisodeConfig(
+            dataset="e2e-smoke",
+            num_clients=1,
+            initial_rounds=1,
+            retrain_rounds=1,
+            warmup_ticks=20,
+            monitor_tick_seconds=1.0,
+            monitor_ticks=1,
+            batch_size=1,
+            corruption="gaussian_noise",
+            severity=1,
+            seed=17,
+            production_horizon_seconds=1.0,
+        )
+
+        def runner(run_config, *, corruption_fn, **_kwargs):
+            return run_drift_comparison(
+                run_config,
+                corruption_fn=corruption_fn,
+                server_factory=_SmokeServer,
+                monitor_factory=lambda _server, _baseline: _SmokeMonitor(),
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = run_matrix(
+                [config],
+                output_dir=directory,
+                runner=runner,
+                corruption_fn=_identity_corruption,
+                include_controls=True,
+            )
+            identity_pair = next(
+                pair for pair in paths if pair[0].parent.parent.name == "identity_sev0"
+            )
+
+            agent, baseline = load_persisted_pair(identity_pair[0].parent)
+
+            self.assertEqual(agent.metadata["corruption"], "identity")
+            self.assertEqual(agent.metadata["severity"], 0)
+            self.assertEqual(baseline.metadata["corruption"], "identity")
+            self.assertEqual(baseline.metadata["severity"], 0)
+            self.assertTrue((identity_pair[0].parent / "pair-manifest.json").is_file())
+
     def test_runs_persists_reloads_summarizes_and_plots_a_schema_v3_pair(self):
         config = DriftEpisodeConfig(
             dataset="e2e-smoke",

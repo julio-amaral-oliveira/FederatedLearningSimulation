@@ -193,6 +193,16 @@ class TestDriftResultLoading(unittest.TestCase):
         self.assertEqual(result.clean_evaluations[-1]["accuracy"], 0.75)
         self.assertEqual(result.metrics["recovery_duration_seconds"], 12.0)
 
+    def test_loads_legacy_v2_identity_severity_zero_without_v3_validation(self):
+        payload = _v2_payload()
+        payload["metadata"].update(corruption="identity", severity=0)
+
+        result = DriftResult.from_payload(payload)
+
+        self.assertEqual(result.schema_version, 2)
+        self.assertEqual(result.metadata["corruption"], "identity")
+        self.assertEqual(result.metadata["severity"], 0)
+
     def test_loads_auditable_v3(self):
         with tempfile.TemporaryDirectory() as directory:
             result = load_drift_result(self._write(directory, _v3_payload()))
@@ -308,6 +318,22 @@ class TestDriftResultLoading(unittest.TestCase):
 
                 with self.assertRaisesRegex(ValueError, field):
                     DriftResult.from_payload(payload)
+
+    def test_v3_allows_only_identity_severity_zero(self):
+        identity = _v3_payload()
+        identity["metadata"].update(corruption="identity", severity=0)
+        identity["experiment_config"].update(corruption="identity", severity=0)
+
+        result = DriftResult.from_payload(identity)
+
+        self.assertEqual(result.metadata["corruption"], "identity")
+        self.assertEqual(result.metadata["severity"], 0)
+
+        invalid_identity = copy.deepcopy(identity)
+        invalid_identity["metadata"]["severity"] = 1
+        invalid_identity["experiment_config"]["severity"] = 1
+        with self.assertRaisesRegex(ValueError, "identity severity"):
+            DriftResult.from_payload(invalid_identity)
 
     def test_v3_requires_non_empty_runtime_identity_strings(self):
         for field in (

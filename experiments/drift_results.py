@@ -148,8 +148,13 @@ def _validate_v3_internal_consistency(payload: dict[str, Any]) -> None:
     if not isinstance(corruption, str) or not corruption.strip():
         raise ValueError("schema v3 corruption must be a non-empty string")
     severity = metadata["severity"]
-    if not _is_integer(severity) or not 1 <= severity <= 5:
-        raise ValueError("schema v3 severity must be an integer in [1, 5]")
+    if corruption == "identity":
+        if not _is_integer(severity) or severity != 0:
+            raise ValueError("schema v3 identity severity must be integer 0")
+    elif not _is_integer(severity) or not 1 <= severity <= 5:
+        raise ValueError(
+            "schema v3 non-identity severity must be an integer in [1, 5]"
+        )
     seed = metadata["seed"]
     if not _is_integer(seed):
         raise ValueError("schema v3 seed must be an integer")
