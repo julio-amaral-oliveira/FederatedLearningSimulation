@@ -21,6 +21,7 @@ _V3_REQUIRED = (
     "detector_config",
     "runtime",
     "tick_history",
+    "drift_events",
     "retrain_decisions",
     "counterfactual_triggers",
     "retrain_round_events",
@@ -34,6 +35,8 @@ _LIST_FIELDS = (
     "tick_history",
     "retrain_round_events",
 )
+_TIME_REL_TOL = 1e-9
+_TIME_ABS_TOL = 1e-9
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ class DriftResult:
             raise TypeError("drift result payload must be a mapping")
         data = copy.deepcopy(dict(payload))
         schema_version = data.get("schema_version")
-        if schema_version not in (2, 3):
+        if type(schema_version) is not int or schema_version not in (2, 3):
             raise ValueError(
                 f"unsupported drift result schema_version: {schema_version}"
             )
@@ -121,7 +124,17 @@ class DriftResult:
 def _validate_v3_internal_consistency(payload: dict[str, Any]) -> None:
     metadata = payload["metadata"]
     config = payload["experiment_config"]
-    for field in ("dataset", "corruption", "severity", "seed", "tau", "baseline"):
+    detector = payload["detector_config"]
+    runtime = payload["runtime"]
+    for field in (
+        "dataset",
+        "corruption",
+        "severity",
+        "seed",
+        "tau",
+        "baseline",
+        "production_horizon_seconds",
+    ):
         if field not in metadata:
             raise ValueError(f"schema v3 metadata requires {field}")
         if field not in config:
@@ -131,19 +144,265 @@ def _validate_v3_internal_consistency(payload: dict[str, Any]) -> None:
                 f"schema v3 {field} differs between metadata and experiment_config"
             )
 
-    for field in (
-        "production_start_time",
-        "end_time_seconds",
-        "production_horizon_seconds",
-    ):
+    corruption = metadata["corruption"]
+    if not isinstance(corruption, str) or not corruption.strip():
+        raise ValueError("schema v3 corruption must be a non-empty string")
+    severity = metadata["severity"]
+    if not _is_integer(severity) or not 1 <= severity <= 5:
+        raise ValueError("schema v3 severity must be an integer in [1, 5]")
+    seed = metadata["seed"]
+    if not _is_integer(seed):
+        raise ValueError("schema v3 seed must be an integer")
+    tau = metadata["tau"]
+    if not _is_finite_number(tau) or not 0.0 <= float(tau) <= 1.0:
+        raise ValueError("schema v3 tau must be numeric in [0, 1]")
+    if not isinstance(metadata["baseline"], bool):
+        raise ValueError("schema v3 baseline must be a bool")
+
+    for field in ("production_start_time", "end_time_seconds"):
         if field not in metadata:
             raise ValueError(f"schema v3 metadata requires {field}")
-
-    checkpoint = payload["runtime"].get("clean_checkpoint_digest")
-    if not isinstance(checkpoint, str) or not checkpoint:
+        if not _is_finite_number(metadata[field]):
+            raise ValueError(f"schema v3 {field} must be finite")
+    production_start = float(metadata["production_start_time"])
+    end_time = float(metadata["end_time_seconds"])
+    horizon = metadata["production_horizon_seconds"]
+    if not _is_finite_number(horizon) or float(horizon) <= 0.0:
         raise ValueError(
-            "schema v3 runtime requires non-empty clean_checkpoint_digest"
+            "schema v3 production_horizon_seconds must be a positive finite number"
         )
+    if end_time < production_start:
+        raise ValueError(
+            "schema v3 end_time_seconds must not precede production_start_time"
+        )
+    expected_end = production_start + float(horizon)
+    if not math.isclose(
+        end_time,
+        expected_end,
+        rel_tol=_TIME_REL_TOL,
+        abs_tol=_TIME_ABS_TOL,
+    ):
+        raise ValueError(
+            "schema v3 end_time_seconds must equal production_start_time + "
+            "production_horizon_seconds"
+        )
+
+    if "retrain_rounds" not in config or not _is_integer(config["retrain_rounds"]):
+        raise ValueError("schema v3 experiment_config requires integer retrain_rounds")
+    if config["retrain_rounds"] < 1:
+        raise ValueError("schema v3 retrain_rounds must be at least 1")
+
+    _validate_detector_config(detector)
+    _validate_runtime(runtime)
+    _validate_v3_histories(payload, production_start, end_time)
+    _validate_v3_actions(payload, production_start, end_time)
+
+
+def _is_integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_finite_number(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
+
+
+def _validate_detector_config(detector: dict[str, Any]) -> None:
+    required = (
+        "detector_kind",
+        "detector_alpha",
+        "detector_T",
+        "trigger_threshold",
+        "trigger_window_ticks",
+    )
+    for field in required:
+        if field not in detector:
+            raise ValueError(f"schema v3 detector_config requires {field}")
+
+    if detector["detector_kind"] != "udd":
+        raise ValueError("schema v3 detector_kind must be 'udd'")
+    alpha = detector["detector_alpha"]
+    if not _is_finite_number(alpha) or not 0.0 < float(alpha) < 1.0:
+        raise ValueError("schema v3 detector_alpha must be numeric in (0, 1)")
+    mc_passes = detector["detector_T"]
+    if not _is_integer(mc_passes) or mc_passes < 1:
+        raise ValueError("schema v3 detector_T must be an integer >= 1")
+    threshold = detector["trigger_threshold"]
+    if (
+        not _is_finite_number(threshold)
+        or not 0.0 <= float(threshold) <= 1.0
+    ):
+        raise ValueError("schema v3 trigger_threshold must be numeric in [0, 1]")
+    window_ticks = detector["trigger_window_ticks"]
+    if not _is_integer(window_ticks) or window_ticks < 1:
+        raise ValueError("schema v3 trigger_window_ticks must be an integer >= 1")
+
+
+def _validate_runtime(runtime: dict[str, Any]) -> None:
+    for field in (
+        "python_version",
+        "numpy_version",
+        "torch_version",
+        "effective_device",
+        "clean_checkpoint_digest",
+    ):
+        value = runtime.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"schema v3 runtime requires non-empty {field}")
+
+
+def _timestamp(
+    entry: Any,
+    *,
+    field: str,
+    key: str = "time",
+) -> float:
+    if not isinstance(entry, dict):
+        raise ValueError(f"schema v3 {field} entries must be objects")
+    if key not in entry or not _is_finite_number(entry[key]):
+        raise ValueError(f"schema v3 {field} {key} must be finite")
+    return float(entry[key])
+
+
+def _within_interval(value: float, start: float, end: float) -> bool:
+    return start <= value <= end
+
+
+def _validate_timestamped_history(
+    entries: list[Any],
+    *,
+    field: str,
+    start: float,
+    end: float,
+    allow_warmup: bool = False,
+) -> None:
+    previous: float | None = None
+    for entry in entries:
+        timestamp = _timestamp(entry, field=field)
+        if previous is not None and timestamp < previous:
+            raise ValueError(
+                f"schema v3 {field} timestamps must be monotonically non-decreasing"
+            )
+        if allow_warmup and entry.get("warmup") is True:
+            if timestamp > start:
+                raise ValueError(
+                    f"schema v3 {field} warmup timestamps must not follow production start"
+                )
+        elif not _within_interval(timestamp, start, end):
+            raise ValueError(
+                f"schema v3 {field} timestamps must remain within the production interval"
+            )
+        previous = timestamp
+
+
+def _validate_v3_histories(
+    payload: dict[str, Any],
+    production_start: float,
+    end_time: float,
+) -> None:
+    for field in (
+        "corrupted_accuracy_history",
+        "clean_evaluations",
+        "drift_events",
+        "retrain_decisions",
+        "counterfactual_triggers",
+    ):
+        _validate_timestamped_history(
+            payload[field],
+            field=field,
+            start=production_start,
+            end=end_time,
+        )
+    _validate_timestamped_history(
+        payload["tick_history"],
+        field="tick_history",
+        start=production_start,
+        end=end_time,
+        allow_warmup=True,
+    )
+
+
+def _validate_v3_actions(
+    payload: dict[str, Any],
+    production_start: float,
+    end_time: float,
+) -> None:
+    baseline = payload["metadata"]["baseline"]
+    decisions = payload["retrain_decisions"]
+    counterfactuals = payload["counterfactual_triggers"]
+    rounds = payload["retrain_round_events"]
+
+    if baseline:
+        if decisions:
+            raise ValueError("schema v3 baseline must have zero retrain_decisions")
+        if rounds:
+            raise ValueError("schema v3 baseline must have zero retrain_round_events")
+        if len(counterfactuals) > 1:
+            raise ValueError(
+                "schema v3 baseline must have at most one counterfactual trigger"
+            )
+        return
+
+    if counterfactuals:
+        raise ValueError("schema v3 agent cannot contain counterfactual triggers")
+    if len(decisions) > 1:
+        raise ValueError("schema v3 agent must have at most one retrain decision")
+
+    expected_rounds = (
+        payload["experiment_config"]["retrain_rounds"] if decisions else 0
+    )
+    if len(rounds) != expected_rounds:
+        raise ValueError(
+            "schema v3 retrain_round_events count mismatch: "
+            f"expected={expected_rounds}, actual={len(rounds)}"
+        )
+    if not decisions:
+        return
+
+    decision_time = _timestamp(decisions[0], field="retrain_decisions")
+    previous_completed = decision_time
+    previous_round: int | None = None
+    for event in rounds:
+        started = _timestamp(
+            event,
+            field="retrain_round_events",
+            key="started_time",
+        )
+        completed = _timestamp(
+            event,
+            field="retrain_round_events",
+            key="completed_time",
+        )
+        round_number = event.get("round") if isinstance(event, dict) else None
+        if not _is_integer(round_number):
+            raise ValueError(
+                "schema v3 retrain_round_events round must be an integer"
+            )
+        if previous_round is not None and round_number <= previous_round:
+            raise ValueError(
+                "schema v3 retrain_round_events rounds must be strictly ordered"
+            )
+        if started < previous_completed:
+            raise ValueError(
+                "schema v3 retrain_round_events must be ordered after the decision"
+            )
+        if completed < started:
+            raise ValueError(
+                "schema v3 retrain_round_events completed_time must not precede "
+                "started_time"
+            )
+        if (
+            not _within_interval(started, production_start, end_time)
+            or not _within_interval(completed, production_start, end_time)
+        ):
+            raise ValueError(
+                "schema v3 retrain_round_events must remain within the fixed horizon"
+            )
+        previous_completed = completed
+        previous_round = round_number
 
 
 def load_drift_result(path: str | Path) -> DriftResult:

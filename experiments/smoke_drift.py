@@ -162,6 +162,7 @@ def _experiment_config(config: DriftEpisodeConfig) -> dict:
 def _detector_config(config: DriftEpisodeConfig) -> dict:
     """Return the uncertainty detector settings used for this episode."""
     return {
+        "detector_kind": "udd",
         "detector_alpha": config.detector_alpha,
         "detector_T": config.detector_T,
         "trigger_threshold": config.trigger_threshold,

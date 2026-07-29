@@ -53,6 +53,7 @@ def _v3_payload(*, baseline=False):
             "production_horizon_seconds": 40.0,
         },
         "detector_config": {
+            "detector_kind": "udd",
             "detector_alpha": 0.002,
             "detector_T": 5,
             "trigger_threshold": 0.3,
@@ -191,7 +192,16 @@ class TestDriftResultLoading(unittest.TestCase):
         self.assertEqual(result.runtime["clean_checkpoint_digest"], "checkpoint-42")
 
     def test_v3_requires_trace_configs_and_runtime(self):
-        required = ("tick_history", "experiment_config", "detector_config", "runtime")
+        required = (
+            "tick_history",
+            "drift_events",
+            "retrain_decisions",
+            "counterfactual_triggers",
+            "retrain_round_events",
+            "experiment_config",
+            "detector_config",
+            "runtime",
+        )
         for key in required:
             with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
                 payload = _v3_payload()
@@ -201,12 +211,201 @@ class TestDriftResultLoading(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, key):
                     load_drift_result(path)
 
+    def test_v3_rejects_an_overshot_end_time(self):
+        payload = _v3_payload()
+        payload["metadata"]["end_time_seconds"] = 41.0
+
+        with self.assertRaisesRegex(ValueError, "end_time_seconds"):
+            DriftResult.from_payload(payload)
+
+    def test_v3_requires_every_detector_and_runtime_identity_field(self):
+        cases = (
+            ("detector_config", "detector_kind"),
+            ("detector_config", "detector_alpha"),
+            ("detector_config", "detector_T"),
+            ("detector_config", "trigger_threshold"),
+            ("detector_config", "trigger_window_ticks"),
+            ("runtime", "python_version"),
+            ("runtime", "numpy_version"),
+            ("runtime", "torch_version"),
+            ("runtime", "effective_device"),
+        )
+        for section, field in cases:
+            with self.subTest(section=section, field=field):
+                payload = _v3_payload()
+                del payload[section][field]
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_rejects_invalid_detector_values_and_types(self):
+        cases = (
+            ("detector_kind", "other"),
+            ("detector_alpha", 0.0),
+            ("detector_alpha", 1.0),
+            ("detector_alpha", True),
+            ("detector_T", 0),
+            ("detector_T", True),
+            ("trigger_threshold", -0.1),
+            ("trigger_threshold", 1.1),
+            ("trigger_threshold", True),
+            ("trigger_window_ticks", 0),
+            ("trigger_window_ticks", True),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                payload = _v3_payload()
+                payload["detector_config"][field] = value
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_rejects_invalid_experiment_identity_and_horizon_values(self):
+        cases = (
+            ("corruption", ""),
+            ("severity", True),
+            ("severity", 0),
+            ("severity", 6),
+            ("seed", True),
+            ("seed", 42.0),
+            ("tau", True),
+            ("tau", -0.1),
+            ("tau", 1.1),
+            ("baseline", 0),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                payload = _v3_payload()
+                payload["metadata"][field] = value
+                payload["experiment_config"][field] = value
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+        horizon_cases = (
+            ("production_start_time", float("inf")),
+            ("end_time_seconds", float("nan")),
+            ("production_horizon_seconds", 0.0),
+            ("production_horizon_seconds", True),
+        )
+        for field, value in horizon_cases:
+            with self.subTest(field=field, value=value):
+                payload = _v3_payload()
+                payload["metadata"][field] = value
+                if field == "production_horizon_seconds":
+                    payload["experiment_config"][field] = value
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_requires_non_empty_runtime_identity_strings(self):
+        for field in (
+            "python_version",
+            "numpy_version",
+            "torch_version",
+            "effective_device",
+            "clean_checkpoint_digest",
+        ):
+            with self.subTest(field=field):
+                payload = _v3_payload()
+                payload["runtime"][field] = " "
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_rejects_invalid_or_unordered_history_timestamps(self):
+        cases = (
+            (
+                "corrupted_accuracy_history",
+                lambda payload: payload["corrupted_accuracy_history"][1].update(
+                    time=float("nan")
+                ),
+            ),
+            (
+                "clean_evaluations",
+                lambda payload: payload["clean_evaluations"][1].update(time=-1.0),
+            ),
+            (
+                "tick_history",
+                lambda payload: payload["tick_history"][3].update(time=15.0),
+            ),
+            (
+                "drift_events",
+                lambda payload: payload["drift_events"][0].update(time=41.0),
+            ),
+        )
+        for field, mutate in cases:
+            with self.subTest(field=field):
+                payload = _v3_payload()
+                mutate(payload)
+
+                with self.assertRaisesRegex(ValueError, field):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_does_not_apply_horizon_tolerance_to_event_ordering(self):
+        cases = (
+            lambda payload: payload["tick_history"][3].update(
+                time=20.0 - 5e-10
+            ),
+            lambda payload: payload["retrain_round_events"][0].update(
+                started_time=20.0 - 5e-10
+            ),
+            lambda payload: payload["retrain_round_events"][0].update(
+                started_time=25.0,
+                completed_time=25.0 - 5e-10,
+            ),
+        )
+        for mutate in cases:
+            with self.subTest(mutate=mutate):
+                payload = _v3_payload()
+                mutate(payload)
+
+                with self.assertRaisesRegex(
+                    ValueError, "tick_history|retrain_round_events"
+                ):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_rejects_a_baseline_retraining_event_at_construction(self):
+        payload = _v3_payload(baseline=True)
+        payload["retrain_round_events"].append(
+            {
+                "round": 2,
+                "started_time": 20.0,
+                "completed_time": 25.0,
+                "aggregated": True,
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "baseline.*retrain_round_events"):
+            DriftResult.from_payload(payload)
+
+    def test_v3_rejects_an_agent_decision_with_the_wrong_round_count(self):
+        payload = _v3_payload()
+        payload["retrain_round_events"].pop()
+
+        with self.assertRaisesRegex(ValueError, "retrain_round_events.*expected=2"):
+            DriftResult.from_payload(payload)
+
+    def test_v3_rejects_a_round_event_after_the_horizon(self):
+        payload = _v3_payload()
+        payload["retrain_round_events"][-1]["completed_time"] = 41.0
+
+        with self.assertRaisesRegex(ValueError, "retrain_round_events.*horizon"):
+            DriftResult.from_payload(payload)
+
     def test_unknown_schema_fails_clearly(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self._write(directory, {"schema_version": 99})
 
             with self.assertRaisesRegex(ValueError, "unsupported drift result schema_version: 99"):
                 load_drift_result(path)
+
+    def test_v3_schema_version_must_be_the_integer_three(self):
+        payload = _v3_payload()
+        payload["schema_version"] = 3.0
+
+        with self.assertRaisesRegex(ValueError, "schema_version"):
+            DriftResult.from_payload(payload)
 
 
 class TestDriftPairValidation(unittest.TestCase):
@@ -226,8 +425,14 @@ class TestDriftPairValidation(unittest.TestCase):
             "checkpoint": lambda payload: payload["runtime"].update(
                 clean_checkpoint_digest="other"
             ),
-            "production start": lambda payload: payload["metadata"].update(
-                production_start_time=1.0
+            "production start": lambda payload: (
+                payload["metadata"].update(
+                    production_start_time=-1.0,
+                    production_horizon_seconds=41.0,
+                ),
+                payload["experiment_config"].update(
+                    production_horizon_seconds=41.0
+                ),
             ),
             "horizon": lambda payload: (
                 payload["metadata"].update(
@@ -250,6 +455,27 @@ class TestDriftPairValidation(unittest.TestCase):
 
                 with self.assertRaisesRegex(ValueError, message):
                     validate_pair(_v3_payload(), baseline)
+
+    def test_rejects_an_extra_unmatched_counterfactual_trigger(self):
+        baseline = _v3_payload(baseline=True)
+        baseline["counterfactual_triggers"].append(
+            {"time": 30.0, "flagged_fraction": 0.5}
+        )
+
+        with self.assertRaisesRegex(ValueError, "counterfactual"):
+            validate_pair(_v3_payload(), baseline)
+
+    def test_accepts_a_v3_pair_when_the_control_takes_no_action(self):
+        agent = _v3_payload()
+        agent["retrain_decisions"] = []
+        agent["retrain_round_events"] = []
+        baseline = _v3_payload(baseline=True)
+        baseline["counterfactual_triggers"] = []
+
+        validate_pair(agent, baseline)
+        summary = summarize_pair(agent, baseline)
+
+        self.assertTrue(summary["audited_pair"])
 
     def test_accepts_v2_only_as_legacy_unverified_pair(self):
         agent = _v2_payload()

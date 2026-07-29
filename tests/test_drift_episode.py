@@ -248,6 +248,7 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(
             result["detector_config"],
             {
+                "detector_kind": "udd",
                 "detector_alpha": 0.01,
                 "detector_T": 7,
                 "trigger_threshold": 0.4,
@@ -462,7 +463,7 @@ class TestDriftEpisode(unittest.TestCase):
             return server
 
         results = run_drift_comparison(
-            _config(),
+            _config(production_horizon_seconds=400.0),
             corruption_fn=_identity,
             server_factory=server_factory,
             monitor_factory=lambda _server, _baseline: _ScriptedMonitor(
@@ -503,7 +504,11 @@ class TestDriftEpisode(unittest.TestCase):
         )
 
     def test_comparison_replays_real_dropout_detector_trace_until_first_trigger(self):
-        config = _config(monitor_ticks=12, batch_size=4)
+        config = _config(
+            monitor_ticks=12,
+            batch_size=4,
+            production_horizon_seconds=400.0,
+        )
         results = run_drift_comparison(
             config,
             corruption_fn=lambda x, *_args, **_kwargs: x + 1,
@@ -511,9 +516,18 @@ class TestDriftEpisode(unittest.TestCase):
         )
 
         self.assertTrue(results["agent"]["retrain_decisions"])
+        decision_time = results["agent"]["retrain_decisions"][0]["time"]
         self.assertEqual(
-            results["agent"]["tick_history"],
-            results["baseline"]["tick_history"][: len(results["agent"]["tick_history"])],
+            [
+                entry
+                for entry in results["agent"]["tick_history"]
+                if entry["time"] <= decision_time
+            ],
+            [
+                entry
+                for entry in results["baseline"]["tick_history"]
+                if entry["time"] <= decision_time
+            ],
         )
 
     def test_result_tick_history_does_not_alias_monitor_trace(self):
