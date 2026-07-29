@@ -608,6 +608,9 @@ def run_drift_comparison(
         _initial_training_complete=True,
         _clean_checkpoint_digest=checkpoint.get("clean_checkpoint_digest"),
     )
+    from experiments.drift_results import validate_pair
+
+    validate_pair(agent, baseline)
     return {"agent": agent, "baseline": baseline}
 
 

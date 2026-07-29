@@ -79,9 +79,26 @@ class TestDriftRunMatrix(unittest.TestCase):
 
         def runner(config, *, corruption_fn, **kwargs):
             calls.append((config, corruption_fn, kwargs))
+
+            def result(*, baseline, downtime):
+                return {
+                    "schema_version": 2,
+                    "metadata": {
+                        "corruption": config.corruption,
+                        "severity": config.severity,
+                        "seed": config.seed,
+                        "baseline": baseline,
+                        "production_start_time": 0.0,
+                        "end_time_seconds": 10.0,
+                    },
+                    "corrupted_accuracy_history": [],
+                    "clean_evaluations": [],
+                    "metrics": {"downtime_seconds": downtime},
+                }
+
             return {
-                "agent": {"schema_version": 3, "metrics": {"downtime_seconds": 2.0}},
-                "baseline": {"schema_version": 3, "metrics": {"downtime_seconds": 5.0}},
+                "agent": result(baseline=False, downtime=2.0),
+                "baseline": result(baseline=True, downtime=5.0),
             }
 
         with tempfile.TemporaryDirectory() as directory:
@@ -94,8 +111,14 @@ class TestDriftRunMatrix(unittest.TestCase):
             root = Path(directory) / "noise_sev2" / "seed_31"
 
             self.assertEqual(paths, [(root / "agent.json", root / "baseline.json")])
-            self.assertEqual(json.loads((root / "agent.json").read_text()), {"schema_version": 3, "metrics": {"downtime_seconds": 2.0}})
-            self.assertEqual(json.loads((root / "baseline.json").read_text()), {"schema_version": 3, "metrics": {"downtime_seconds": 5.0}})
+            self.assertEqual(
+                json.loads((root / "agent.json").read_text())["metrics"],
+                {"downtime_seconds": 2.0},
+            )
+            self.assertEqual(
+                json.loads((root / "baseline.json").read_text())["metrics"],
+                {"downtime_seconds": 5.0},
+            )
         self.assertEqual(len(calls), 1)
 
     def test_aggregates_only_present_numeric_metrics(self):

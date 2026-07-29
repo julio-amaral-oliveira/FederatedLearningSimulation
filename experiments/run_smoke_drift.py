@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
 from experiments.drift_controls import OracleMonitor, identity_corruption
+from experiments.drift_results import validate_pair
 from experiments.smoke_drift import DriftEpisodeConfig, run_drift_comparison, save_drift_result
 
 
@@ -97,6 +98,7 @@ def _result_directory(
 
 
 def _write_pair(results: dict[str, dict], output_path: Path) -> tuple[Path, Path]:
+    validate_pair(results["agent"], results["baseline"])
     output_path.mkdir(parents=True, exist_ok=True)
     agent_path = Path(save_drift_result(results["agent"], str(output_path), "agent.json"))
     baseline_path = Path(save_drift_result(results["baseline"], str(output_path), "baseline.json"))

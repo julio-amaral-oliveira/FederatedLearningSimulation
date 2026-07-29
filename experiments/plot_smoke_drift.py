@@ -1,146 +1,226 @@
-"""Gráfico do smoke test de drift detection.
+"""Plot a validated agent/baseline drift result pair using raw evaluations."""
 
-Uso (da raiz do projeto):
-  python experiments/plot_smoke_drift.py
-  python experiments/plot_smoke_drift.py --output-dir output-mnist
-  python experiments/plot_smoke_drift.py --output-dir output-mnist --filename smoke_drift.json
-"""
+from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
+from pathlib import Path
+from typing import Mapping, Sequence
 
-import numpy as np
+_ROOT = os.path.join(os.path.dirname(__file__), "..")
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import matplotlib
 
-try:
-    from utils.ema import exponential_moving_average
-except ImportError:
-    from src.utils.ema import exponential_moving_average
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from experiments.drift_results import (
+    DriftResult,
+    load_drift_result,
+    summarize_pair,
+    validate_pair,
+)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Gráfico do smoke test de drift")
-    parser.add_argument(
-        "--output-dir",
-        default="output-mnist",
-        help="Diretório com o JSON de saída (default: output-mnist)",
+def _as_result(value: DriftResult | Mapping) -> DriftResult:
+    return value if isinstance(value, DriftResult) else DriftResult.from_payload(value)
+
+
+def _series(result: DriftResult) -> tuple[list[float], list[float]]:
+    entries = sorted(
+        result.corrupted_accuracy_history,
+        key=lambda entry: float(entry["time"]),
     )
-    parser.add_argument(
-        "--filename",
-        default="smoke_drift.json",
-        help="Nome do arquivo JSON (default: smoke_drift.json)",
+    return (
+        [float(entry["time"]) for entry in entries],
+        [float(entry["accuracy"]) for entry in entries],
     )
-    args = parser.parse_args()
 
-    filepath = os.path.join(args.output_dir, args.filename)
-    if not os.path.exists(filepath):
-        print(f"Arquivo não encontrado: {filepath}")
-        print("Rode primeiro: python experiments/smoke_drift.py --dataset mnist")
-        sys.exit(1)
 
-    with open(filepath) as f:
-        raw = json.load(f)
+def _first_stage_time(result: DriftResult, stage: str) -> float | None:
+    for entry in result.corrupted_accuracy_history:
+        if entry.get("stage") == stage:
+            return float(entry["time"])
+    return None
 
-    # A primeira chave que não é _meta é a chave dos dados
-    data_key = next(k for k in raw if k != "_meta")
-    entries = raw[data_key]
-    meta = raw.get("_meta", {})
 
-    if not entries:
-        print("Nenhum entry encontrado no JSON.")
-        sys.exit(1)
+def _first_recovery(
+    result: DriftResult,
+    *,
+    decision_time: float | None,
+    tau: float,
+) -> tuple[float, float] | None:
+    if decision_time is None:
+        return None
+    for entry in sorted(
+        result.corrupted_accuracy_history,
+        key=lambda item: float(item["time"]),
+    ):
+        time = float(entry["time"])
+        accuracy = float(entry["accuracy"])
+        if time > decision_time and accuracy >= tau:
+            return time, accuracy
+    return None
 
-    # Ordena por tempo
-    entries = sorted(entries, key=lambda e: e["time"])
-    times = np.array([e["time"] for e in entries]) / 60.0  # s -> min
-    acc = np.array([e["accuracy"] for e in entries])
-    smoothed = exponential_moving_average(acc, alpha=0.15)
-    drift_flags = np.array([e.get("drift_event", False) for e in entries])
-    score = np.array([e.get("mean_score", 0.0) for e in entries])
 
-    # Eventos de drift reais (fronteiras de fase)
-    drift_times = meta.get("drift_events", [])
-    retrain_times = meta.get("retrain_decisions", [])
+def _format_metric(value: float | None, suffix: str = "") -> str:
+    return "N/A" if value is None else f"{value:.2f}{suffix}"
 
-    import matplotlib
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def plot_drift_pair(
+    baseline: DriftResult | Mapping,
+    agent: DriftResult | Mapping,
+    output: str | Path,
+) -> Path:
+    """Render the accepted pair and return the generated PNG path."""
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    baseline_result = _as_result(baseline)
+    agent_result = _as_result(agent)
+    validate_pair(agent_result, baseline_result)
+    summary = summarize_pair(agent_result, baseline_result)
 
-    # --- Painel 1: Acurácia ---
-    ax1.plot(times, acc, alpha=0.3, color="blue", linewidth=0.8, label="Acurácia (bruta)")
-    ax1.plot(times, smoothed, color="blue", linewidth=2, label=f"Acurácia (suavizada)")
+    agent_times, agent_accuracy = _series(agent_result)
+    baseline_times, baseline_accuracy = _series(baseline_result)
+    tau = float(agent_result.metadata["tau"])
+    onset = _first_stage_time(agent_result, "drift_onset")
+    if onset is None:
+        onset = float(agent_result.metadata["production_start_time"])
+    decisions = agent_result.get("retrain_decisions", [])
+    decision_time = float(decisions[0]["time"]) if decisions else None
+    recovery = _first_recovery(
+        agent_result,
+        decision_time=decision_time,
+        tau=tau,
+    )
+    horizon = float(agent_result.metadata["end_time_seconds"])
 
-    # Marca onde o detector flagou drift
-    drift_idx = np.where(drift_flags)[0]
-    if len(drift_idx) > 0:
-        ax1.scatter(
-            times[drift_idx],
-            smoothed[drift_idx],
-            color="red",
-            s=40,
-            zorder=5,
-            marker="v",
-            label="Drift detectado",
+    figure, axis = plt.subplots(figsize=(12, 7))
+    axis.plot(
+        baseline_times,
+        baseline_accuracy,
+        color="#6b7280",
+        marker="o",
+        markersize=3,
+        linewidth=1.4,
+        alpha=0.85,
+        label="Baseline (raw)",
+    )
+    axis.plot(
+        agent_times,
+        agent_accuracy,
+        color="#2563eb",
+        marker="o",
+        markersize=3,
+        linewidth=1.8,
+        label="Drift agent (raw)",
+    )
+    axis.axhline(tau, color="#dc2626", linestyle="--", linewidth=1.2, label=f"tau={tau:g}")
+    axis.axvline(onset, color="#111827", linestyle=":", linewidth=1.2, label="Drift onset")
+    axis.axvline(
+        horizon,
+        color="#7c3aed",
+        linestyle="--",
+        linewidth=1.2,
+        label="Fixed horizon",
+    )
+
+    if decision_time is not None:
+        axis.axvline(
+            decision_time,
+            color="#ea580c",
+            linestyle="-.",
+            linewidth=1.4,
+            label="Retraining decision",
+        )
+    for index, event in enumerate(agent_result.get("retrain_round_events", []), start=1):
+        started = float(event["started_time"])
+        completed = float(event["completed_time"])
+        axis.axvspan(
+            started,
+            completed,
+            color="#f59e0b",
+            alpha=0.10 if index % 2 else 0.18,
+        )
+        axis.text(
+            (started + completed) / 2.0,
+            0.02,
+            f"R{index}",
+            transform=axis.get_xaxis_transform(),
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color="#92400e",
         )
 
-    # Linhas verticais: drifts reais (fronteiras de fase)
-    for t in meta.get("drift_events", []):
-        time_min = t.get("time", 0) / 60.0
-        ax1.axvline(x=time_min, color="gray", linestyle="--", alpha=0.6)
-    # primeira e única linha de fronteira visível
-    # usando o schedule.drift_times
-
-    # tenta inferir T_drift da chave do JSON
-    import re
-
-    m = re.search(r"T_drift_(\d+\.?\d*)", data_key)
-    if m:
-        T_drift = float(m.group(1)) / 60.0
-        for phase in range(1, 10):
-            t = phase * T_drift
-            ax1.axvline(x=t, color="gray", linestyle="--", alpha=0.5, linewidth=1)
-            ax1.text(t, ax1.get_ylim()[1] * 0.95, f"Drift\nfase {phase}", fontsize=8,
-                     ha="center", va="top", color="gray")
-
-    ax1.set_ylabel("Acurácia", fontsize=12)
-    ax1.set_title("Drift Detection — Smoke Test", fontsize=14)
-    ax1.legend(fontsize=10, loc="lower right")
-    ax1.grid(True, alpha=0.3)
-    ax1.set_ylim(-0.05, 1.05)
-
-    # --- Painel 2: Score ---
-    ax2.plot(times, score, color="orange", linewidth=1.5, label="Score médio do detector")
-    if len(drift_idx) > 0:
-        ax2.scatter(
-            times[drift_idx],
-            score[drift_idx],
-            color="red",
-            s=40,
+    if recovery is not None:
+        axis.scatter(
+            [recovery[0]],
+            [recovery[1]],
+            color="#16a34a",
+            marker="*",
+            s=130,
             zorder=5,
-            marker="v",
-            label="Drift detectado",
+            label="First recovery",
         )
-    for phase in range(1, 10):
-        t = phase * T_drift
-        ax2.axvline(x=t, color="gray", linestyle="--", alpha=0.5, linewidth=1)
 
-    ax2.set_xlabel("Tempo (min)", fontsize=12)
-    ax2.set_ylabel("Score", fontsize=12)
-    ax2.legend(fontsize=10, loc="upper right")
-    ax2.grid(True, alpha=0.3)
+    annotation = "\n".join(
+        (
+            f"Agent downtime: {_format_metric(summary['agent_downtime_seconds'], ' s')}",
+            f"Baseline downtime: {_format_metric(summary['baseline_downtime_seconds'], ' s')}",
+            f"Avoided: {_format_metric(summary['downtime_avoided_seconds'], ' s')}",
+            f"Avoided: {_format_metric(summary['downtime_avoided_percent'], '%')}",
+            f"Clean retention delta: {_format_metric(summary['clean_retention_delta'])}",
+            "Pair: audited v3" if summary["audited_pair"] else "Pair: legacy v2 (unverified)",
+        )
+    )
+    axis.text(
+        0.99,
+        0.02,
+        annotation,
+        transform=axis.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=9,
+        bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.9},
+    )
+    axis.set(
+        title="Synchronous drift-agent comparison",
+        xlabel="Virtual time (seconds)",
+        ylabel="Accuracy",
+        ylim=(-0.02, 1.02),
+    )
+    axis.grid(True, alpha=0.2)
+    axis.legend(loc="best")
+    figure.tight_layout()
 
-    fig.tight_layout()
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+    return output_path
 
-    out_path = os.path.join(args.output_dir, "smoke_drift_plot.png")
-    fig.savefig(out_path, dpi=150)
-    print(f"Gráfico salvo: {out_path}")
-    plt.close(fig)
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Plot a validated synchronous drift result pair"
+    )
+    parser.add_argument("--baseline", required=True, help="Path to baseline.json")
+    parser.add_argument("--agent", required=True, help="Path to agent.json")
+    parser.add_argument("--output", required=True, help="Destination PNG")
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+    output = plot_drift_pair(
+        load_drift_result(args.baseline),
+        load_drift_result(args.agent),
+        args.output,
+    )
+    print(f"Plot saved: {output}")
 
 
 if __name__ == "__main__":
