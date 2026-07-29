@@ -142,6 +142,135 @@ class TestDriftRunMatrix(unittest.TestCase):
         )
         self.assertNotIn("enabled", aggregate["metrics"])
 
+    def test_summary_partitions_identity_control_from_visual_metrics(self):
+        def runner(config, **_kwargs):
+            downtime = 100.0 if config.corruption == "identity" else 2.0
+
+            def result(*, baseline):
+                return {
+                    "schema_version": 2,
+                    "metadata": {
+                        "corruption": config.corruption,
+                        "severity": config.severity,
+                        "seed": config.seed,
+                        "baseline": baseline,
+                        "production_start_time": 0.0,
+                        "end_time_seconds": 400.0,
+                    },
+                    "corrupted_accuracy_history": [],
+                    "clean_evaluations": [],
+                    "metrics": {"downtime_seconds": downtime},
+                }
+
+            return {"agent": result(baseline=False), "baseline": result(baseline=True)}
+
+        configs = [
+            DriftEpisodeConfig(corruption="noise", severity=2, seed=1, production_horizon_seconds=400.0),
+            DriftEpisodeConfig(corruption="identity", severity=0, seed=1, production_horizon_seconds=400.0),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            run_matrix(configs, output_dir=directory, runner=runner, corruption_fn=identity_corruption)
+            summary = json.loads((Path(directory) / "summary.json").read_text())
+
+        self.assertIn("groups", summary)
+        groups_by_population = {
+            group["dimensions"]["population"]: group
+            for group in summary["groups"].values()
+        }
+        self.assertEqual(
+            groups_by_population["visual"]["agent"]["downtime_seconds"]["mean"],
+            2.0,
+        )
+        self.assertEqual(
+            groups_by_population["identity_control"]["agent"]["downtime_seconds"]["mean"],
+            100.0,
+        )
+
+    def test_summary_partitions_oracle_from_detector_triggered_runs(self):
+        def runner(config, **_kwargs):
+            def result(*, baseline):
+                return {
+                    "schema_version": 2,
+                    "metadata": {
+                        "corruption": config.corruption,
+                        "severity": config.severity,
+                        "seed": config.seed,
+                        "baseline": baseline,
+                        "production_start_time": 0.0,
+                        "end_time_seconds": 400.0,
+                    },
+                    "corrupted_accuracy_history": [],
+                    "clean_evaluations": [],
+                    "metrics": {"downtime_seconds": 2.0},
+                }
+
+            return {"agent": result(baseline=False), "baseline": result(baseline=True)}
+
+        with tempfile.TemporaryDirectory() as directory:
+            run_matrix(
+                [DriftEpisodeConfig(corruption="identity", severity=0, production_horizon_seconds=400.0)],
+                output_dir=directory,
+                runner=runner,
+                corruption_fn=identity_corruption,
+                include_controls=True,
+            )
+            summary = json.loads((Path(directory) / "summary.json").read_text())
+
+        self.assertIn("groups", summary)
+        dimensions = {tuple(sorted(group["dimensions"].items())) for group in summary["groups"].values()}
+        self.assertEqual(len(dimensions), 2)
+        self.assertIn(
+            "detector",
+            {group["dimensions"]["trigger_policy"] for group in summary["groups"].values()},
+        )
+        self.assertIn(
+            "oracle",
+            {group["dimensions"]["trigger_policy"] for group in summary["groups"].values()},
+        )
+
+    def test_summary_aggregates_equal_dimensions_across_sorted_unique_seeds(self):
+        def runner(config, **_kwargs):
+            def result(*, baseline):
+                return {
+                    "schema_version": 2,
+                    "metadata": {
+                        "corruption": config.corruption,
+                        "severity": config.severity,
+                        "seed": config.seed,
+                        "baseline": baseline,
+                        "production_start_time": 0.0,
+                        "end_time_seconds": 400.0,
+                    },
+                    "corrupted_accuracy_history": [],
+                    "clean_evaluations": [],
+                    "metrics": {"downtime_seconds": float(config.seed * 2)},
+                }
+
+            return {"agent": result(baseline=False), "baseline": result(baseline=True)}
+
+        with tempfile.TemporaryDirectory() as directory:
+            run_matrix(
+                build_run_matrix(
+                    seeds=[2, 1],
+                    scenarios=[("noise", 2)],
+                    base_config=DriftEpisodeConfig(production_horizon_seconds=400.0),
+                ),
+                output_dir=directory,
+                runner=runner,
+                corruption_fn=identity_corruption,
+            )
+            summary = json.loads((Path(directory) / "summary.json").read_text())
+
+        self.assertIn("groups", summary)
+        group = next(iter(summary["groups"].values()))
+        self.assertEqual(group["dimensions"]["population"], "visual")
+        self.assertEqual(group["seeds"], [1, 2])
+        self.assertEqual(group["run_count"], 2)
+        self.assertEqual(
+            group["agent"]["downtime_seconds"],
+            {"count": 2, "mean": 3.0, "std": 1.0, "min": 2.0, "max": 4.0},
+        )
+
     def test_cli_exposes_explicit_matrix_and_control_options(self):
         args = parse_args(
             [

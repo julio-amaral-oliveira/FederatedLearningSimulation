@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import statistics
 from collections import Counter, defaultdict
@@ -88,6 +89,77 @@ def aggregate_runs(results: list[dict]) -> dict:
     }
 
 
+def _summary_dimensions(
+    config: DriftEpisodeConfig,
+    *,
+    population: str,
+    trigger_policy: str,
+) -> dict:
+    """Return the explicit run descriptor used to partition matrix summaries."""
+    return {
+        "population": population,
+        "corruption": config.corruption,
+        "severity": config.severity,
+        "trigger_policy": trigger_policy,
+        "quorum": config.trigger_threshold,
+        "retrain_rounds": config.retrain_rounds,
+        "production_horizon_seconds": config.production_horizon_seconds,
+    }
+
+
+def _summary_group_key(dimensions: dict) -> str:
+    """Encode the seed-independent descriptor as a stable JSON object key."""
+    return json.dumps(dimensions, sort_keys=True, separators=(",", ":"))
+
+
+def _summary_population(config: DriftEpisodeConfig, *, oracle_control: bool) -> str:
+    if oracle_control:
+        return "oracle_control"
+    if config.corruption == "identity":
+        return "identity_control"
+    return "visual"
+
+
+def _summarize_matrix_runs(
+    runs: list[tuple[DriftEpisodeConfig, str, str, dict[str, dict]]],
+) -> dict:
+    """Partition arm aggregates by their explicit matrix-run descriptors."""
+    grouped: dict[str, dict] = {}
+    for config, population, trigger_policy, results in runs:
+        dimensions = _summary_dimensions(
+            config,
+            population=population,
+            trigger_policy=trigger_policy,
+        )
+        key = _summary_group_key(dimensions)
+        group = grouped.setdefault(
+            key,
+            {
+                "dimensions": dimensions,
+                "seeds": set(),
+                "agent_results": [],
+                "baseline_results": [],
+            },
+        )
+        group["seeds"].add(config.seed)
+        group["agent_results"].append(results["agent"])
+        group["baseline_results"].append(results["baseline"])
+
+    return {
+        "schema_version": 1,
+        "groups": {
+            key: {
+                "dimensions": group["dimensions"],
+                "seeds": sorted(group["seeds"]),
+                "run_count": len(group["agent_results"]),
+                "agent": aggregate_runs(group["agent_results"])["metrics"],
+                "baseline": aggregate_runs(group["baseline_results"])["metrics"],
+            }
+            for key, group in sorted(grouped.items())
+        },
+    }
+
+
 def _result_directory(
     output_dir: Path,
     config: DriftEpisodeConfig,
@@ -136,8 +208,7 @@ def run_matrix(
 
     duplicates = Counter((c.corruption, c.severity, c.seed) for c in all_configs)
     output_paths: list[tuple[Path, Path]] = []
-    agent_results: list[dict] = []
-    baseline_results: list[dict] = []
+    summarized_runs: list[tuple[DriftEpisodeConfig, str, str, dict[str, dict]]] = []
     original_count = len(configs)
     for index, config in enumerate(all_configs):
         is_control = index >= original_count
@@ -147,14 +218,17 @@ def run_matrix(
             **({"monitor_factory": lambda _server, _baseline: OracleMonitor()} if is_control else {}),
         )
         output_paths.append(_write_pair(results, _result_directory(root, config, duplicates)))
-        agent_results.append(results["agent"])
-        baseline_results.append(results["baseline"])
+        oracle_control = is_control
+        summarized_runs.append(
+            (
+                config,
+                _summary_population(config, oracle_control=oracle_control),
+                "oracle" if oracle_control else "detector",
+                results,
+            )
+        )
 
-    summary = {
-        "schema_version": 1,
-        "agent": aggregate_runs(agent_results),
-        "baseline": aggregate_runs(baseline_results),
-    }
+    summary = _summarize_matrix_runs(summarized_runs)
     atomic_write_json(root / "summary.json", summary)
     return output_paths
 
