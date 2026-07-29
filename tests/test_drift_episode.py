@@ -2,12 +2,14 @@ import unittest
 import random
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
 import torch.nn as nn
 
 from experiments.comparison_core import compute_downtime
+from experiments import smoke_drift
 from experiments.smoke_drift import (
     DriftEpisodeConfig,
     capture_random_state,
@@ -168,6 +170,64 @@ class _DropoutTraceModel(nn.Module):
 
 
 class TestDriftEpisode(unittest.TestCase):
+    def test_capture_and_restore_random_state_uses_all_cuda_device_states(self):
+        cuda_states = [
+            torch.tensor([1, 2], dtype=torch.uint8),
+            torch.tensor([3, 4], dtype=torch.uint8),
+        ]
+
+        with (
+            patch.object(smoke_drift.torch.cuda, "is_available", return_value=True),
+            patch.object(
+                smoke_drift.torch.cuda,
+                "get_rng_state_all",
+                return_value=cuda_states,
+            ) as get_rng_state_all,
+            patch.object(smoke_drift.torch.cuda, "set_rng_state_all") as set_rng_state_all,
+        ):
+            state = capture_random_state()
+            restore_random_state(state)
+
+        self.assertIs(state["torch_cuda"], cuda_states)
+        get_rng_state_all.assert_called_once_with()
+        set_rng_state_all.assert_called_once_with(cuda_states)
+
+    def test_capture_and_restore_random_state_uses_mps_rng_state(self):
+        mps_state = torch.tensor([5, 6], dtype=torch.uint8)
+        fake_mps = SimpleNamespace(
+            get_rng_state=MagicMock(return_value=mps_state),
+            set_rng_state=MagicMock(),
+        )
+        fake_mps_backend = SimpleNamespace(is_available=MagicMock(return_value=True))
+
+        with (
+            patch.object(smoke_drift.torch.cuda, "is_available", return_value=False),
+            patch.object(smoke_drift.torch.backends, "mps", fake_mps_backend),
+            patch.object(smoke_drift.torch, "mps", fake_mps),
+        ):
+            state = capture_random_state()
+            restore_random_state(state)
+
+        self.assertIs(state["torch_mps"], mps_state)
+        fake_mps.get_rng_state.assert_called_once_with()
+        fake_mps.set_rng_state.assert_called_once_with(mps_state)
+
+    @unittest.skipUnless(
+        torch.cuda.is_available() or torch.backends.mps.is_available(),
+        "CUDA/MPS unavailable; a skipped test is not accelerator execution evidence.",
+    )
+    def test_restore_random_state_replays_dropout_on_an_available_accelerator(self):
+        device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+        dropout = torch.nn.Dropout(p=0.5).train().to(device)
+        source = torch.ones(32, device=device)
+        state = capture_random_state()
+
+        first = dropout(source)
+        restore_random_state(state)
+        replayed = dropout(source)
+
+        self.assertTrue(torch.equal(first, replayed))
+
     def test_dropout_trace_model_logits_depend_on_dropout_output(self):
         model = _DropoutTraceModel().train()
         x = torch.ones(4, 1, 2, 2)

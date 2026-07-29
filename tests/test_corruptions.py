@@ -18,7 +18,32 @@ def deterministic_image(batch_size: int | None = None) -> torch.Tensor:
     return image if batch_size is None else image.unsqueeze(0).repeat(batch_size, 1, 1, 1)
 
 
+def available_accelerator_device() -> torch.device | None:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return None
+
+
 class ApplyCorruptionContractTests(unittest.TestCase):
+    @unittest.skipUnless(
+        available_accelerator_device() is not None,
+        "CUDA/MPS unavailable; a skipped test is not accelerator execution evidence.",
+    )
+    def test_every_corruption_preserves_accelerator_device_shape_and_dtype(self):
+        device = available_accelerator_device()
+        assert device is not None
+        source = deterministic_image(batch_size=2).to(device)
+
+        for kind in CORRUPTIONS:
+            with self.subTest(kind=kind):
+                result = apply_corruption(source, kind, severity=3, seed=23)
+
+                self.assertEqual(result.device, device)
+                self.assertEqual(result.shape, source.shape)
+                self.assertEqual(result.dtype, source.dtype)
+
     def test_every_corruption_preserves_tensor_contract_without_mutating_3d_input(self):
         source = deterministic_image()
         original = source.clone()
