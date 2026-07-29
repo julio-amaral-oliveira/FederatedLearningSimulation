@@ -1,5 +1,6 @@
 import unittest
 import random
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -186,6 +187,83 @@ class TestDriftEpisode(unittest.TestCase):
 
         self.assertTrue(torch.equal(first, replayed))
 
+    def test_schema_v3_persists_auditable_experiment_detector_and_runtime_metadata(self):
+        config = _config(
+            dataset="auditable-dataset",
+            retrain_rounds=2,
+            monitor_ticks=1,
+            monitor_tick_seconds=7.5,
+            trigger_threshold=0.4,
+            trigger_window_ticks=3,
+            detector_alpha=0.01,
+            detector_T=7,
+            local_epochs=2,
+            batch_size=4,
+            timeout_percentile=80,
+            max_train_samples_per_client=9,
+            tau=0.6,
+            corruption="gaussian_blur",
+            severity=4,
+            seed=99,
+            output_dir="must-not-be-persisted",
+            production_horizon_seconds=10.0,
+        )
+        server = _FakeServer(
+            global_model=nn.Linear(4, 2),
+            evaluation_accuracies=[0.8, 0.2, 0.3, 0.5, 0.5, 0.7],
+        )
+
+        result = run_drift_episode(
+            config,
+            server=server,
+            monitor=_ScriptedMonitor([False]),
+            corruption_fn=_identity,
+        )
+
+        self.assertEqual(result["schema_version"], 3)
+        self.assertEqual(
+            result["experiment_config"],
+            {
+                "dataset": "auditable-dataset",
+                "num_clients": 3,
+                "initial_rounds": 1,
+                "retrain_rounds": 2,
+                "warmup_ticks": 20,
+                "monitor_tick_seconds": 7.5,
+                "monitor_ticks": 1,
+                "local_epochs": 2,
+                "batch_size": 4,
+                "timeout_percentile": 80,
+                "max_train_samples_per_client": 9,
+                "tau": 0.6,
+                "corruption": "gaussian_blur",
+                "severity": 4,
+                "seed": 99,
+                "baseline": False,
+                "production_horizon_seconds": 10.0,
+            },
+        )
+        self.assertEqual(
+            result["detector_config"],
+            {
+                "detector_alpha": 0.01,
+                "detector_T": 7,
+                "trigger_threshold": 0.4,
+                "trigger_window_ticks": 3,
+            },
+        )
+        self.assertEqual(result["runtime"]["python_version"], sys.version)
+        self.assertEqual(result["runtime"]["numpy_version"], np.__version__)
+        self.assertEqual(result["runtime"]["torch_version"], torch.__version__)
+        self.assertEqual(result["runtime"]["effective_device"], "cpu")
+        self.assertIsInstance(result["runtime"]["deterministic_algorithms_enabled"], bool)
+        self.assertIsInstance(result["runtime"]["cudnn_deterministic"], bool)
+        self.assertIsInstance(result["runtime"]["cudnn_benchmark"], bool)
+        self.assertRegex(result["runtime"]["clean_checkpoint_digest"], r"^[0-9a-f]{64}$")
+        self.assertNotIn("output_dir", result["experiment_config"])
+        self.assertAlmostEqual(result["metrics"]["clean_retention_delta"], -0.1)
+        self.assertAlmostEqual(result["metrics"]["corrupted_accuracy_gain"], 0.3)
+
     def test_agent_executes_exactly_one_five_round_retraining_block(self):
         server = _FakeServer()
         monitor = _ScriptedMonitor([False, False, True])
@@ -355,7 +433,7 @@ class TestDriftEpisode(unittest.TestCase):
         created_servers = []
 
         def server_factory():
-            server = _FakeServer()
+            server = _FakeServer(global_model=nn.Linear(4, 2))
             created_servers.append(server)
             return server
 
@@ -392,6 +470,13 @@ class TestDriftEpisode(unittest.TestCase):
             created_servers[0].round_durations[0],
         )
         self.assertEqual(agent_server.evaluation_states[0]["next_round_index"], 1)
+        self.assertRegex(
+            results["agent"]["runtime"]["clean_checkpoint_digest"], r"^[0-9a-f]{64}$"
+        )
+        self.assertEqual(
+            results["agent"]["runtime"]["clean_checkpoint_digest"],
+            results["baseline"]["runtime"]["clean_checkpoint_digest"],
+        )
 
     def test_comparison_replays_real_dropout_detector_trace_until_first_trigger(self):
         config = _config(monitor_ticks=12, batch_size=4)

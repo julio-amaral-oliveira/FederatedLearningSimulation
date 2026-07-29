@@ -135,9 +135,70 @@ def _run_retraining(
         )
 
 
-def _new_result(config: DriftEpisodeConfig) -> dict:
+def _experiment_config(config: DriftEpisodeConfig) -> dict:
+    """Return only user-controlled experiment inputs that affect an episode."""
     return {
-        "schema_version": 2,
+        "dataset": config.dataset,
+        "num_clients": config.num_clients,
+        "initial_rounds": config.initial_rounds,
+        "retrain_rounds": config.retrain_rounds,
+        "warmup_ticks": config.warmup_ticks,
+        "monitor_tick_seconds": config.monitor_tick_seconds,
+        "monitor_ticks": config.monitor_ticks,
+        "local_epochs": config.local_epochs,
+        "batch_size": config.batch_size,
+        "timeout_percentile": config.timeout_percentile,
+        "max_train_samples_per_client": config.max_train_samples_per_client,
+        "tau": config.tau,
+        "corruption": config.corruption,
+        "severity": config.severity,
+        "seed": config.seed,
+        "baseline": config.baseline,
+        "production_horizon_seconds": config.production_horizon_seconds,
+    }
+
+
+def _detector_config(config: DriftEpisodeConfig) -> dict:
+    """Return the uncertainty detector settings used for this episode."""
+    return {
+        "detector_alpha": config.detector_alpha,
+        "detector_T": config.detector_T,
+        "trigger_threshold": config.trigger_threshold,
+        "trigger_window_ticks": config.trigger_window_ticks,
+    }
+
+
+def _effective_device(server) -> str:
+    """Report the actual device of the model used by an injected or real server."""
+    model = getattr(server, "global_model", None)
+    if model is not None:
+        parameter = next(model.parameters(), None)
+        if parameter is not None:
+            return str(parameter.device)
+    return "cpu"
+
+
+def _runtime_metadata(server) -> dict:
+    """Capture environment facts required to reproduce a result."""
+    cudnn = getattr(torch.backends, "cudnn", None)
+    return {
+        "python_version": sys.version,
+        "numpy_version": np.__version__,
+        "torch_version": torch.__version__,
+        "effective_device": _effective_device(server),
+        "deterministic_algorithms_enabled": torch.are_deterministic_algorithms_enabled(),
+        "cudnn_deterministic": bool(getattr(cudnn, "deterministic", False)),
+        "cudnn_benchmark": bool(getattr(cudnn, "benchmark", False)),
+        "clean_checkpoint_digest": None,
+    }
+
+
+def _new_result(config: DriftEpisodeConfig, server) -> dict:
+    return {
+        "schema_version": 3,
+        "experiment_config": _experiment_config(config),
+        "detector_config": _detector_config(config),
+        "runtime": _runtime_metadata(server),
         "metadata": {
             "dataset": config.dataset,
             "corruption": config.corruption,
@@ -164,6 +225,8 @@ def _new_result(config: DriftEpisodeConfig) -> dict:
             "detection_delay_seconds": None,
             "retraining_duration_seconds": None,
             "time_to_recovery_seconds": None,
+            "clean_retention_delta": None,
+            "corrupted_accuracy_gain": None,
         },
     }
 
@@ -171,6 +234,24 @@ def _new_result(config: DriftEpisodeConfig) -> dict:
 def _state_digest(state: object) -> str:
     """Return a compact, JSON-safe identifier for a reproducibility state."""
     return hashlib.sha256(repr(state).encode("utf-8")).hexdigest()
+
+
+def _weights_digest(weights: list[torch.Tensor]) -> str:
+    """Hash model weights with shape and dtype boundaries for stable audit IDs."""
+    digest = hashlib.sha256()
+    for index, weight in enumerate(weights):
+        tensor = weight.detach().cpu().contiguous()
+        digest.update(f"{index}:{tensor.dtype}:{tuple(tensor.shape)}\n".encode("utf-8"))
+        digest.update(tensor.numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _global_weights_digest(server) -> str | None:
+    if not hasattr(server, "global_model"):
+        return None
+    from utils.models import get_model_weights
+
+    return _weights_digest(get_model_weights(server.global_model))
 
 
 def _preproduction_server_state(server) -> dict[str, float | int | str | None]:
@@ -293,6 +374,7 @@ def _snapshot_clean_checkpoint(server) -> dict:
         from utils.models import get_model_weights
 
         checkpoint["global_weights"] = get_model_weights(server.global_model)
+        checkpoint["clean_checkpoint_digest"] = _weights_digest(checkpoint["global_weights"])
     return checkpoint
 
 
@@ -329,6 +411,26 @@ def _finish_result(result: dict, server, clean_test, config: DriftEpisodeConfig)
     result["metrics"]["downtime_seconds"] = compute_downtime(
         result["corrupted_accuracy_history"], config.tau, end_time=end_time
     )
+    clean_pre_drift = next(
+        entry for entry in result["clean_evaluations"] if entry["stage"] == "pre_drift"
+    )
+    clean_final = next(
+        entry for entry in reversed(result["clean_evaluations"]) if entry["stage"] == "final"
+    )
+    corrupted_onset = next(
+        entry for entry in result["corrupted_accuracy_history"] if entry["stage"] == "drift_onset"
+    )
+    corrupted_final = next(
+        entry
+        for entry in reversed(result["corrupted_accuracy_history"])
+        if entry["stage"] == "episode_end"
+    )
+    result["metrics"]["clean_retention_delta"] = (
+        float(clean_final["accuracy"]) - float(clean_pre_drift["accuracy"])
+    )
+    result["metrics"]["corrupted_accuracy_gain"] = (
+        float(corrupted_final["accuracy"]) - float(corrupted_onset["accuracy"])
+    )
     if result["retrain_decisions"]:
         decision_time = float(result["retrain_decisions"][0]["time"])
         result["metrics"]["detection_delay_seconds"] = (
@@ -360,6 +462,7 @@ def run_drift_episode(
     server=None,
     monitor=None,
     _initial_training_complete: bool = False,
+    _clean_checkpoint_digest: str | None = None,
 ) -> dict:
     """Run one clean-warmup/corrupted-production episode.
 
@@ -391,12 +494,17 @@ def run_drift_episode(
         _call_corruption(corruption_fn, clean_test[0], config, seed=config.seed + 9_999),
         clean_test[1].copy(),
     )
-    result = _new_result(config)
+    result = _new_result(config, server)
     result["_monitor"] = monitor
     result["_corrupted_test"] = corrupted_test
 
     if not _initial_training_complete:
         server.run_rounds(config.initial_rounds, record_default_metrics=False)
+    result["runtime"]["clean_checkpoint_digest"] = (
+        _clean_checkpoint_digest
+        if _clean_checkpoint_digest is not None
+        else _global_weights_digest(server)
+    )
     _record_evaluation(result["clean_evaluations"], server, clean_test, "pre_drift")
 
     # ADWIN sees stable, unlabeled clean inputs before production starts.
@@ -487,6 +595,7 @@ def run_drift_comparison(
         server=agent_server,
         monitor=agent_monitor,
         _initial_training_complete=True,
+        _clean_checkpoint_digest=checkpoint.get("clean_checkpoint_digest"),
     )
     baseline_server = make_server()
     _restore_clean_checkpoint(baseline_server, checkpoint)
@@ -497,12 +606,13 @@ def run_drift_comparison(
         server=baseline_server,
         monitor=baseline_monitor,
         _initial_training_complete=True,
+        _clean_checkpoint_digest=checkpoint.get("clean_checkpoint_digest"),
     )
     return {"agent": agent, "baseline": baseline}
 
 
 def save_drift_result(result: dict, output_dir: str, filename: str = "smoke_drift.json") -> str:
-    """Persist a complete schema-v2 result only after metrics are computed."""
+    """Persist a complete schema-v3 result only after metrics are computed."""
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
     with open(path, "w", encoding="utf-8") as output:
