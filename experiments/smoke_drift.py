@@ -29,6 +29,12 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
 DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
+CORRUPTED_TEST_SEED_OFFSET = 9_999
+
+
+def corrupted_test_seed(base_seed: int) -> int:
+    """Derive the shared corruption seed for test-set evaluation."""
+    return base_seed + CORRUPTED_TEST_SEED_OFFSET
 
 
 @dataclass(frozen=True)
@@ -492,7 +498,12 @@ def run_drift_episode(
         for index, (x, y) in enumerate(clean_client_datasets)
     ]
     corrupted_test = (
-        _call_corruption(corruption_fn, clean_test[0], config, seed=config.seed + 9_999),
+        _call_corruption(
+            corruption_fn,
+            clean_test[0],
+            config,
+            seed=corrupted_test_seed(config.seed),
+        ),
         clean_test[1].copy(),
     )
     result = _new_result(config, server)

@@ -97,7 +97,7 @@ class TestCalibrateSeverities(unittest.TestCase):
             result["accuracy_interval"], {"minimum": 0.25, "maximum": 0.50, "strict": True}
         )
 
-    def test_calibrates_every_copy_from_one_clean_trained_server(self):
+    def test_calibrates_every_copy_with_episode_test_seed_from_one_clean_server(self):
         from experiments.severity_calibration import calibrate_clean_checkpoint
 
         class FakeServer:
@@ -121,7 +121,7 @@ class TestCalibrateSeverities(unittest.TestCase):
         config = SimpleNamespace(dataset="tiny", initial_rounds=3, seed=17)
 
         def corruption(inputs, _corruption, severity, *, seed):
-            self.assertEqual(seed, 17)
+            self.assertEqual(seed, 10_016)
             return inputs + severity / 10
 
         with patch("experiments.smoke_drift._build_server", return_value=server) as build_server:
@@ -143,6 +143,7 @@ class TestCalibrateSeverities(unittest.TestCase):
         self.assertAlmostEqual(result["selected"]["fog"]["accuracy"], 0.2)
         self.assertEqual(result["dataset"], "tiny")
         self.assertEqual(result["seed"], 17)
+        self.assertEqual(result["corrupted_test_seed"], 10_016)
         self.assertRegex(result["clean_checkpoint_digest"], r"^[0-9a-f]{64}$")
 
 

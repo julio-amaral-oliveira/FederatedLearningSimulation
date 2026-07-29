@@ -83,7 +83,11 @@ def calibrate_clean_checkpoint(
     corruption_fn=None,
 ) -> dict:
     """Train one clean server, then evaluate all corrupted test-set copies."""
-    from experiments.smoke_drift import _build_server, _global_weights_digest
+    from experiments.smoke_drift import (
+        _build_server,
+        _global_weights_digest,
+        corrupted_test_seed,
+    )
 
     if corruption_fn is None:
         from src.utils.corruptions import apply_corruption
@@ -98,6 +102,7 @@ def calibrate_clean_checkpoint(
     server.run_rounds(config.initial_rounds, record_default_metrics=False)
     clean_checkpoint_digest = _global_weights_digest(server)
     clean_inputs, clean_labels = server.testing_data
+    evaluation_seed = corrupted_test_seed(config.seed)
 
     def evaluate_accuracy(corruption: str, severity: int) -> float:
         # Every evaluation starts from a new copy; the clean checkpoint itself
@@ -106,7 +111,7 @@ def calibrate_clean_checkpoint(
             torch.as_tensor(clean_inputs).detach().clone(),
             corruption,
             severity,
-            seed=config.seed,
+            seed=evaluation_seed,
         )
         if not isinstance(corrupted, torch.Tensor):
             raise TypeError("corruption_fn must return torch.Tensor")
@@ -129,6 +134,7 @@ def calibrate_clean_checkpoint(
             "schema_version": 1,
             "dataset": config.dataset,
             "seed": config.seed,
+            "corrupted_test_seed": evaluation_seed,
             "clean_checkpoint_digest": clean_checkpoint_digest,
         }
     )
