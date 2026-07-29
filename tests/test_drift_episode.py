@@ -38,6 +38,7 @@ class _FakeServer:
         rng_seed=123,
         global_model=None,
         evaluation_accuracies=None,
+        timeout=None,
     ):
         self.clients = [_FakeClient(0), _FakeClient(1), _FakeClient(2)]
         self.testing_data = (
@@ -46,6 +47,7 @@ class _FakeServer:
         )
         self.virtual_time = 0.0
         self.round_durations = tuple(round_durations)
+        self.timeout = max(self.round_durations) if timeout is None else timeout
         self.rng = random.Random(rng_seed)
         self.next_round_index = 0
         self.run_round_calls = []
@@ -277,6 +279,22 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(len(result["retrain_decisions"]), 1)
         self.assertEqual(len(result["retrain_round_events"]), 5)
 
+    def test_fixed_horizon_rejects_retraining_before_any_round_when_budget_cannot_fit(self):
+        server = _FakeServer(
+            round_durations=(2.0, 10.0, 10.0, 10.0, 10.0, 10.0),
+            timeout=10.0,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "retraining budget"):
+            run_drift_episode(
+                _config(production_horizon_seconds=22.0),
+                server=server,
+                monitor=_ScriptedMonitor([True]),
+                corruption_fn=_identity,
+            )
+
+        self.assertEqual(server.run_one_round_calls, 1)
+
     def test_fixed_production_horizon_continues_after_retraining_and_reports_distinct_recovery_metrics(self):
         config = _config(production_horizon_seconds=100.0)
         server = _FakeServer(
@@ -307,6 +325,12 @@ class TestDriftEpisode(unittest.TestCase):
         decision_time = agent["retrain_decisions"][0]["time"]
         last_round_end = agent["retrain_round_events"][-1]["completed_time"]
         first_recovery_time = 81.0
+        self.assertLessEqual(
+            config.retrain_rounds * server.timeout,
+            agent["metadata"]["production_start_time"]
+            + config.production_horizon_seconds
+            - decision_time,
+        )
         self.assertEqual(
             agent["metadata"]["end_time_seconds"],
             agent["metadata"]["production_start_time"] + config.production_horizon_seconds,

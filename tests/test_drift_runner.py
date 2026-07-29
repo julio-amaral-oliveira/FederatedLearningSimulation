@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import torch
 
@@ -9,6 +10,7 @@ from experiments.drift_controls import OracleMonitor, identity_corruption
 from experiments.run_smoke_drift import (
     aggregate_runs,
     build_run_matrix,
+    main,
     parse_args,
     run_matrix,
 )
@@ -156,6 +158,24 @@ class TestDriftRunMatrix(unittest.TestCase):
         self.assertEqual(args.quorums, [0.2, 0.4])
         self.assertEqual(args.retrain_rounds, [3, 5])
         self.assertTrue(args.include_controls)
+
+    def test_matrix_cli_propagates_its_default_production_horizon_to_every_config(self):
+        captured = []
+
+        def fake_run_matrix(configs, **_kwargs):
+            captured.extend(configs)
+            return []
+
+        with patch("experiments.run_smoke_drift.run_matrix", side_effect=fake_run_matrix):
+            main([
+                "--seeds", "11", "12",
+                "--scenario", "noise:3",
+            ])
+
+        self.assertEqual(
+            [config.production_horizon_seconds for config in captured],
+            [400.0, 400.0],
+        )
 
 
 if __name__ == "__main__":

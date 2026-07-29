@@ -13,7 +13,12 @@ from typing import Callable, Iterable, Sequence
 
 from experiments.drift_controls import OracleMonitor, identity_corruption
 from experiments.drift_results import validate_pair
-from experiments.smoke_drift import DriftEpisodeConfig, run_drift_comparison, save_drift_result
+from experiments.smoke_drift import (
+    DEFAULT_PRODUCTION_HORIZON_SECONDS,
+    DriftEpisodeConfig,
+    run_drift_comparison,
+    save_drift_result,
+)
 
 
 DEFAULT_SCENARIOS: tuple[tuple[str, int], ...] = (
@@ -179,6 +184,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--quorums", nargs="+", type=float)
     parser.add_argument("--retrain-rounds", nargs="+", type=int)
+    parser.add_argument(
+        "--production-horizon-seconds",
+        type=float,
+        default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
+    )
     parser.add_argument("--include-controls", action="store_true")
     return parser.parse_args(argv)
 
@@ -190,7 +200,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         scenarios=[_parse_scenario(value) for value in args.scenario],
         quorums=args.quorums,
         retrain_rounds=args.retrain_rounds,
-        base_config=DriftEpisodeConfig(dataset=args.dataset, output_dir=args.output_dir),
+        base_config=DriftEpisodeConfig(
+            dataset=args.dataset,
+            output_dir=args.output_dir,
+            production_horizon_seconds=args.production_horizon_seconds,
+        ),
     )
     paths = run_matrix(configs, output_dir=args.output_dir, include_controls=args.include_controls)
     for agent_path, baseline_path in paths:

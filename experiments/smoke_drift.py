@@ -29,6 +29,7 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
         sys.path.insert(0, _path)
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
+DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
 
 
 @dataclass(frozen=True)
@@ -549,6 +550,14 @@ def run_drift_episode(
         _record_evaluation(result["corrupted_accuracy_history"], server, corrupted_test, "monitor_tick")
         tick += 1
         if outcome.should_retrain and not config.baseline and not retrained:
+            if config.production_horizon_seconds is not None:
+                required_seconds = config.retrain_rounds * server.timeout
+                remaining_seconds = float(target_time) - float(server.virtual_time)
+                if remaining_seconds < required_seconds:
+                    raise RuntimeError(
+                        "retraining budget cannot fit within the fixed production horizon: "
+                        f"{remaining_seconds:g}s remaining, {required_seconds:g}s required"
+                    )
             _run_retraining(
                 result,
                 server,
@@ -629,6 +638,11 @@ def main() -> None:
     parser.add_argument("--corruption", default="gaussian_noise")
     parser.add_argument("--severity", type=int, default=3)
     parser.add_argument("--output-dir", default="output/cifar-10/drift-agent")
+    parser.add_argument(
+        "--production-horizon-seconds",
+        type=float,
+        default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
+    )
     args = parser.parse_args()
     try:
         # Deferred on purpose: the corruption module belongs to a parallel task.
@@ -640,6 +654,7 @@ def main() -> None:
         corruption=args.corruption,
         severity=args.severity,
         output_dir=args.output_dir,
+        production_horizon_seconds=args.production_horizon_seconds,
     )
     results = run_drift_comparison(config, corruption_fn=apply_corruption)
     for name, result in results.items():
