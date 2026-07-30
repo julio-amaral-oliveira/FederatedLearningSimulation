@@ -1,6 +1,6 @@
 # Estado atual — drift-agent-hardening
 
-> Verdade vigente do projeto em 2026-07-29. Para a evolução e as evidências,
+> Verdade vigente do projeto em 2026-07-30. Para a evolução e as evidências,
 > consulte [JOURNAL.md](JOURNAL.md). Para terminologia e fronteiras, consulte
 > [CONTEXT.md](CONTEXT.md).
 
@@ -43,11 +43,17 @@ checkpoint, stream e horizonte virtual.
 ## Estado do código
 
 - Branch: `feature/drift-agent-hardening`.
-- Head observado: `a573478` (`fix: validate identity control severity`).
+- Último commit de código observado: `73839fd`
+  (`feat: add configurable client speed profiles`).
 - Base da implementação endurecida: `c9e9355`.
 - A revisão final e a re-revisão concluíram **Ready**.
-- Última verificação completa observada: 116 testes passando e 2 skips
-  condicionais de CUDA/MPS; `compileall` e `git diff --check` passaram.
+- A última verificação completa executou 121 testes.
+- A verificação passou em 119 testes.
+- A verificação ignorou 2 testes condicionais de CUDA/MPS.
+- O experimento usa `uniform` como default.
+- Os módulos legados síncrono e assíncrono usam `heterogeneous` como default.
+- O schema v3 registra `client_speed_profile` e `client_speed_tiers`.
+- Os testes cobrem o default, a seleção explícita e a divisão do resumo.
 - Não houve push nem trailers `Co-authored-by`.
 - Alterações locais preexistentes do usuário foram preservadas. Em especial,
   os documentos 11 e 12 estavam não rastreados e são contexto, não prova do
@@ -99,6 +105,14 @@ Referências principais:
 12. **Execuções reais só depois dos testes estruturais.** O smoke injetado
     prova o encadeamento técnico, não a qualidade do modelo nem a hipótese
     científica.
+13. **Seed de teste compartilhada.** A calibração e o episódio usam
+    `base_seed + 9999`. O calibrador registra `corrupted_test_seed`.
+14. **Perfil de velocidade é uma dimensão experimental.** Os perfis alteram o
+    timeout, a participação e o tempo virtual.
+    Não agregue resultados de perfis diferentes.
+    A escolha do default metodológico ainda está aberta.
+15. **Checkpoint contínuo.** Registre cada nova evidência, decisão, reversão,
+    bloqueio ou termo durável nos três artefatos.
 
 ## Invariantes e requisitos
 
@@ -119,55 +133,63 @@ Referências principais:
 
 ## Evidência experimental vigente
 
-O piloto observado foi:
+### Calibração uniforme corrigida
 
-```text
-dataset=cifar10
-seed=42
-scenario=gaussian_noise:5
-horizon=400 s
-include_controls=true
-device=mps:0
-```
+O artefato de 2026-07-29 usa a seed base 42 e a seed de teste 10041.
+O checkpoint é `9432a30f...`.
 
-O par visual foi aceito como v3 auditado e apresentou:
+- `gaussian_noise`: nenhuma severidade no intervalo estrito
+- `frosted_glass_blur:4`: 0.4237
+- `motion_blur:1`: 0.3744
+- `fog:4`: 0.4925.
 
-- acurácia corrompida no onset: 0.5353;
-- decisão após 120 s, exatamente com quorum 0.30;
-- cinco rounds em 78.5268 s virtuais;
-- acurácia corrompida final do agente: 0.7409;
-- acurácia corrompida final da baseline: 0.5353;
-- ganho corrompido do agente: +0.2056;
-- retenção limpa do agente: -0.0405;
-- downtime do agente e da baseline: 0 s.
+### Matriz principal anterior, heterogênea
 
-Conclusão vigente: o piloto prova que, nesta seed, o detector disparou e o
-retreino melhorou a acurácia sob ruído. Ele **não testa a hipótese primária de
-redução de downtime**, porque a acurácia no onset permaneceu acima de
-`tau=0.50`. O `time_to_recovery` desse piloto não representa recuperação de
-uma indisponibilidade real, pois não houve intervalo abaixo de `tau`.
+A matriz usou cinco seeds de `motion_blur:1`, cinco rounds e o perfil
+heterogêneo. O ganho corrompido médio foi +0.3006.
+O agente teve downtime médio de 111.99 s. A baseline teve downtime de 400 s.
+A retenção limpa média foi -0.2057.
+Esses resultados sustentam a redução de downtime no perfil heterogêneo.
+Não combine esses resultados com execuções uniformes.
 
-O controle Oracle `identity:0` disparou no primeiro tick, não produziu
-downtime e alterou a acurácia limpa em apenas +0.0026. Ele testa o caminho de
-ação quando o evento é conhecido; não mede falso positivo do detector real em
-dados limpos.
+### Exploração de rounds, uniforme, seed 42
+
+Os quatro pares `1/3/5/10` usam schema v3 e têm manifests válidos.
+Eles usam o checkpoint `9432a30f...`.
+O onset foi 0.3744. A decisão ocorreu após 90 s.
+A primeira recuperação ocorreu após 8.0037 s.
+
+| Rounds | Final corrompida | Ganho | Downtime | Retenção limpa | Duração |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.5895 | +0.2151 | 98.0037 s | -0.2123 | 8.0037 s |
+| 3 | 0.5967 | +0.2223 | 106.0073 s | -0.2243 | 24.0110 s |
+| 5 | 0.5025 | +0.1281 | 106.0073 s | -0.2409 | 40.0183 s |
+| 10 | 0.5758 | +0.2014 | 106.0073 s | -0.2318 | 80.0365 s |
+
+Um round teve o melhor resultado conjunto de downtime, custo e retenção.
+Três rounds adicionaram 0.0072 à acurácia corrompida final.
+Esse ganho exigiu mais tempo e causou maior perda limpa.
+O segundo round reduziu a acurácia para 0.4783.
+Mais rounds não garantiram uma acurácia maior.
+Um round ainda causou uma perda limpa de 0.2123.
 
 ## Bloqueios
 
-1. **Calibração ainda não confirmada.** Na última inspeção não existia
-   `output/cifar-10/severity-calibration/severity_calibration.json`. O usuário
-   iniciou a calibração, mas sua conclusão e os valores de `selected` ainda
-   não foram verificados.
-2. **Piloto sem downtime.** `gaussian_noise:5` resultou em 0.5353 no onset,
-   acima do limiar de 0.50.
-3. **Apenas uma seed.** `std=0` no resumo é consequência de `run_count=1`, não
-   evidência de estabilidade.
-4. **Wall-clock inviável para a matriz.** O piloto com controle levou cerca de
-   uma hora; durante a calibração foram relatados cerca de 30 minutos para 15
-   rounds.
-5. **Reprodutibilidade bit a bit no MPS não demonstrada.** O piloto registrou
-   `effective_device=mps:0`, mas algoritmos determinísticos estavam
-   desativados.
+1. **A documentação de handoff não contém o perfil de velocidade.**
+   O código e o checkpoint registram o perfil.
+   O handoff ainda não mostra a nova opção da CLI.
+2. **O resultado não registra a participação por round.**
+   O payload registra o perfil e os tiers.
+   O payload não mostra quais clientes excederam o timeout.
+   O JSON não prova a redução de retardatários.
+3. **A exploração de rounds usa uma seed.**
+   Ela ajuda a escolher o próximo teste.
+   Ela não sustenta a escolha final da política.
+4. **A perda limpa permanece alta.**
+   Um round reduziu a acurácia limpa em 21.23 pontos percentuais.
+5. **O MPS não tem reprodução bit a bit confirmada.**
+   Os artefatos registram `effective_device=mps:0`.
+   Os algoritmos determinísticos estavam desativados.
 
 ## Diagnóstico de desempenho vigente
 
@@ -190,8 +212,11 @@ ambiente Conda do usuário que atribua percentuais do wall-clock a cada causa.
 
 ## Questões em aberto
 
-- Quais severidades serão selecionadas pela calibração?
-- Alguma corrupção não terá severidade dentro do intervalo estrito?
+- `uniform` deve ser o cenário principal ou uma análise de sensibilidade?
+- O perfil uniforme deve manter o timeout p75?
+- O perfil uniforme deve incluir todos os clientes?
+- Quais campos devem registrar a participação e as durações por round?
+- Um round mantém o resultado observado nas seeds 43–46?
 - O checkpoint limpo deve ser reutilizado por seed entre todos os cenários e
   controles antes da matriz completa?
 - Qual modo piloto reduz custo sem ser confundido com evidência científica?
@@ -205,23 +230,23 @@ ambiente Conda do usuário que atribua percentuais do wall-clock a cada causa.
 
 - Implementar otimizações antes de medi-las.
 - Paralelizar clientes numa única GPU sem benchmark que demonstre benefício.
-- Alterar batch size, quantidade de rounds ou frequência de avaliação na
-  matriz científica sem registrar a mudança como configuração experimental.
-- Executar a matriz de cinco seeds enquanto calibração e wall-clock permanecem
-  bloqueadores.
+- Alterar batch size ou frequência de avaliação na matriz científica sem
+  registrar a mudança como configuração experimental.
+- Introduzir replay limpo, regularização ou outra estratégia de retenção antes
+  de concluir a sensibilidade de rounds dentro do escopo atual.
 
 ## Próximos passos
 
-1. Aguardar a calibração e inspecionar o JSON completo e `selected`.
-2. Confirmar que a severidade escolhida coloca o onset estritamente abaixo de
-   0.50 e acima de 0.25 em um piloto.
-3. Medir no ambiente Conda `federatedLearning` o wall-clock por:
+1. Documente a opção de perfil no handoff.
+2. Defina `uniform` como cenário principal ou análise de sensibilidade.
+3. Não misture resultados uniformes e heterogêneos.
+4. Registre a participação efetiva por round.
+5. Valide `retrain_rounds=1` nas seeds 43–46 com o perfil uniforme.
+6. Use uma calibração compatível com o perfil uniforme.
+7. Meça no ambiente Conda `federatedLearning` o wall-clock por:
    construção, cliente, round, avaliação, monitoramento e cópia de pesos.
-4. Decidir uma otimização preservando a semântica. A principal candidata é
+8. Escolha uma otimização que preserve a semântica. A principal opção é
    treinar e reutilizar um checkpoint limpo por seed entre cenários e
    controles.
-5. Criar, se aprovado, um modo piloto explicitamente não científico com
-   amostras/rounds reduzidos.
-6. Repetir o piloto calibrado, validar o par e gerar o gráfico.
-7. Somente então executar múltiplas seeds, analisar grupos separados e
-   reportar dispersão.
+9. Se um round ainda causar perda limpa alta, avalie replay ou regularização.
+10. Trate essa avaliação como uma nova pergunta experimental.

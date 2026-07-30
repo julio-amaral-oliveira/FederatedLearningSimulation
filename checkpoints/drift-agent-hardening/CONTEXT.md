@@ -109,6 +109,33 @@
   contém muitos batches e vários fits locais.
 - **Aliases ou nomes usados no código:** `run_one_round`, `run_rounds`.
 
+### Perfil de velocidade dos clientes
+
+- **Definição:** distribuição das faixas de duração virtual de treino.
+  O simulador usa essas faixas para calcular o timeout e a duração de cada
+  cliente.
+- **Não confundir com:** wall-clock real, seed do experimento ou quantidade
+  de rounds.
+- **Aliases ou nomes usados no código:** `client_speed_profile`,
+  `client_speed_tiers`, `SPEED_PROFILES`.
+
+### Perfil uniforme
+
+- **Definição:** todos os clientes usam o tier virtual
+  `("uniform", 0, 10, 1.0)`.
+- **Limite:** o simulador ainda gera durações diferentes para os clientes.
+  O timeout p75 não garante a participação de todos.
+- **Aliases ou nomes usados no código:** `client_speed_profile="uniform"`.
+
+### Perfil heterogêneo
+
+- **Definição:** os clientes usam os tiers `fast`, `medium`, `slow` e
+  `very_slow`. Cada tier tem uma faixa de duração virtual.
+- **Não confundir com:** distribuição não-IID dos dados. A heterogeneidade
+  temporal e a heterogeneidade estatística são eixos diferentes.
+- **Aliases ou nomes usados no código:**
+  `client_speed_profile="heterogeneous"`.
+
 ### Covariate drift visual
 
 - **Definição:** mudança em `P(X)` causada por transformação das imagens, com
@@ -169,6 +196,13 @@
   round do bloco.
 - **Não confundir com:** tempo até recuperação.
 - **Aliases ou nomes usados no código:** `retraining_duration_seconds`.
+
+### Sensibilidade de rounds
+
+- **Definição:** comparação de valores de `retrain_rounds`. A comparação
+  mantém cenário, seed, quorum, horizonte e perfil de velocidade.
+- **Não confundir com:** replicação entre seeds. Mais rounds não garantem
+  acurácia maior.
 
 ### Tempo até recuperação
 

@@ -255,3 +255,119 @@ Criados os três artefatos canônicos em
 cronologia e do glossário. Documentos de literatura e relatórios de revisão
 permanecem fontes de evidência referenciadas, não fontes concorrentes de
 estado atual.
+
+## 2026-07-30 — seed corrigida, uniformidade e exploração de rounds
+
+### Correção da seed de teste
+
+O episódio usava `base_seed + 9999` para a corrupção do teste.
+A calibração antiga usava a seed base.
+O primeiro teste falhou com `17 != 10016`.
+O código passou a usar uma função para calcular a seed de teste.
+O calibrador passou a registrar `corrupted_test_seed`.
+O commit `982c19d` contém a correção.
+A suíte completa passou em 116 testes e ignorou 2 testes de acelerador.
+
+### Matriz heterogênea de cinco seeds
+
+O validador aceitou os pares de `motion_blur:1` para as seeds 42–46.
+Cada execução usou cinco rounds e o perfil heterogêneo.
+O onset ficou entre 0.3136 e 0.3891.
+A decisão ocorreu após 90 s em todas as seeds.
+O ganho corrompido médio foi +0.3006.
+O agente teve downtime médio de 111.99 s.
+A baseline teve downtime de 400 s.
+A retenção limpa média foi -0.2057.
+A seed 45 ficou abaixo de `tau` durante rounds intermediários.
+
+### Alteração local de perfil de velocidade
+
+O usuário adicionou os perfis `uniform` e `heterogeneous`.
+O runner aceita `--client-speed-profile` e `--speed-profile`.
+O drift experiment usa `uniform` como default local.
+O perfil uniforme usa um tier com faixa de 0 a 10.
+Os módulos legados mantêm o perfil heterogêneo.
+
+O perfil uniforme remove as diferenças entre tiers.
+Ele não produz durações iguais para todos os clientes.
+O simulador ainda gera uma duração para cada cliente.
+O timeout p75 ainda pode excluir os clientes mais lentos.
+O perfil também altera o checkpoint, o timeout e o tempo virtual.
+Por isso, o perfil é uma dimensão experimental.
+
+A mudança está local e não tem commit.
+A suíte focada passou em 33 testes e ignorou 1 teste.
+Um teste de metadata v3 falhou.
+A expectativa não contém `client_speed_profile` e `client_speed_tiers`.
+Não há testes novos para a seleção do perfil ou para o default.
+Não há teste novo para a divisão do resumo por perfil.
+
+Uma validação anterior usou o ambiente Conda `federatedLearning`.
+Essa validação passou em 45 testes de runner, resultados e smoke E2E.
+Ela não executou `tests.test_drift_episode`.
+Por isso, ela não encontrou a expectativa incorreta.
+
+### Nova calibração uniforme
+
+O novo JSON usa a seed base 42 e `corrupted_test_seed=10041`.
+O checkpoint é `9432a30f...`.
+A exploração de rounds usa o mesmo checkpoint.
+
+- `gaussian_noise`: nenhuma
+- `frosted_glass_blur:4`: 0.4237
+- `motion_blur:1`: 0.3744
+- `fog:4`: 0.4925.
+
+### Exploração `motion_blur:1`, seed 42
+
+`load_persisted_pair` aceitou os pares com 1, 3, 5 e 10 rounds.
+Todos os pares usam o mesmo checkpoint e o perfil uniforme.
+O onset foi 0.3744.
+A decisão ocorreu após 90 s.
+
+- 1 round: final corrompida 0.5895, downtime 98.0037 s, retenção -0.2123,
+  duração 8.0037 s.
+- 3 rounds: final 0.5967, downtime 106.0073 s, retenção -0.2243, duração
+  24.0110 s.
+- 5 rounds: final 0.5025, downtime 106.0073 s, retenção -0.2409, duração
+  40.0183 s.
+- 10 rounds: final 0.5758, downtime 106.0073 s, retenção -0.2318, duração
+  80.0365 s.
+
+O primeiro round atingiu 0.5895.
+O segundo round reduziu a acurácia para 0.4783.
+O terceiro round aumentou a acurácia para 0.5967.
+Mais rounds não produziram uma melhora contínua.
+Um round teve o melhor resultado conjunto de downtime, custo e retenção.
+Três rounds adicionaram 0.0072 à acurácia final.
+Um round ainda causou uma perda limpa de 0.2123.
+
+### Decisão provisória
+
+Não adicione replay limpo ou regularização agora.
+Primeiro, consolide e documente o perfil de velocidade.
+Depois, corrija os testes e valide um round em outras seeds.
+Se a perda limpa continuar alta, defina uma nova pergunta experimental.
+Não adicione uma estratégia de retenção como um ajuste sem registro.
+
+O usuário pediu o uso contínuo da skill `maintaining-project-checkpoints`.
+As próximas mudanças devem atualizar os três artefatos canônicos.
+
+### Perfis de velocidade consolidados
+
+O commit `73839fd` adicionou os perfis configuráveis.
+O drift experiment usa o perfil uniforme como default.
+Os executáveis legados usam o perfil heterogêneo como default.
+
+O teste de metadata v3 agora exige o perfil e os tiers resolvidos.
+Os testes também verificam o default uniforme.
+Outro teste verifica a seleção explícita do perfil heterogêneo.
+Um teste verifica a propagação do perfil para a matriz.
+Um teste verifica os perfis centrais dos módulos síncrono e assíncrono.
+Um teste verifica a divisão do resumo por perfil.
+
+A suíte focada executou 34 testes.
+Ela passou em 33 testes e ignorou 1 teste de acelerador.
+A suíte completa executou 121 testes.
+Ela passou em 119 testes e ignorou 2 testes de acelerador.
+`py_compile` e `git diff --check` passaram.
