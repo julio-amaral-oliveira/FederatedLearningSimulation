@@ -15,9 +15,43 @@ from experiments.run_smoke_drift import (
     run_matrix,
 )
 from experiments.smoke_drift import DriftEpisodeConfig
+from src.asynchronous.constants import (
+    DEFAULT_SPEED_PROFILE as ASYNC_DEFAULT_SPEED_PROFILE,
+    SPEED_PROFILES as ASYNC_SPEED_PROFILES,
+)
+from src.synchronous.constants import (
+    DEFAULT_SPEED_PROFILE as SYNC_DEFAULT_SPEED_PROFILE,
+    SPEED_PROFILES as SYNC_SPEED_PROFILES,
+)
 
 
 class TestDriftRunMatrix(unittest.TestCase):
+    def test_sync_and_async_share_the_named_speed_profiles(self):
+        self.assertEqual(SYNC_SPEED_PROFILES, ASYNC_SPEED_PROFILES)
+        self.assertEqual(SYNC_DEFAULT_SPEED_PROFILE, "heterogeneous")
+        self.assertEqual(ASYNC_DEFAULT_SPEED_PROFILE, "heterogeneous")
+
+    def test_drift_config_and_matrix_cli_default_to_uniform_speed_profile(self):
+        self.assertEqual(DriftEpisodeConfig().client_speed_profile, "uniform")
+        self.assertEqual(parse_args([]).client_speed_profile, "uniform")
+
+    def test_matrix_cli_accepts_the_heterogeneous_speed_profile_alias(self):
+        args = parse_args(["--speed-profile", "heterogeneous"])
+
+        self.assertEqual(args.client_speed_profile, "heterogeneous")
+
+    def test_build_run_matrix_preserves_the_requested_speed_profile(self):
+        configs = build_run_matrix(
+            seeds=[42, 43],
+            scenarios=[("motion_blur", 1)],
+            base_config=DriftEpisodeConfig(client_speed_profile="heterogeneous"),
+        )
+
+        self.assertEqual(
+            [config.client_speed_profile for config in configs],
+            ["heterogeneous", "heterogeneous"],
+        )
+
     def test_builds_explicit_seed_and_scenario_product_without_sensitivities(self):
         configs = build_run_matrix(
             seeds=[11, 12],
@@ -270,6 +304,63 @@ class TestDriftRunMatrix(unittest.TestCase):
             group["agent"]["downtime_seconds"],
             {"count": 2, "mean": 3.0, "std": 1.0, "min": 2.0, "max": 4.0},
         )
+
+    def test_summary_partitions_client_speed_profiles(self):
+        def runner(config, **_kwargs):
+            def result(*, baseline):
+                return {
+                    "schema_version": 2,
+                    "metadata": {
+                        "corruption": config.corruption,
+                        "severity": config.severity,
+                        "seed": config.seed,
+                        "baseline": baseline,
+                        "production_start_time": 0.0,
+                        "end_time_seconds": 400.0,
+                    },
+                    "corrupted_accuracy_history": [],
+                    "clean_evaluations": [],
+                    "metrics": {"downtime_seconds": 2.0},
+                }
+
+            return {
+                "agent": result(baseline=False),
+                "baseline": result(baseline=True),
+            }
+
+        configs = [
+            DriftEpisodeConfig(
+                corruption="noise",
+                severity=2,
+                seed=1,
+                client_speed_profile="uniform",
+                production_horizon_seconds=400.0,
+            ),
+            DriftEpisodeConfig(
+                corruption="noise",
+                severity=2,
+                seed=2,
+                client_speed_profile="heterogeneous",
+                production_horizon_seconds=400.0,
+            ),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            run_matrix(
+                configs,
+                output_dir=directory,
+                runner=runner,
+                corruption_fn=identity_corruption,
+            )
+            summary = json.loads((Path(directory) / "summary.json").read_text())
+
+        self.assertEqual(
+            {
+                group["dimensions"]["client_speed_profile"]
+                for group in summary["groups"].values()
+            },
+            {"uniform", "heterogeneous"},
+        )
+        self.assertEqual(len(summary["groups"]), 2)
 
     def test_cli_exposes_explicit_matrix_and_control_options(self):
         args = parse_args(

@@ -27,9 +27,13 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
+from synchronous.constants import SPEED_PROFILES
+
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
 DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
 CORRUPTED_TEST_SEED_OFFSET = 9_999
+DEFAULT_CLIENT_SPEED_PROFILE = "uniform"
+CLIENT_SPEED_PROFILES = tuple(SPEED_PROFILES)
 
 
 def corrupted_test_seed(base_seed: int) -> int:
@@ -53,6 +57,7 @@ class DriftEpisodeConfig:
     local_epochs: int = 1
     batch_size: int = 32
     timeout_percentile: int = 75
+    client_speed_profile: str = DEFAULT_CLIENT_SPEED_PROFILE
     max_train_samples_per_client: int | None = None
     tau: float = 0.50
     corruption: str = "gaussian_noise"
@@ -142,7 +147,7 @@ def _run_retraining(
 
 
 def _experiment_config(config: DriftEpisodeConfig) -> dict:
-    """Return only user-controlled experiment inputs that affect an episode."""
+    """Return the effective experiment inputs that affect an episode."""
     return {
         "dataset": config.dataset,
         "num_clients": config.num_clients,
@@ -154,6 +159,10 @@ def _experiment_config(config: DriftEpisodeConfig) -> dict:
         "local_epochs": config.local_epochs,
         "batch_size": config.batch_size,
         "timeout_percentile": config.timeout_percentile,
+        "client_speed_profile": config.client_speed_profile,
+        "client_speed_tiers": [
+            list(tier) for tier in _speed_tiers_for_profile(config.client_speed_profile)
+        ],
         "max_train_samples_per_client": config.max_train_samples_per_client,
         "tau": config.tau,
         "corruption": config.corruption,
@@ -162,6 +171,18 @@ def _experiment_config(config: DriftEpisodeConfig) -> dict:
         "baseline": config.baseline,
         "production_horizon_seconds": config.production_horizon_seconds,
     }
+
+
+def _speed_tiers_for_profile(
+    profile: str,
+) -> tuple[tuple[str, int, int, float], ...]:
+    try:
+        return tuple(SPEED_PROFILES[profile])
+    except KeyError as error:
+        choices = ", ".join(CLIENT_SPEED_PROFILES)
+        raise ValueError(
+            f"unknown client speed profile {profile!r}; expected one of: {choices}"
+        ) from error
 
 
 def _detector_config(config: DriftEpisodeConfig) -> dict:
@@ -280,7 +301,6 @@ def _build_server(config: DriftEpisodeConfig):
         MAX_CONNECTION_TIME,
         MIN_CONNECTION_TIME,
         SPEED_TIER_SEED,
-        SPEED_TIERS,
     )
     from synchronous.monte_carlo import get_percentiles_timeout
     from synchronous.server import Server
@@ -296,10 +316,14 @@ def _build_server(config: DriftEpisodeConfig):
             (x[: config.max_train_samples_per_client], y[: config.max_train_samples_per_client])
             for x, y in client_data
         ]
+    speed_tiers = _speed_tiers_for_profile(config.client_speed_profile)
     timeout = get_percentiles_timeout(
-        [config.timeout_percentile], MIN_CONNECTION_TIME, MAX_CONNECTION_TIME, SPEED_TIERS
+        [config.timeout_percentile],
+        MIN_CONNECTION_TIME,
+        MAX_CONNECTION_TIME,
+        speed_tiers,
     )[0]
-    speeds = assign_speed_tiers(config.num_clients, SPEED_TIERS, SPEED_TIER_SEED)
+    speeds = assign_speed_tiers(config.num_clients, speed_tiers, SPEED_TIER_SEED)
     clients = [
         Client(dataset, index + 1, (speed[1], speed[2]), speed[0])
         for index, (dataset, speed) in enumerate(zip(client_data, speeds))
@@ -650,6 +674,12 @@ def main() -> None:
     parser.add_argument("--severity", type=int, default=3)
     parser.add_argument("--output-dir", default="output/cifar-10/drift-agent")
     parser.add_argument(
+        "--client-speed-profile",
+        "--speed-profile",
+        choices=CLIENT_SPEED_PROFILES,
+        default=DEFAULT_CLIENT_SPEED_PROFILE,
+    )
+    parser.add_argument(
         "--production-horizon-seconds",
         type=float,
         default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
@@ -665,6 +695,7 @@ def main() -> None:
         corruption=args.corruption,
         severity=args.severity,
         output_dir=args.output_dir,
+        client_speed_profile=args.client_speed_profile,
         production_horizon_seconds=args.production_horizon_seconds,
     )
     results = run_drift_comparison(config, corruption_fn=apply_corruption)

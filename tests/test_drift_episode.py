@@ -296,6 +296,8 @@ class TestDriftEpisode(unittest.TestCase):
                 "local_epochs": 2,
                 "batch_size": 4,
                 "timeout_percentile": 80,
+                "client_speed_profile": "uniform",
+                "client_speed_tiers": [["uniform", 0, 10, 1.0]],
                 "max_train_samples_per_client": 9,
                 "tau": 0.6,
                 "corruption": "gaussian_blur",

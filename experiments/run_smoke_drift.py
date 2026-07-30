@@ -14,6 +14,8 @@ from typing import Callable, Iterable, Sequence
 from experiments.drift_controls import OracleMonitor, identity_corruption
 from experiments.result_io import atomic_write_json, save_validated_pair
 from experiments.smoke_drift import (
+    CLIENT_SPEED_PROFILES,
+    DEFAULT_CLIENT_SPEED_PROFILE,
     DEFAULT_PRODUCTION_HORIZON_SECONDS,
     DriftEpisodeConfig,
     run_drift_comparison,
@@ -103,6 +105,7 @@ def _summary_dimensions(
         "trigger_policy": trigger_policy,
         "quorum": config.trigger_threshold,
         "retrain_rounds": config.retrain_rounds,
+        "client_speed_profile": config.client_speed_profile,
         "production_horizon_seconds": config.production_horizon_seconds,
     }
 
@@ -257,6 +260,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--quorums", nargs="+", type=float)
     parser.add_argument("--retrain-rounds", nargs="+", type=int)
     parser.add_argument(
+        "--client-speed-profile",
+        "--speed-profile",
+        choices=CLIENT_SPEED_PROFILES,
+        default=DEFAULT_CLIENT_SPEED_PROFILE,
+    )
+    parser.add_argument(
         "--production-horizon-seconds",
         type=float,
         default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
@@ -275,6 +284,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         base_config=DriftEpisodeConfig(
             dataset=args.dataset,
             output_dir=args.output_dir,
+            client_speed_profile=args.client_speed_profile,
             production_horizon_seconds=args.production_horizon_seconds,
         ),
     )
