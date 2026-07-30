@@ -371,3 +371,96 @@ Ela passou em 33 testes e ignorou 1 teste de acelerador.
 A suíte completa executou 121 testes.
 Ela passou em 119 testes e ignorou 2 testes de acelerador.
 `py_compile` e `git diff --check` passaram.
+
+### Papel dos perfis de velocidade
+
+O usuário confirmou o perfil uniforme como cenário principal.
+O perfil heterogêneo fica como análise de sensibilidade.
+Esta decisão remove a questão pendente sobre o default metodológico.
+
+### Matriz principal definida
+
+O usuário decidiu encerrar os testes ponto a ponto.
+A matriz principal usará as seeds 42–46.
+Ela usará o perfil uniforme, quorum 0.30 e um round.
+Ela incluirá `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`.
+Ela também incluirá os controles Oracle.
+`gaussian_noise` fica fora porque a calibração não selecionou uma severidade.
+
+### Matriz principal concluída
+
+O runner concluiu a matriz em
+`output/cifar-10/drift-agent/final-matrix`.
+A inspeção encontrou 20 arquivos `agent.json`.
+Ela também encontrou 20 arquivos `baseline.json`.
+Cada um dos 20 pares tem um `pair-manifest.json`.
+
+Cada cenário contém as seeds 42–46.
+Os cenários são `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`.
+O controle Oracle `identity:0` também contém as cinco seeds.
+A análise agregada dos resultados ainda está pendente.
+
+### Gráficos individuais gerados
+
+O plotter usou o Python do ambiente Conda `federatedLearning`.
+Ele gerou um arquivo `comparison.png` para cada par.
+A verificação encontrou 20 arquivos com conteúdo.
+O plotter validou cada par antes de salvar o gráfico.
+
+A inspeção visual usou `motion_blur:1`, seed 42.
+O gráfico mostrou agente, baseline, tau, onset e horizonte.
+Ele também mostrou a decisão, o round e a primeira recuperação.
+O aviso de cache do Fontconfig não impediu a geração.
+
+### Proposta de gráfico agregado por corrupção
+
+Um subagente sem contexto anterior analisou os JSONs e o plotter atual.
+Ele não editou arquivos.
+Ele recomendou uma figura composta para cada corrupção.
+
+O painel superior usaria tempo desde o onset.
+Ele mostraria as cinco seeds como curvas em degraus.
+Linhas sólidas representariam o agente.
+Linhas tracejadas representariam a baseline.
+Uma linha espessa mostraria a média de cada braço.
+Uma faixa translúcida mostraria o mínimo e o máximo observados.
+Essa faixa não seria apresentada como intervalo de confiança.
+
+Três painéis inferiores usariam dumbbells pareados por seed.
+Eles mostrariam acurácia corrompida final, downtime e retenção limpa.
+A figura manteria o controle `identity:0` separado e identificado como Oracle.
+
+O subagente rejeitou barras, violinos e médias isoladas.
+Essas opções esconderiam o pareamento ou a variabilidade com cinco seeds.
+A proposta ainda depende de aprovação e implementação.
+
+### Plotter agregado implementado do zero
+
+O usuário pediu a exclusão do plotter anterior.
+O arquivo `experiments/plot_smoke_drift.py` foi excluído.
+Um subagente sem contexto anterior recriou o arquivo do zero.
+Ele recebeu somente `experiments/smoke_drift.py` e exemplos JSON.
+Ele não consultou a implementação excluída.
+
+A nova CLI recebe `--scenario-dir` e `--output`.
+Ela descobre os pares `agent.json` e `baseline.json` por seed.
+Ela rejeita grupos vazios, braços ausentes e dimensões incompatíveis.
+Ela normaliza o tempo desde o onset.
+Ela usa curvas em degraus e alinhamento por forward-fill.
+Ela mostra as trajetórias, as médias e a faixa mínima–máxima.
+Ela também mostra os três dumbbells pareados.
+
+A inspeção visual encontrou dois problemas no controle Oracle.
+O eixo de downtime ampliava ruído numérico próximo de zero.
+Os marcadores coincidentes também escondiam a baseline.
+O implementador fixou o eixo entre zero e o horizonte.
+Ele também usou um círculo aberto maior para a baseline.
+
+Os testes antigos passaram a usar o contrato por cenário.
+A suíte completa executou 127 testes.
+Ela passou em 125 testes e ignorou 2 testes de acelerador.
+O commit `90b230b` contém o plotter e os testes.
+
+O plotter gerou quatro figuras `seeds_42-46_comparison.png`.
+Cada cenário da matriz principal contém uma figura.
+A inspeção visual confirmou `motion_blur:1` e o controle Oracle `identity:0`.

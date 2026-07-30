@@ -43,12 +43,12 @@ checkpoint, stream e horizonte virtual.
 ## Estado do código
 
 - Branch: `feature/drift-agent-hardening`.
-- Último commit de código observado: `73839fd`
-  (`feat: add configurable client speed profiles`).
+- Último commit de código observado: `90b230b`
+  (`feat: compare drift results across seeds`).
 - Base da implementação endurecida: `c9e9355`.
 - A revisão final e a re-revisão concluíram **Ready**.
-- A última verificação completa executou 121 testes.
-- A verificação passou em 119 testes.
+- A última verificação completa executou 127 testes.
+- A verificação passou em 125 testes.
 - A verificação ignorou 2 testes condicionais de CUDA/MPS.
 - O experimento usa `uniform` como default.
 - Os módulos legados síncrono e assíncrono usam `heterogeneous` como default.
@@ -110,9 +110,15 @@ Referências principais:
 14. **Perfil de velocidade é uma dimensão experimental.** Os perfis alteram o
     timeout, a participação e o tempo virtual.
     Não agregue resultados de perfis diferentes.
-    A escolha do default metodológico ainda está aberta.
+    O perfil uniforme é o cenário principal.
+    O perfil heterogêneo é uma análise de sensibilidade.
 15. **Checkpoint contínuo.** Registre cada nova evidência, decisão, reversão,
     bloqueio ou termo durável nos três artefatos.
+16. **Política da matriz principal.** A matriz usa o perfil uniforme, quorum
+    0.30, um round e as seeds 42–46.
+    A matriz usa `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`.
+    `gaussian_noise` fica fora porque a calibração não selecionou uma
+    severidade.
 
 ## Invariantes e requisitos
 
@@ -173,6 +179,29 @@ O segundo round reduziu a acurácia para 0.4783.
 Mais rounds não garantiram uma acurácia maior.
 Um round ainda causou uma perda limpa de 0.2123.
 
+### Matriz principal uniforme concluída
+
+O runner gerou 20 pares em `output/cifar-10/drift-agent/final-matrix`.
+Cada par tem `agent.json`, `baseline.json` e `pair-manifest.json`.
+A matriz contém cinco seeds para cada cenário selecionado.
+Ela contém `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`.
+Ela também contém cinco pares do controle Oracle `identity:0`.
+O plotter gerou um arquivo `comparison.png` para cada um dos 20 pares.
+Todos os 20 arquivos existem e têm conteúdo.
+A inspeção visual de `motion_blur:1`, seed 42, confirmou o plot esperado.
+Os artefatos estão completos, mas a análise agregada ainda está pendente.
+
+### Visualização por corrupção implementada
+
+Um subagente sem contexto anterior recriou o plotter do zero.
+Ele usou apenas `smoke_drift.py` e exemplos JSON como contexto.
+O painel superior mostra as cinco seeds como curvas em degraus.
+Ele também mostra a média e a faixa mínima–máxima observada.
+Três painéis inferiores mostram métricas pareadas por seed.
+As métricas são acurácia corrompida final, downtime e retenção limpa.
+O commit `90b230b` contém o código e os testes.
+O plotter gerou quatro figuras agregadas, uma para cada cenário.
+
 ## Bloqueios
 
 1. **A documentação de handoff não contém o perfil de velocidade.**
@@ -212,11 +241,10 @@ ambiente Conda do usuário que atribua percentuais do wall-clock a cada causa.
 
 ## Questões em aberto
 
-- `uniform` deve ser o cenário principal ou uma análise de sensibilidade?
 - O perfil uniforme deve manter o timeout p75?
 - O perfil uniforme deve incluir todos os clientes?
 - Quais campos devem registrar a participação e as durações por round?
-- Um round mantém o resultado observado nas seeds 43–46?
+- A matriz principal confirma o resultado de um round nas seeds 42–46?
 - O checkpoint limpo deve ser reutilizado por seed entre todos os cenários e
   controles antes da matriz completa?
 - Qual modo piloto reduz custo sem ser confundido com evidência científica?
@@ -238,15 +266,14 @@ ambiente Conda do usuário que atribua percentuais do wall-clock a cada causa.
 ## Próximos passos
 
 1. Documente a opção de perfil no handoff.
-2. Defina `uniform` como cenário principal ou análise de sensibilidade.
-3. Não misture resultados uniformes e heterogêneos.
-4. Registre a participação efetiva por round.
-5. Valide `retrain_rounds=1` nas seeds 43–46 com o perfil uniforme.
-6. Use uma calibração compatível com o perfil uniforme.
-7. Meça no ambiente Conda `federatedLearning` o wall-clock por:
+2. Não misture resultados uniformes e heterogêneos.
+3. Registre a participação efetiva por round.
+4. Carregue os 20 manifests e gere o resumo particionado.
+5. Analise downtime, atraso, recuperação e retenção limpa por cenário.
+6. Meça no ambiente Conda `federatedLearning` o wall-clock por:
    construção, cliente, round, avaliação, monitoramento e cópia de pesos.
-8. Escolha uma otimização que preserve a semântica. A principal opção é
+7. Escolha uma otimização que preserve a semântica. A principal opção é
    treinar e reutilizar um checkpoint limpo por seed entre cenários e
    controles.
-9. Se um round ainda causar perda limpa alta, avalie replay ou regularização.
-10. Trate essa avaliação como uma nova pergunta experimental.
+8. Se um round ainda causar perda limpa alta, avalie replay ou regularização.
+9. Trate essa avaliação como uma nova pergunta experimental.
