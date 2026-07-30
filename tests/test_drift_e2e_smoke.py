@@ -9,7 +9,7 @@ import numpy as np
 import torch.nn as nn
 
 from experiments.drift_results import validate_pair
-from experiments.plot_smoke_drift import plot_drift_pair
+from experiments.plot_smoke_drift import plot_scenario
 from experiments.result_io import load_persisted_pair
 from experiments.run_smoke_drift import run_matrix
 from experiments.smoke_drift import DriftEpisodeConfig, run_drift_comparison
@@ -161,7 +161,10 @@ class TestDriftWorkflowEndToEndSmoke(unittest.TestCase):
             agent, baseline = load_persisted_pair(agent_path.parent)
             validate_pair(agent, baseline)
             summary = json.loads((root / "summary.json").read_text(encoding="utf-8"))
-            image_path = plot_drift_pair(baseline, agent, root / "comparison.png")
+            image_path = plot_scenario(
+                agent_path.parent.parent,
+                root / "comparison.png",
+            )
 
             self.assertEqual(agent.schema_version, 3)
             self.assertEqual(baseline.schema_version, 3)

@@ -17,7 +17,7 @@ from experiments.result_io import (
     load_persisted_pair,
     save_validated_pair,
 )
-from experiments.plot_smoke_drift import plot_drift_pair
+from experiments.plot_smoke_drift import plot_scenario
 from experiments.run_smoke_drift import run_matrix
 from experiments.smoke_drift import (
     DriftEpisodeConfig,
@@ -754,13 +754,20 @@ class TestDriftResultPersistence(unittest.TestCase):
 class TestDriftPlot(unittest.TestCase):
     def test_generates_non_empty_png_with_agg_backend(self):
         with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "comparison.png"
-
-            result = plot_drift_pair(
-                _v3_payload(baseline=True),
-                _v3_payload(),
-                output,
+            root = Path(directory)
+            seed_directory = root / "gaussian_noise_sev3" / "seed_42"
+            seed_directory.mkdir(parents=True)
+            (seed_directory / "agent.json").write_text(
+                json.dumps(_v3_payload()),
+                encoding="utf-8",
             )
+            (seed_directory / "baseline.json").write_text(
+                json.dumps(_v3_payload(baseline=True)),
+                encoding="utf-8",
+            )
+            output = root / "comparison.png"
+
+            result = plot_scenario(seed_directory.parent, output)
 
             self.assertEqual(result, output)
             self.assertTrue(output.is_file())
