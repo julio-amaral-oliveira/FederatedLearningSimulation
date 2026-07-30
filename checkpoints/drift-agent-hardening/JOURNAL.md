@@ -464,3 +464,12 @@ O commit `90b230b` contém o plotter e os testes.
 O plotter gerou quatro figuras `seeds_42-46_comparison.png`.
 Cada cenário da matriz principal contém uma figura.
 A inspeção visual confirmou `motion_blur:1` e o controle Oracle `identity:0`.
+
+### Gráficos antigos substituídos
+
+Os 20 diretórios de seed ainda continham `comparison.png`.
+Esses arquivos vieram do plotter individual excluído.
+O usuário pediu a substituição pelos gráficos agregados.
+Os 20 arquivos individuais foram removidos.
+Os quatro arquivos `seeds_42-46_comparison.png` foram mantidos.
+Cada cenário agora contém somente o gráfico do plotter novo.

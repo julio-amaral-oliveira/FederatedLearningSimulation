@@ -186,9 +186,9 @@ Cada par tem `agent.json`, `baseline.json` e `pair-manifest.json`.
 A matriz contém cinco seeds para cada cenário selecionado.
 Ela contém `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`.
 Ela também contém cinco pares do controle Oracle `identity:0`.
-O plotter gerou um arquivo `comparison.png` para cada um dos 20 pares.
-Todos os 20 arquivos existem e têm conteúdo.
-A inspeção visual de `motion_blur:1`, seed 42, confirmou o plot esperado.
+Os 20 gráficos individuais do plotter antigo foram removidos.
+Cada cenário mantém somente seu gráfico agregado `seeds_42-46_comparison.png`.
+As quatro figuras agregadas existem e têm conteúdo.
 Os artefatos estão completos, mas a análise agregada ainda está pendente.
 
 ### Visualização por corrupção implementada
