@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.ticker import PercentFormatter
 
 
@@ -343,20 +344,54 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         Line2D([0], [0], color=color, linewidth=2, label=f"Seed {pair.seed}")
         for pair, color in zip(pairs, colors)
     ]
-    semantic_handles = [
-        Line2D([0], [0], color="#1557a0", linewidth=3, label="Agent mean"),
+    style_handles = [
         Line2D(
-            [0], [0], color="#a84d10", linewidth=3, linestyle="--", label="Baseline mean"
+            [0],
+            [0],
+            color="#555555",
+            linestyle="-",
+            linewidth=1.8,
+            label="Agent (solid, with retraining)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="#555555",
+            linestyle="--",
+            linewidth=1.8,
+            label="Baseline (dashed, no retraining)",
+        ),
+    ]
+    semantic_handles = [
+        Line2D(
+            [0],
+            [0],
+            color="#1557a0",
+            linewidth=3,
+            label="Agent mean (solid, with retraining)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="#a84d10",
+            linewidth=3,
+            linestyle="--",
+            label="Baseline mean (dashed, no retraining)",
         ),
         Line2D([0], [0], color="#555555", linestyle=":", label=f"τ = {sample.tau:g}"),
         Line2D([0], [0], color="#777777", alpha=0.4, label="Decision / retraining"),
     ]
-    first_legend = axis.legend(handles=seed_handles, loc="lower right", ncol=2, fontsize=8)
+    first_legend = axis.legend(
+        handles=[*seed_handles, *style_handles],
+        loc="lower right",
+        ncol=2,
+        fontsize=8,
+    )
     axis.add_artist(first_legend)
     axis.legend(handles=semantic_handles, loc="upper right", fontsize=8)
 
 
-def _plot_dumbbell(
+def _plot_grouped_bars(
     axis,
     pairs: Sequence[SeedPair],
     colors: Sequence[Any],
@@ -364,36 +399,52 @@ def _plot_dumbbell(
     title: str,
     percent: bool,
     x_limits: tuple[float, float] | None = None,
+    percent_decimals: int | None = None,
 ) -> None:
     y = np.arange(len(pairs), dtype=float)
     agent_values = np.asarray([getattr(pair.agent, field) for pair in pairs])
     baseline_values = np.asarray([getattr(pair.baseline, field) for pair in pairs])
+
+    bar_height = 0.30
+    offset = 0.18
     for row, agent, baseline, color in zip(y, agent_values, baseline_values, colors):
-        axis.plot([baseline, agent], [row, row], color=color, linewidth=1.5, alpha=0.75)
-        axis.scatter(agent, row, s=34, color=color, marker="o", zorder=3)
-        axis.scatter(
+        axis.barh(
+            row - offset,
             baseline,
-            row,
-            s=72,
-            facecolor="none",
+            height=bar_height,
+            color="white",
             edgecolor=color,
-            linewidth=1.5,
-            zorder=4,
+            hatch="//",
+            linewidth=1.2,
+        )
+        axis.barh(
+            row + offset,
+            agent,
+            height=bar_height,
+            color=color,
+            edgecolor=color,
+            linewidth=0.8,
         )
 
-    mean_row = len(pairs) + 0.55
+    mean_row = len(pairs) + 0.85
     agent_mean = float(np.mean(agent_values))
     baseline_mean = float(np.mean(baseline_values))
-    axis.plot([baseline_mean, agent_mean], [mean_row, mean_row], color="black", linewidth=2.4)
-    axis.scatter(agent_mean, mean_row, s=50, color="black", zorder=3)
-    axis.scatter(
+    axis.barh(
+        mean_row - offset,
         baseline_mean,
-        mean_row,
-        s=92,
-        facecolor="none",
+        height=bar_height,
+        color="white",
         edgecolor="black",
-        linewidth=1.7,
-        zorder=4,
+        hatch="//",
+        linewidth=1.5,
+    )
+    axis.barh(
+        mean_row + offset,
+        agent_mean,
+        height=bar_height,
+        color="black",
+        edgecolor="black",
+        linewidth=0.8,
     )
     axis.axvline(0, color="#777777", linewidth=0.8, alpha=0.55)
     axis.set_yticks([*y, mean_row], [*[f"Seed {pair.seed}" for pair in pairs], "Mean"])
@@ -401,14 +452,15 @@ def _plot_dumbbell(
     axis.set_title(title, fontsize=10)
     axis.grid(axis="x", alpha=0.2)
     if percent:
-        axis.xaxis.set_major_formatter(PercentFormatter(1.0))
+        axis.xaxis.set_major_formatter(
+            PercentFormatter(1.0, decimals=percent_decimals)
+        )
     else:
         axis.set_xlabel("Seconds")
     if x_limits is None:
         axis.margins(x=0.12)
     else:
         axis.set_xlim(*x_limits)
-
 
 def build_figure(pairs: Sequence[SeedPair]) -> Figure:
     """Build the grouped trajectory and paired-outcome figure."""
@@ -422,7 +474,7 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
     bottom_axes = [figure.add_subplot(grid[1, index]) for index in range(3)]
 
     _plot_trajectories(trajectory_axis, pairs, colors)
-    _plot_dumbbell(
+    _plot_grouped_bars(
         bottom_axes[0],
         pairs,
         colors,
@@ -430,22 +482,23 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
         "Final corrupted accuracy",
         True,
     )
-    _plot_dumbbell(
+    _plot_grouped_bars(
         bottom_axes[1],
         pairs,
         colors,
         "downtime",
         "Downtime",
         False,
-        x_limits=(0.0, pairs[0].agent.horizon),
+        x_limits=(0.0, pairs[0].agent.horizon * 1.20),
     )
-    _plot_dumbbell(
+    _plot_grouped_bars(
         bottom_axes[2],
         pairs,
         colors,
         "clean_retention_delta",
         "Clean retention Δ",
         True,
+        percent_decimals=2,
     )
     bottom_axes[1].tick_params(axis="y", labelleft=False)
     bottom_axes[2].tick_params(axis="y", labelleft=False)
@@ -464,18 +517,16 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
     )
     figure.legend(
         handles=[
-            Line2D(
-                [0], [0], marker="o", color="black", linestyle="", label="Agent (filled)"
+            Patch(
+                facecolor="black",
+                edgecolor="black",
+                label="Agent (filled bar)",
             ),
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                markerfacecolor="white",
-                markeredgecolor="black",
-                color="white",
-                linestyle="",
-                label="Baseline (open)",
+            Patch(
+                facecolor="white",
+                edgecolor="black",
+                hatch="//",
+                label="Baseline (hatched bar, no retraining)",
             ),
         ],
         loc="outside lower center",

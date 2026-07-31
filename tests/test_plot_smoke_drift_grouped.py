@@ -89,8 +89,23 @@ class PlotSmokeDriftTests(unittest.TestCase):
             figure = build_figure(pairs)
             self.assertEqual([pair.seed for pair in pairs], [42, 43])
             self.assertIn("oracle-trigger control", figure._suptitle.get_text())
+            trajectory_legend = figure.axes[0].get_legend()
+            self.assertIsNotNone(trajectory_legend)
+            self.assertIn(
+                "Baseline mean (dashed, no retraining)",
+                [text.get_text() for text in trajectory_legend.get_texts()],
+            )
+            seed_legend = figure.axes[0].artists[0]
+            self.assertIn(
+                "Agent (solid, with retraining)",
+                [text.get_text() for text in seed_legend.get_texts()],
+            )
+            self.assertIn(
+                "Baseline (dashed, no retraining)",
+                [text.get_text() for text in seed_legend.get_texts()],
+            )
 
-    def test_zero_downtime_uses_horizon_scale_and_keeps_both_markers_visible(
+    def test_zero_downtime_uses_horizon_scale_and_keeps_both_bars_visible(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -98,18 +113,21 @@ class PlotSmokeDriftTests(unittest.TestCase):
             _write_pair(root, "seed_42", 42)
             figure = build_figure(load_scenario(root))
             downtime_axis = figure.axes[2]
-            self.assertEqual(downtime_axis.get_xlim(), (0.0, 40.0))
+            self.assertEqual(downtime_axis.get_xlim(), (0.0, 48.0))
 
-            seed_agent, seed_baseline = downtime_axis.collections[:2]
-            mean_agent, mean_baseline = downtime_axis.collections[-2:]
-            self.assertGreater(
-                seed_baseline.get_sizes()[0], seed_agent.get_sizes()[0]
-            )
-            self.assertGreater(
-                mean_baseline.get_sizes()[0], mean_agent.get_sizes()[0]
-            )
-            self.assertEqual(seed_baseline.get_facecolors().size, 0)
-            self.assertEqual(mean_baseline.get_facecolors().size, 0)
+            self.assertEqual(len(downtime_axis.patches), 4)
+            self.assertEqual(downtime_axis.patches[0].get_hatch(), "//")
+            self.assertIsNone(downtime_axis.patches[1].get_hatch())
+            self.assertEqual(downtime_axis.patches[2].get_hatch(), "//")
+            self.assertIsNone(downtime_axis.patches[3].get_hatch())
+
+    def test_clean_retention_uses_two_percent_decimals(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_pair(root, "seed_42", 42)
+            figure = build_figure(load_scenario(root))
+            retention_axis = figure.axes[3]
+            self.assertEqual(retention_axis.xaxis.get_major_formatter().decimals, 2)
 
     def test_rejects_missing_arm(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
