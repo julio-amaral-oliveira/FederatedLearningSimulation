@@ -38,7 +38,7 @@ def apply_corruption(
 
     # 5. Aplicação da Corrupção
     if kind == 'gaussian_noise':
-        std_levels = [0.04, 0.06, 0.08, 0.09, 0.10]
+        std_levels = [0.08, 0.10, 0.14, 0.18, 0.24]
         std = std_levels[severity - 1]
         
         if gen is not None:
