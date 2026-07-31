@@ -18,7 +18,16 @@ class TestOutputPaths(unittest.TestCase):
 
         get_dataset_info("cifar10", output_dir=output_dir)
 
-        self.assertEqual(get_dataset_info("cifar10")["output_dir"], "output-cifar-10")
+        self.assertEqual(
+            get_dataset_info("cifar10")["output_dir"],
+            "output/e01-static/cifar-10",
+        )
+
+    def test_dataset_defaults_use_the_e01_temporary_root(self):
+        self.assertEqual(
+            get_dataset_info("mnist")["output_dir"],
+            "output/e01-static/mnist",
+        )
 
 
 if __name__ == "__main__":

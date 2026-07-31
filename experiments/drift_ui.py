@@ -24,6 +24,17 @@ except ModuleNotFoundError:
     )
 
 
+DEFAULT_SYNC_JSON = (
+    "results/e05-temporal-drift/cifar-10/raw/"
+    "accuracy_data_iid_compare_T200_sync.json"
+)
+DEFAULT_ASYNC_JSON = (
+    "results/e05-temporal-drift/cifar-10/raw/"
+    "accuracy_data_iid_compare_T200_async.json"
+)
+DEFAULT_PLOT_DIR = "output/e05-temporal-drift/cifar-10/plots"
+
+
 def main():
     st.set_page_config(page_title="Temporal Drift Plots", layout="wide")
     st.title("Temporal Drift — Visualizacao")
@@ -47,7 +58,7 @@ def main():
         with col_left:
             json_file = st.text_input(
                 "Arquivo JSON",
-                value="output-cifar-10/accuracy_data_iid_T_drift_200_sync.json",
+                value=DEFAULT_SYNC_JSON,
                 help="Caminho para o JSON de resultado do temporal_drift.py",
             )
             json_key = st.text_input(
@@ -64,7 +75,7 @@ def main():
         with col_left:
             sync_json = st.text_input(
                 "Sync JSON",
-                value="output-cifar-10/accuracy_data_iid_T_drift_200_sync.json",
+                value=DEFAULT_SYNC_JSON,
             )
             sync_key = st.text_input(
                 "Sync chave (opcional)",
@@ -74,7 +85,7 @@ def main():
         with col_right:
             async_json = st.text_input(
                 "Async JSON",
-                value="output-cifar-10/accuracy_data_iid_T_drift_200_async.json",
+                value=DEFAULT_ASYNC_JSON,
             )
             async_key = st.text_input(
                 "Async chave (opcional)",
@@ -100,7 +111,7 @@ def main():
     with col_c:
         output_dir = st.text_input(
             "Diretorio de saida",
-            value="output",
+            value=DEFAULT_PLOT_DIR,
         )
 
     output_prefix = st.text_input(

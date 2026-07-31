@@ -73,10 +73,10 @@ def _infer_dataset(output_dir):
     """Infere o nome amigável do dataset a partir do diretório de saída."""
     base = os.path.basename(os.path.normpath(output_dir))
     mapping = {
-        "output-cifar-10": "CIFAR-10",
-        "output-mnist": "MNIST",
-        "output-fashion-mnist": "Fashion-MNIST",
-        "output-gtsrb": "GTSRB",
+        "cifar-10": "CIFAR-10",
+        "mnist": "MNIST",
+        "fashion-mnist": "Fashion-MNIST",
+        "gtsrb": "GTSRB",
     }
     return mapping.get(base, base)
 

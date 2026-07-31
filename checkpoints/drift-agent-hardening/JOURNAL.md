@@ -1052,3 +1052,33 @@ Esta validação encerra as tarefas restantes do plano de reorganização. O
 próximo trabalho possível é migrar os imports internos para os namespaces e
 depois revisar o diff para staging/commit. A análise científica não faz parte
 desse trabalho.
+
+## 2026-07-31 — migração das raízes de saída legadas
+
+O inventário confirmou que `output-cifar-10/` continha 38 JSONs rastreados
+desde o commit `8462356` e misturava E04 com E05. `output-mnist/` continha 14
+arquivos ignorados. Dez eram smoke tests legados do E06. Um era QA do E05. Os
+três arquivos restantes eram uma comparação entre E05 e E06.
+
+As cópias foram criadas nestes destinos:
+
+| Origem | Destino | Arquivos |
+|---|---|---:|
+| `output-cifar-10/` E04 | `results/e04-static-comparison/cifar-10/raw/` | 4 |
+| `output-cifar-10/` E05 | `results/e05-temporal-drift/cifar-10/raw/` | 34 |
+| `output-mnist/` E05 QA | `results/e05-temporal-drift/mnist/qa/` | 1 |
+| `output-mnist/` E06 | `results/e06-drift-agent-prototype/mnist/legacy/` | 10 |
+| `output-mnist/` QA cruzado | `results/qa/cross-experiment/mnist/` | 3 |
+
+As 52 cópias passaram por comparação byte a byte. Os arquivos de origem foram
+removidos somente depois dessa validação. As raízes `output-cifar-10/` e
+`output-mnist/` não existem mais.
+
+O diretório `drift-agent/` não existia no checkout no momento da migração. O
+destino `results/e06-drift-agent-prototype/cifar-10/legacy-v2/` contém somente
+seu README. Não foram criados dados ausentes.
+
+Os defaults das UIs de E04, E05 e E06 agora apontam para os caminhos nomeados.
+O carregador de datasets usa `output/e01-static/<dataset>/` quando não recebe
+uma raiz explícita. O catálogo e o README de `results/` documentam a nova
+fronteira entre saída temporária, histórico e publicação oficial.

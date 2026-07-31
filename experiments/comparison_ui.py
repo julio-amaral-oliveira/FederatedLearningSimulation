@@ -19,12 +19,12 @@ except ModuleNotFoundError:
 DEFAULT_SCENARIO_ROWS = [
     {
         "label": "Sync IID p75",
-        "path": "output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json",
+        "path": "results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_sync.json",
         "key": "75",
     },
     {
         "label": "Async IID p75",
-        "path": "output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json",
+        "path": "results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_async.json",
         "key": "75",
     },
 ]
@@ -178,7 +178,7 @@ def main() -> None:
 
     output_base = st.text_input(
         "Saida",
-        value="output/comparison_ui_output",
+        value="output/e04-static-comparison/cifar-10/comparison-ui",
         help="Caminho base sem extensao. Serao gerados .md, .csv e .png.",
     )
 

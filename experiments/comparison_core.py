@@ -26,7 +26,7 @@ def parse_scenario_spec(value: str) -> ScenarioSpec:
     if "=" not in value:
         raise ValueError(
             "scenario must use 'Label=path.json#key', for example "
-            "'Async IID=output-cifar-10/result.json#75'"
+            "'Async IID=results/e04-static-comparison/cifar-10/raw/result.json#75'"
         )
 
     label, location = value.split("=", 1)

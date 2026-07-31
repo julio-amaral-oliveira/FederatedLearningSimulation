@@ -96,12 +96,16 @@ Eles não definem sozinhos uma família de experimento.
 
 | Diretório | Experimento | Estado | Conteúdo observado |
 |---|---|---|---|
-| `output-cifar-10/` | E04 e E05 | `misturado` | JSONs estáticos `compare_5000` e JSONs de drift com `T20`, `T200`, `T500` e outros. |
-| `output-mnist/` | E06 | `histórico` | JSONs `smoke_drift*.json` e uma execução temporal de QA. |
+| `output/<experiment-id>/<dataset>/` | E01 a E07 | `temporário` | Raiz usada por novas execuções. O ID do experimento identifica a família. |
+| `results/e04-static-comparison/cifar-10/raw/` | E04 | `histórico` | Quatro JSONs brutos migrados de `output-cifar-10/`. |
+| `results/e05-temporal-drift/cifar-10/raw/` | E05 | `histórico` | JSONs temporais brutos migrados de `output-cifar-10/`. |
+| `results/e05-temporal-drift/mnist/qa/` | E05 | `QA` | Execução temporal pequena para QA. |
+| `results/e06-drift-agent-prototype/mnist/legacy/` | E06 | `legado` | JSONs `smoke_drift*.json` migrados de `output-mnist/`. |
+| `results/qa/cross-experiment/mnist/` | E05 e E06 | `QA cruzado` | Comparação histórica entre um smoke E06 e um resultado temporal E05. |
 | `output/<dataset>/` | E04 | `histórico` | CSVs, Markdown e PNGs de comparação estática. |
 | `output/drift/T_<tempo>/` | E05 | `histórico` | Gráficos por fase e por grupo de classes. |
 | `output/corrupted-drift/T_<tempo>/` | E05 | `histórico` | Variante antiga de drift temporal com corrupção visual. |
-| `drift-agent/<cenário>/` | E06 | `legado` | Pares `agent.json` e `baseline.json` schema v2. |
+| `results/e06-drift-agent-prototype/cifar-10/legacy-v2/` | E06 | `legado` | README do destino. A fonte `drift-agent/` não estava presente no checkout. |
 | `output/cifar-10/severity-calibration/` | E07 | `atual` | Calibração oficial schema 1. Seleciona `gaussian_noise:3`, `frosted_glass_blur:4`, `motion_blur:1` e `fog:4`. |
 | `output/cifar-10/drift-agent/severity-calibration/` | E07 | `histórico` | Destino documentado em uma versão anterior. Não é a fonte da calibração atual. |
 | `output/cifar-10/drift-agent/final-matrix/` | E07 | `histórico` | Saída local anterior. Não use como matriz oficial. |
@@ -110,10 +114,10 @@ Eles não definem sozinhos uma família de experimento.
 | `results/e07-drift-agent/cifar-10/uniform/matrix-v1/` | E07 | `atual` | Cópia publicada e validada dos 25 pares, gráficos e resumo. |
 | `results/e07-drift-agent/cifar-10/uniform/smoke/` | E07 | `atual` | Cópia publicada e validada do smoke separado. |
 
-Não use `output-cifar-10/` como uma população única. O diretório contém saídas
-de E04 e E05. Não use `drift-agent/` junto com
-`output/cifar-10/drift-agent-2/`. O primeiro contém schema v2 legado. O
-segundo contém a matriz científica atual em schema v3.
+As raízes `output-cifar-10/` e `output-mnist/` foram removidas depois da
+validação da migração. Não use os resultados históricos junto com a matriz
+científica atual. A matriz atual usa schema v3 em
+`results/e07-drift-agent/`. Os dados legados usam formatos anteriores.
 
 A calibração de origem está em
 `output/cifar-10/severity-calibration/severity_calibration.json`. A cópia
@@ -538,24 +542,24 @@ O catálogo já separa as perguntas e os protocolos. A árvore do repositório a
 mistura códigos e resultados de famílias diferentes. Esta seção define o alvo
 da reorganização. Ela não autoriza mover ou apagar artefatos nesta etapa.
 
-### Problema observado
+### Problema observado antes da migração
 
 - `experiments/` mantém entradas de E02, E05, E06 e E07 no mesmo nível.
 - `src/synchronous/` e `src/asynchronous/` servem E01, E03 e E04 sem uma
   entrada que mostre a família executada.
-- `output-cifar-10/` mistura JSONs de E04 e E05.
+- `output-cifar-10/` misturava JSONs de E04 e E05.
 - `output/` mistura gráficos de E04, E05 e saídas de E07.
-- `drift-agent/` contém o formato v2 legado do E06.
+- `drift-agent/` continha o formato v2 legado do E06.
 - `output/cifar-10/` mistura E04 com o E07 atual.
 - O `.gitignore` ignora as saídas. Uma mudança de caminho não aparece no
   histórico do Git sem um registro documentado.
 
 ### Layout alvo dos resultados
 
-Use `output/` como área temporária e ignorada. Publique os resultados oficiais
-em `results/`, que será versionado pelo Git. Use o ID do experimento como a
+Use `output/` como área temporária e ignorada. Use o ID do experimento como a
 primeira pasta dentro de `results/`. Use o dataset dentro do experimento. Use
-nomes de protocolo para as variações.
+nomes de protocolo para as variações. Resultados históricos que precisam de
+proveniência ficam em subdiretórios `raw/`, `qa/` ou `legacy/`.
 
 ```text
 results/
@@ -638,34 +642,34 @@ preservam o comportamento dos comandos antigos e tornam a família visível no
 comando. A mensagem e a remoção dos adapters ficam para uma etapa posterior,
 depois da migração dos imports.
 
-### Mapa de migração
+### Mapa de migração concluído
 
-| Origem atual | Destino planejado | Regra |
+| Origem histórica | Destino | Resultado |
 |---|---|---|
-| `output-cifar-10/accuracy_data_iid_compare*` e `*_non_iid_compare*` | `results/e04-static-comparison/cifar-10/raw/` | Copiar e validar os JSONs como E04. |
-| `output-cifar-10/accuracy_data_iid_T*` e `*_corrupted_*` | `results/e05-temporal-drift/cifar-10/raw/` | Copiar sem misturar com E04. |
+| `output-cifar-10/accuracy_data_iid_compare*` e `*_non_iid_compare*` | `results/e04-static-comparison/cifar-10/raw/` | Migração validada. |
+| `output-cifar-10/accuracy_data_iid_T*` e `*_corrupted_*` | `results/e05-temporal-drift/cifar-10/raw/` | Migração validada. |
 | `output/drift/` e `output/corrupted-drift/` | `results/e05-temporal-drift/cifar-10/plots/` | Preservar a variante visual no nome ou em um índice. |
 | `output/cifar-10/IID_p75.*` e `NON_IID_p75.*` | `results/e04-static-comparison/cifar-10/plots/` | Associar ao comando e aos JSONs de origem. |
-| `drift-agent/` | `results/e06-drift-agent-prototype/` | Marcar como schema v2 legado. |
-| `output-mnist/smoke_drift*.json` | `results/e06-drift-agent-prototype/mnist/` | Separar o QA temporal antes de copiar. |
+| `drift-agent/` | `results/e06-drift-agent-prototype/cifar-10/legacy-v2/` | README preservado. A fonte não estava presente na migração. |
+| `output-mnist/smoke_drift*.json` | `results/e06-drift-agent-prototype/mnist/legacy/` | Migração validada. |
+| `output-mnist/accuracy_data_iid_qa_temporal_small_T100_sync.json` | `results/e05-temporal-drift/mnist/qa/` | Migração validada. |
+| `output-mnist/qa_compare_test.*` | `results/qa/cross-experiment/mnist/` | Migração validada. |
 | `output/cifar-10/severity-calibration/` | `results/e07-drift-agent/cifar-10/calibration/` | Cópia validada. Manter a origem e seu schema. |
 | `output/cifar-10/drift-agent-2/final-matrix-rerun/` | `results/e07-drift-agent/cifar-10/uniform/matrix-v1/` | Cópia validada. Manter os 25 pares e os manifests. |
 | `output/cifar-10/drift-agent-2/omp-smoke/` | `results/e07-drift-agent/cifar-10/uniform/smoke/` | Cópia validada e separada da matriz científica. |
 
-### Ordem de execução
+### Ordem de execução concluída
 
-1. Criar as entradas, o registro operacional e os contratos de saída sem mover
-   resultados.
-2. Adicionar `--output-dir` explícito às entradas que ainda usam caminhos
-   fixos. Novas execuções usam `output/<experiment-id>/<dataset>/`.
-3. A cópia validada do E07 está publicada em `results/`. Mantenha a origem.
-4. Atualizar comandos, README, receitas e links para os novos destinos.
-5. Comparar contagens, schemas, manifests e digests entre origem e destino.
-6. Marcar os caminhos antigos como históricos antes de qualquer remoção.
+1. Criar as entradas, o registro operacional e os contratos de saída.
+2. Adicionar raízes temporárias nomeadas às entradas que usam caminhos fixos.
+3. Publicar e validar as cópias oficiais do E07 em `results/`.
+4. Migrar os dados históricos de E04, E05 e E06 para destinos separados.
+5. Atualizar comandos, README, receitas e UIs para os novos destinos.
+6. Comparar contagens e bytes antes de remover as raízes antigas.
 
-O E07 deve migrar primeiro porque possui o protocolo atual e artefatos oficiais.
-E01 a E05 podem migrar depois, em ordem de dependência. O E06 deve permanecer
-separado como protótipo histórico.
+O E07 continua separado porque sua origem em `output/cifar-10/` é parte da
+proveniência da matriz atual. E04, E05 e E06 agora usam destinos históricos
+separados. O E06 continua separado como protótipo legado.
 
 ## Tratamento do código e dos relatórios
 

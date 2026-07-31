@@ -2,14 +2,14 @@
 
 Example:
     python experiments/compare_results.py ^
-      --scenario "Sync IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" ^
-      --scenario "Async IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" ^
+      --scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" ^
+      --scenario "Async IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" ^
       --target-accuracy 0.50 ^
       --target-accuracy 0.60 ^
       --horizon-seconds 4000 ^
       --horizon-seconds 5000 ^
       --title "Sync vs Async - CIFAR-10 IID p75" ^
-      --output experiments/comparison_iid_p75_5000
+      --output output/e04-static-comparison/cifar-10/comparison_iid_p75_5000
 """
 
 import argparse
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Explicit scenario to compare. Use '#KEY' for JSON files with "
             "multiple percentile keys, e.g. "
-            "'Async IID=output-cifar-10/result.json#75'. Repeat at least twice."
+            "'Async IID=results/e04-static-comparison/cifar-10/raw/result.json#75'. Repeat at least twice."
         ),
     )
     parser.add_argument(

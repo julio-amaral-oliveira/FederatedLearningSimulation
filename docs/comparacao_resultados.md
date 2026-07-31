@@ -12,22 +12,22 @@ chave interna do JSON.
 
 ```bash
 python -m experiments.e04_static_comparison.compare \
-  --scenario "Sync IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
-  --scenario "Async IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
+  --scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
+  --scenario "Async IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
   --target-accuracy 0.50 \
   --target-accuracy 0.60 \
   --horizon-seconds 4000 \
   --horizon-seconds 5000 \
   --title "Sync vs Async - CIFAR-10 IID p75" \
-  --output output/comparison_iid_p75_5000
+  --output output/e04-static-comparison/cifar-10/comparison_iid_p75_5000
 ```
 
 Saidas sempre geradas:
 
 ```text
-output/comparison_iid_p75_5000.md
-output/comparison_iid_p75_5000.csv
-output/comparison_iid_p75_5000.png
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.md
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.csv
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.png
 ```
 
 ## Formato de `--scenario`
@@ -39,8 +39,8 @@ output/comparison_iid_p75_5000.png
 Exemplos:
 
 ```bash
---scenario "Sync IID p75=output/e04-static-comparison/cifar-10/sync.json#75"
---scenario "Async Non-IID p50=output/e04-static-comparison/cifar-10/async.json#50"
+--scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/sync.json#75"
+--scenario "Async Non-IID p50=results/e04-static-comparison/cifar-10/raw/async.json#50"
 ```
 
 Regras:

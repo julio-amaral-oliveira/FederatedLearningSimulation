@@ -148,10 +148,10 @@ def main():
     st.sidebar.header("Dados")
 
     dataset_options = {
-        "MNIST": "output-mnist",
-        "CIFAR-10": "output-cifar-10",
-        "Fashion-MNIST": "output-fashion-mnist",
-        "GTSRB": "output-gtsrb",
+        "MNIST": "results/e06-drift-agent-prototype/mnist/legacy",
+        "CIFAR-10": "results/e06-drift-agent-prototype/cifar-10/legacy-v2",
+        "Fashion-MNIST": "output/e06-drift-agent-prototype/fashion-mnist",
+        "GTSRB": "output/e06-drift-agent-prototype/gtsrb",
     }
     selected_dataset = st.sidebar.selectbox(
         "Dataset", list(dataset_options.keys()), index=0
@@ -164,7 +164,7 @@ def main():
             f"Nenhum arquivo smoke_drift*.json encontrado em `{output_dir}`.\n\n"
             "Rode primeiro:\n"
             "```bash\n"
-            f"python experiments/smoke_drift.py --dataset {selected_dataset.lower()}\n"
+            f"python -m experiments.e06_drift_agent_prototype.prototype --dataset {selected_dataset.lower()}\n"
             "```"
         )
         st.stop()

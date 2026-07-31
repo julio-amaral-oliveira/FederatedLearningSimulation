@@ -6,25 +6,25 @@ DATASET_INFO = {
         "num_classes": 10,
         "input_shape": (3, 32, 32),
         "model": "cnn_cifar10",
-        "output_dir": "output-cifar-10",
+        "output_dir": "output/e01-static/cifar-10",
     },
     "mnist": {
         "num_classes": 10,
         "input_shape": (1, 28, 28),
         "model": "cnn_mnist",
-        "output_dir": "output-mnist",
+        "output_dir": "output/e01-static/mnist",
     },
     "fashion_mnist": {
         "num_classes": 10,
         "input_shape": (1, 28, 28),
         "model": "cnn_fashion_mnist",
-        "output_dir": "output-fashion-mnist",
+        "output_dir": "output/e01-static/fashion-mnist",
     },
     "gtsrb": {
         "num_classes": 43,
         "input_shape": (3, 32, 32),
         "model": "cnn_gtsrb",
-        "output_dir": "output-gtsrb",
+        "output_dir": "output/e01-static/gtsrb",
     },
 }
 

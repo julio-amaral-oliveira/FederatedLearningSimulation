@@ -63,13 +63,13 @@ Os scripts principais aceitam `--dataset` com:
 - `gtsrb`
 
 Os entrypoints organizados usam `output/<experiment-id>/<dataset>/` por
-default. Os diretórios abaixo continuam como defaults legados da camada de
-dados quando ela é usada diretamente:
+default. O carregador de datasets usa a raiz temporária do E01 quando recebe
+um dataset sem uma raiz explícita:
 
-- `cifar10` -> `output-cifar-10`
-- `mnist` -> `output-mnist`
-- `fashion_mnist` -> `output-fashion-mnist`
-- `gtsrb` -> `output-gtsrb`
+- `cifar10` -> `output/e01-static/cifar-10`
+- `mnist` -> `output/e01-static/mnist`
+- `fashion_mnist` -> `output/e01-static/fashion-mnist`
+- `gtsrb` -> `output/e01-static/gtsrb`
 
 ## Estrutura do projeto
 
@@ -273,14 +273,14 @@ Comparacao entre cenarios:
 
 ```bash
 python -m experiments.e04_static_comparison.compare \
-  --scenario "Sync IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
-  --scenario "Async IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
+  --scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
+  --scenario "Async IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
   --target-accuracy 0.50 \
   --target-accuracy 0.60 \
   --horizon-seconds 4000 \
   --horizon-seconds 5000 \
   --title "Sync vs Async - CIFAR-10 IID p75" \
-  --output output/comparison_iid_p75_5000
+  --output output/e04-static-comparison/cifar-10/comparison_iid_p75_5000
 ```
 
 UI simples em Streamlit:

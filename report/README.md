@@ -72,7 +72,11 @@ fontes com uma decisão documental.
 
 - `report/` guarda documentos de origem, relatórios e fontes.
 - `output/` guarda artefatos temporários.
-- `results/` guarda artefatos experimentais validados.
+- `results/` guarda artefatos experimentais publicados, históricos ou de QA.
+
+Os caminhos `synchronous/output-cifar-10/`, `asynchronous/output-cifar-10/`
+e `output-cifar-10/` citados acima pertencem ao layout histórico dos relatórios.
+Eles não são raízes válidas para novas execuções.
 
 Uma futura movimentação deve preservar os pares PDF e `.tex`, quando existirem,
 e atualizar os caminhos relativos antes de remover qualquer cópia antiga.

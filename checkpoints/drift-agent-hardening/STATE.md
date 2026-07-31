@@ -397,8 +397,12 @@ os scripts, módulos, diretórios de saída e comandos por E01 a E07.
   migração.
 - `experiments/smoke_drift.py` continua sendo o motor de um episódio. Sua CLI
   direta é diagnóstica e não substitui a matriz oficial.
-- `output-cifar-10/` mistura saídas históricas de E04 e E05.
-- `drift-agent/` contém pares schema v2 legados.
+- `output-cifar-10/` foi migrado para as raízes históricas de E04 e E05 em
+  `results/` depois de uma validação byte a byte de 38 arquivos.
+- `output-mnist/` foi migrado para as raízes históricas de E05, E06 e QA
+  cruzado em `results/` depois de uma validação byte a byte de 14 arquivos.
+- `drift-agent/` não existe no checkout atual. O README do destino E06 registra
+  que os oito arquivos schema v2 não estavam disponíveis para a migração.
 - `output/cifar-10/severity-calibration/` contém a calibração oficial schema 1.
 - `output/cifar-10/drift-agent/` contém uma saída anterior e não oficial.
 - `output/cifar-10/drift-agent-2/final-matrix-rerun/` contém a matriz
@@ -436,6 +440,11 @@ os scripts, módulos, diretórios de saída e comandos por E01 a E07.
 - O catálogo agora trata `src/` como código versionado compartilhado e `report/`
   como documentos versionados. O Relatório Final FAPESP está associado à
   origem do E01.
+- As raízes legadas `output-cifar-10/` e `output-mnist/` não são mais diretórios
+  válidos de execução. Dados históricos ficam em `results/` por família.
+- As UIs de compatibilidade apontam para os destinos históricos em `results/`.
+- O carregador de datasets usa `output/e01-static/<dataset>/` como default
+  temporário. Um diretório explícito continua substituindo esse default.
 - A próxima mudança estrutural é migrar os imports dos módulos planos para os
   namespaces e completar a documentação de E01–E06. Staging e commit da
   publicação devem ocorrer somente após revisão do diff.

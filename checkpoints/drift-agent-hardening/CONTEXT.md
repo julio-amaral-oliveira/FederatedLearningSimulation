@@ -61,6 +61,28 @@
   histórica importada.
 - **Alias ou nome usado no código:** `temporary_output_path`.
 
+### Raiz legada de saída
+
+- **Definição:** diretório criado pela convenção antiga antes da identificação
+  dos experimentos por namespace.
+- **Exemplos:** `output-cifar-10/` e `output-mnist/`.
+- **Estado atual:** as raízes foram migradas e não são válidas para novas
+  execuções.
+
+### Resultado histórico bruto
+
+- **Definição:** arquivo produzido por uma execução antiga e preservado para
+  rastreabilidade.
+- **Não confundir com:** uma publicação oficial atual ou um par E07 auditado.
+- **Local:** subdiretório `raw/`, `legacy/` ou `legacy-v2/` em `results/`.
+
+### QA cruzado
+
+- **Definição:** comparação ou verificação que usa dados de duas famílias de
+  experimentos.
+- **Não confundir com:** resultado de uma única família.
+- **Local:** `results/qa/cross-experiment/`.
+
 ### UDD
 
 - **Definição:** detector de drift baseado em incerteza: múltiplos forwards
