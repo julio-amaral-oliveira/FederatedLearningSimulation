@@ -2,6 +2,8 @@ import argparse
 import os
 import subprocess
 
+from experiments.registry import temporary_output_path
+
 
 def run_simulation(cmd):
     cmd_str = " ".join(cmd)
@@ -13,17 +15,21 @@ def run_simulation(cmd):
         print(f"[ERRO] Código {e.returncode}: {cmd_str}")
 
 
-def run_ablation():
+def run_ablation(argv=None):
     parser = argparse.ArgumentParser(description="Estudo de ablação - variação isolada de parâmetros")
     parser.add_argument("--num-updates", type=int, default=40, help="Número de atualizações (default: 40)")
     parser.add_argument("--percentile", type=int, default=50, help="Percentil único para o ablation (default: 50)")
     parser.add_argument("--num-clients", type=int, default=40, help="Número de clientes (default: 40)")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=32)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--output-dir",
+        default=str(temporary_output_path("e02-ablation", "cifar-10")),
+    )
+    args = parser.parse_args(argv)
 
     print("== Estudo de Ablação (variação isolada) ==\n")
-    os.makedirs("output-cifar-10", exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
 
     # Valores padrão (referência)
     DEFAULT_ALPHA = 0.8
@@ -77,6 +83,8 @@ def run_ablation():
             "--tardiness-sensivity", str(tardiness),
             "--percentile", str(args.percentile),
             "--output-prefix", suffix,
+            "--output-dir", args.output_dir,
+            "--experiment-id", "e02-ablation",
         ]
         if is_non_iid:
             cmd.append("--non-iid")
@@ -96,6 +104,7 @@ def run_ablation():
                 "--distribution", dist,
                 "--percentile", str(args.percentile),
                 "--vary", vary,
+                "--output-dir", args.output_dir,
             ])
 
     print("\n== Estudo de ablação finalizado! ==")

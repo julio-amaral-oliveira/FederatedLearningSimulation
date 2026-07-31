@@ -7,6 +7,38 @@ resultados por tempo simulado.
 O projeto foi desenvolvido no contexto de iniciacao cientifica FAPESP na
 UNICAMP.
 
+## Mapa dos experimentos
+
+O projeto contém sete familias de experimento. Leia o [catalogo de
+experimentos](docs/experimentos.md) antes de executar um script em
+`experiments/` ou comparar resultados.
+
+O registro operacional em `experiments/registry.py` define os IDs e as raízes
+em `results/`. Ele não move resultados por conta própria.
+
+- E01 a E04: simulador federado estatico, ablação, timeout e comparação Sync
+  contra Async.
+- E05: drift temporal sazonal com alternância de grupos de classes. É um
+  estudo histórico.
+- E06: primeiro protótipo do drift agent. É legado.
+- E07: drift agent endurecido, com calibração, pares auditados, matriz de
+  seeds, controles e horizonte fixo. É o fluxo atual de drift.
+
+O [Relatório Final FAPESP](report/Relat%C3%B3rio_Final_FAPESP.pdf) é o documento
+de origem do E01. Os relatórios posteriores registram a evolução dos estudos e
+não substituem a configuração persistida de cada experimento.
+
+Os comandos de simulação base deste README cobrem E01 a E04. Use as
+[receitas rápidas](docs/receitas_rapidas.md) para exemplos adicionais e o
+[runbook do E07](docs/literatura/15.%20handoff-experimento-drift-agent.md) para
+o experimento de drift atual.
+
+A calibração de origem do E07 está em
+`output/cifar-10/severity-calibration/`. Sua cópia publicada está em
+`results/e07-drift-agent/cifar-10/calibration/`. A matriz de origem está em
+`output/cifar-10/drift-agent-2/final-matrix-rerun/`. Sua cópia publicada está
+em `results/e07-drift-agent/cifar-10/uniform/matrix-v1/`.
+
 ## O que este repositorio faz
 
 - Simulacao de FL sincrono com FedAvg por rodada.
@@ -19,6 +51,7 @@ UNICAMP.
 - Geracao automatica de graficos de acuracia.
 - Comparacao de cenarios por CLI e por UI Streamlit.
 - Estudo de ablacao para parametros do servidor assincrono.
+- Drift temporal e drift visual com monitoramento e retreino reativo.
 
 ## Datasets suportados
 
@@ -29,7 +62,9 @@ Os scripts principais aceitam `--dataset` com:
 - `fashion_mnist`
 - `gtsrb`
 
-Diretorios de saida por dataset:
+Os entrypoints organizados usam `output/<experiment-id>/<dataset>/` por
+default. Os diretórios abaixo continuam como defaults legados da camada de
+dados quando ela é usada diretamente:
 
 - `cifar10` -> `output-cifar-10`
 - `mnist` -> `output-mnist`
@@ -63,8 +98,14 @@ Diretorios de saida por dataset:
 │   ├── plot_ablation.py
 │   ├── comparison_core.py
 │   ├── compare_results.py
-│   └── comparison_ui.py
+│   ├── comparison_ui.py
+│   ├── temporal_drift.py
+│   ├── smoke_drift.py
+│   ├── run_smoke_drift.py
+│   ├── severity_calibration.py
+│   └── plot_smoke_drift.py
 ├── docs/
+├── checkpoints/
 └── output-*/
 ```
 
@@ -111,7 +152,10 @@ pip install -e .
 
 Guia de comandos curtos:
 
-- `docs/receitas_rapidas.md`
+- [Mapa dos experimentos](docs/experimentos.md)
+- [Índice dos relatórios](report/README.md)
+- [Receitas rápidas](docs/receitas_rapidas.md)
+- [Runbook do E07](docs/literatura/15.%20handoff-experimento-drift-agent.md)
 
 ## Como executar
 
@@ -130,12 +174,12 @@ Comportamento:
 Comandos:
 
 ```bash
-python src/synchronous/main.py
-python src/synchronous/main.py --dataset mnist --iid
-python src/synchronous/main.py --dataset fashion_mnist --non-iid
-python src/synchronous/main.py --dataset gtsrb --iid --percentile 50
-python src/synchronous/main.py --dataset cifar10 --include-no-timeout
-python src/synchronous/main.py --dataset cifar10 --iid --percentile 75 --num-rounds 5000 --eval-every 10 --output-prefix compare_5000_p75_sync
+python src/synchronous/main.py --experiment-id e01-static
+python src/synchronous/main.py --experiment-id e01-static --dataset mnist --iid
+python src/synchronous/main.py --experiment-id e01-static --dataset fashion_mnist --non-iid
+python src/synchronous/main.py --experiment-id e01-static --dataset gtsrb --iid --percentile 50
+python src/synchronous/main.py --experiment-id e03-timeout --dataset cifar10 --include-no-timeout
+python src/synchronous/main.py --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-rounds 5000 --eval-every 10 --output-prefix compare_5000_p75_sync
 ```
 
 Argumentos principais:
@@ -150,6 +194,8 @@ Argumentos principais:
 - `--percentile INT`
 - `--include-no-timeout`
 - `--output-prefix STR`
+- `--output-dir PATH` (default: `output/<experiment-id>/<dataset>/`)
+- `--experiment-id ID`
 - `--eval-every INT`
 
 ### 2) Simulacao assincrona
@@ -165,11 +211,11 @@ Comportamento:
 Comandos:
 
 ```bash
-python src/asynchronous/main.py
-python src/asynchronous/main.py --dataset mnist --percentile 50
-python src/asynchronous/main.py --dataset gtsrb --non-iid --num-updates 40
-python src/asynchronous/main.py --base-alpha 0.5 --decay-of-base-alpha 0.99 --tardiness-sensivity 0.1
-python src/asynchronous/main.py --dataset cifar10 --iid --percentile 75 --num-updates 5000 --eval-every 10 --output-prefix compare_5000_p75_async
+python src/asynchronous/main.py --experiment-id e01-static
+python src/asynchronous/main.py --experiment-id e01-static --dataset mnist --percentile 50
+python src/asynchronous/main.py --experiment-id e01-static --dataset gtsrb --non-iid --num-updates 40
+python src/asynchronous/main.py --experiment-id e02-ablation --base-alpha 0.5 --decay-of-base-alpha 0.99 --tardiness-sensivity 0.1
+python src/asynchronous/main.py --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-updates 5000 --eval-every 10 --output-prefix compare_5000_p75_async
 ```
 
 Argumentos principais:
@@ -186,13 +232,15 @@ Argumentos principais:
 - `--decay-of-base-alpha FLOAT`
 - `--tardiness-sensivity FLOAT`
 - `--output-prefix STR`
+- `--output-dir PATH` (default: `output/<experiment-id>/<dataset>/`)
+- `--experiment-id ID`
 - `--eval-every INT`
 - `--stop-on-stability`
 - `--target-accuracy FLOAT`
 
 ### 3) Estudo de ablacao
 
-Script: `experiments/ablation_study.py`
+Entrada organizada: `experiments/e02_ablation/run.py`
 
 O estudo varia um parametro por vez no cenario assincrono e executa IID e
 Non-IID.
@@ -200,9 +248,9 @@ Non-IID.
 Comandos:
 
 ```bash
-python experiments/ablation_study.py
-python experiments/ablation_study.py --num-updates 80 --percentile 75
-python experiments/ablation_study.py --num-clients 20 --epochs 1 --batch-size 32
+python -m experiments.e02_ablation.run
+python -m experiments.e02_ablation.run --num-updates 80 --percentile 75
+python -m experiments.e02_ablation.run --num-clients 20 --epochs 1 --batch-size 32
 ```
 
 ### 4) Graficos e comparacao de resultados
@@ -210,23 +258,23 @@ python experiments/ablation_study.py --num-clients 20 --epochs 1 --batch-size 32
 Graficos de acuracia gerais:
 
 ```bash
-python -m utils.plot_accuracy --output-dir output-cifar-10
-python -m utils.plot_accuracy --output-dir output-mnist --non-iid --x-label atualizacoes
+python -m utils.plot_accuracy --output-dir output/e01-static/cifar-10
+python -m utils.plot_accuracy --output-dir output/e01-static/mnist --non-iid --x-label atualizacoes
 ```
 
 Graficos do estudo de ablacao:
 
 ```bash
-python experiments/plot_ablation.py --distribution iid --vary all
-python experiments/plot_ablation.py --distribution all --vary all --percentile 50
+python -m experiments.e02_ablation.plot --distribution iid --vary all
+python -m experiments.e02_ablation.plot --distribution all --vary all --percentile 50
 ```
 
 Comparacao entre cenarios:
 
 ```bash
-python experiments/compare_results.py \
-  --scenario "Sync IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
-  --scenario "Async IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
+python -m experiments.e04_static_comparison.compare \
+  --scenario "Sync IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
+  --scenario "Async IID p75=output/e04-static-comparison/cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
   --target-accuracy 0.50 \
   --target-accuracy 0.60 \
   --horizon-seconds 4000 \

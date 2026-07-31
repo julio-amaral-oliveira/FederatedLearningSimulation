@@ -9,13 +9,16 @@ import numpy as np
 import torch
 
 from experiments.result_io import atomic_write_json
+from experiments.registry import temporary_output_path
 
 
 CORRUPTIONS = ["gaussian_noise", "frosted_glass_blur", "motion_blur", "fog"]
 SEVERITIES = [1, 2, 3, 4, 5]
 TARGET_MIN_ACC = 0.25
 TARGET_MAX_ACC = 0.50
-OUTPUT_BASE_DIR = "output/severity_calibration"
+OUTPUT_BASE_DIR = str(
+    temporary_output_path("e07-drift-agent", "cifar-10") / "calibration"
+)
 
 
 def calibrate_severities(
@@ -148,7 +151,7 @@ def save_calibration(result: dict, output_dir: str) -> str:
     return str(path)
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Calibrate all corruptions from one clean checkpoint")
     parser.add_argument("--dataset", default="cifar10")
     parser.add_argument("--corruptions", nargs="+", default=CORRUPTIONS)
@@ -159,7 +162,7 @@ def main() -> None:
     parser.add_argument("--num-clients", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default=OUTPUT_BASE_DIR)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     from experiments.smoke_drift import DriftEpisodeConfig
 

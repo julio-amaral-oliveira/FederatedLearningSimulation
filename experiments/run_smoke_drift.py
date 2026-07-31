@@ -13,6 +13,7 @@ from typing import Callable, Iterable, Sequence
 
 from experiments.drift_controls import OracleMonitor, identity_corruption
 from experiments.result_io import atomic_write_json, save_validated_pair
+from experiments.registry import temporary_output_path
 from experiments.smoke_drift import (
     CLIENT_SPEED_PROFILES,
     DEFAULT_CLIENT_SPEED_PROFILE,
@@ -249,7 +250,14 @@ def _parse_scenario(value: str) -> tuple[str, int]:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a reproducible drift experiment matrix")
     parser.add_argument("--dataset", default="cifar10")
-    parser.add_argument("--output-dir", default="output/cifar-10/drift-agent")
+    parser.add_argument(
+        "--output-dir",
+        default=str(
+            temporary_output_path("e07-drift-agent", "cifar-10")
+            / "uniform"
+            / "matrix-v1"
+        ),
+    )
     parser.add_argument("--seeds", nargs="+", type=int, default=[42])
     parser.add_argument(
         "--scenario",

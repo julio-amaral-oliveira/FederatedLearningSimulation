@@ -13,6 +13,8 @@ try:
 except ImportError:
     from src.utils.ema import exponential_moving_average
 
+from experiments.registry import temporary_output_path
+
 
 def _get_plt():
     import matplotlib
@@ -332,7 +334,7 @@ def _parse_float_list(text):
     return values
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Plot temporal drift results"
     )
@@ -347,7 +349,9 @@ def main():
                         help="Async JSON file for compare mode")
     parser.add_argument("--sync-key", type=str, default=None)
     parser.add_argument("--async-key", type=str, default=None)
-    parser.add_argument("--output-dir", type=str, default="output",
+    parser.add_argument(
+                        "--output-dir", type=str,
+                        default=str(temporary_output_path("e05-temporal-drift", "cifar-10") / "plots"),
                         help="Output directory for plots")
     parser.add_argument("--alpha", type=float, default=0.1,
                         help="EMA smoothing factor")
@@ -358,7 +362,7 @@ def main():
                         help="Disable EMA curve")
     parser.add_argument("--output-prefix", type=str, default="",
                         help="Prefix for output filenames")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -390,4 +394,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

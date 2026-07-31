@@ -29,6 +29,38 @@
 - **Aliases ou nomes usados no código:** `validate_pair`,
   `audited_pair=True`, `pair-manifest.json`.
 
+### Registro operacional
+
+- **Definição:** mapa versionado que associa cada ID de experimento ao estado e
+  à raiz publicada de resultados.
+- **Não confundir com:** catálogo humano, configuração científica ou manifest
+  de um par.
+- **Alias ou nome usado no código:** `experiments.registry`.
+
+### Dry-run de migração
+
+- **Definição:** listagem de todos os arquivos e destinos planejados sem criar,
+  copiar, mover ou apagar arquivos.
+- **Não confundir com:** uma cópia validada ou uma publicação em `results/`.
+- **Alias ou nome usado no código:** `experiments.migrate_outputs`.
+
+### Namespace de experimento
+
+- **Definição:** caminho Python que torna a família do experimento visível na
+  entrada, como `experiments.e07_drift_agent.run_matrix`.
+- **Não confundir com:** o módulo compartilhado que implementa o motor ou com
+  a raiz onde os resultados são publicados.
+- **Papel:** oferecer um seam estável para migrar imports sem quebrar os
+  comandos planos antigos.
+
+### Raiz temporária de execução
+
+- **Definição:** diretório em `output/` usado por uma nova execução antes de
+  sua validação e publicação.
+- **Não confundir com:** a raiz oficial em `results/` ou com uma origem
+  histórica importada.
+- **Alias ou nome usado no código:** `temporary_output_path`.
+
 ### UDD
 
 - **Definição:** detector de drift baseado em incerteza: múltiplos forwards
@@ -295,6 +327,173 @@
 - **Aliases ou nomes usados no código:** `summary.json`, `groups`,
   `dimensions`.
 
+### Catálogo de experimentos
+
+- **Definição:** mapa que identifica perguntas, protocolos, métricas, código e
+  fontes de cada estudo do repositório.
+- **Fonte:** `docs/experimentos.md`.
+- **Não confundir com:** o estado atual do drift agent ou o diário de decisões.
+
+### ID de experimento
+
+- **Definição:** rótulo humano estável de um estudo, como `E01` ou `E07`.
+- **Limite:** os IDs ainda não fazem parte dos nomes dos artefatos persistidos.
+- **Fonte:** `docs/experimentos.md`.
+
+### Treinamento federado estático
+
+- **Definição:** execução sem mudança temporal de classes ou corrupção visual
+  durante a produção.
+- **Não confundir com:** drift temporal ou drift agent visual.
+- **ID do catálogo:** `E01` e `E04`.
+
+### Ablação assíncrona
+
+- **Definição:** estudo que varia `alpha`, `beta` e `gamma` da agregação
+  assíncrona.
+- **Não confundir com:** sensibilidade de quorum ou rounds do drift agent.
+- **ID do catálogo:** `E02`.
+
+### Impacto do timeout
+
+- **Definição:** estudo do custo de esperar ou descartar clientes durante
+  rounds síncronos.
+- **Não confundir com:** quorum de detecção coletiva.
+- **ID do catálogo:** `E03`.
+
+### Drift temporal sazonal
+
+- **Definição:** alternância de grupos de classes durante o treinamento, com
+  fases definidas por `T_drift`.
+- **Não confundir com:** corrupção visual de imagens em produção.
+- **ID do catálogo:** `E05`.
+
+### Drift agent inicial
+
+- **Definição:** primeira implementação do fluxo de detecção local, ação
+  coletiva, retreino e baseline.
+- **Limite:** prova de conceito sem as garantias completas de pareamento,
+  calibração e auditoria do fluxo atual.
+- **ID do catálogo:** `E06`.
+
+### Drift agent endurecido
+
+- **Definição:** fluxo síncrono atual com horizonte fixo, matriz de seeds,
+  calibração, controles, schema v3 e validação de pares.
+- **Não confundir com:** o protótipo inicial do drift agent.
+- **ID do catálogo:** `E07`.
+
+### Estado de script
+
+- **Definição:** classificação operacional de um arquivo executável ou módulo.
+- **Valores:** `atual`, `suporte`, `histórico` e `legado`.
+- **Limite:** o estado é relativo à família do experimento. Um arquivo pode ser
+  atual para uma família e histórico para outra.
+- **Fonte:** `docs/experimentos.md`.
+
+### Comando oficial
+
+- **Definição:** comando documentado para iniciar ou visualizar um experimento
+  dentro do protocolo aceito.
+- **Não confundir com:** qualquer CLI que ainda exista no checkout.
+- **Fonte atual do E07:** `python -m experiments.e07_drift_agent.calibrate`,
+  `python -m experiments.e07_drift_agent.run_matrix` e
+  `python -m experiments.e07_drift_agent.plot`. Os caminhos planos continuam
+  disponíveis durante a migração.
+
+### Documento histórico
+
+- **Definição:** documentação preservada para explicar ou reproduzir um estudo
+  anterior, sem autorizar uma nova execução no protocolo atual.
+- **Exemplos:** `handoff-7MZns2.md` e as seções E02 e E05 das receitas rápidas.
+- **Não confundir com:** o runbook operacional do E07.
+- **Fonte:** `docs/experimentos.md`.
+
+### Diretório de saída misturado
+
+- **Definição:** diretório que contém artefatos de mais de uma família ou
+  protocolo.
+- **Exemplo:** `output-cifar-10/` contém resultados de E04 e E05.
+- **Limite:** não agregue os arquivos apenas porque eles compartilham a pasta.
+
+### Saída v2 legada
+
+- **Definição:** par de resultados do drift agent anterior ao contrato v3.
+- **Exemplo:** pares em `drift-agent/<cenário>/`.
+- **Não confundir com:** a matriz v3 oficial em
+  `output/cifar-10/drift-agent-2/final-matrix-rerun/`.
+
+### Importação externa de artefatos
+
+- **Definição:** resultados gerados em outra máquina e copiados para o
+  checkout local para auditoria ou análise.
+- **Exemplo atual:** `output/cifar-10/drift-agent-2/`.
+- **Papel atual:** contém a matriz científica oficial em
+  `final-matrix-rerun/`. A calibração oficial fica em
+  `output/cifar-10/severity-calibration/`.
+- **Regra:** manter `omp-smoke/` separado e registrar o ambiente e a
+  proveniência antes de agregar os resultados.
+
+### ID do experimento
+
+- **Definição:** identificador estável de uma família experimental, como E01
+  ou `e07-drift-agent`.
+- **Não confundir com:** seed, severidade, cenário ou nome de uma execução.
+- **Papel:** separar protocolo, código de entrada e raiz de resultados.
+
+### Layout de execução
+
+- **Definição:** estrutura temporária que coloca o ID do experimento antes do
+  dataset e das variações de protocolo.
+- **Formato:** `output/<experiment-id>/<dataset>/`.
+- **Não confundir com:** o layout canônico de publicação em `results/`.
+
+### Layout canônico de publicação
+
+- **Definição:** estrutura versionada que coloca o ID do experimento antes do
+  dataset e recebe somente artefatos validados.
+- **Formato:** `results/<experiment-id>/<dataset>/`.
+- **Não confundir com:** uma raiz temporária ou histórica que apenas contém a
+  execução mais recente.
+
+### Raiz de resultados
+
+- **Definição:** diretório base no qual uma entrada publica seus artefatos
+  depois da validação.
+- **Exemplos atuais:** `results/e07-drift-agent/cifar-10/` e suas subpastas
+  `calibration/`, `uniform/matrix-v1/` e `uniform/smoke/`.
+- **Regra:** cada raiz deve identificar uma única família experimental.
+
+### Migração não destrutiva
+
+- **Definição:** cópia validada de uma raiz antiga para uma raiz canônica sem
+  apagar a origem.
+- **Requisitos:** comparar contagens, schemas, manifests e digests antes de
+  atualizar o caminho oficial.
+
+### Saída histórica
+
+- **Definição:** artefato preservado para reprodução ou contexto, mas que não
+  deve ser usado como padrão para uma nova execução.
+- **Não confundir com:** uma saída inválida. Uma saída histórica pode ser
+  tecnicamente válida dentro do protocolo que a gerou.
+
+### Documento de origem do experimento
+
+- **Definição:** documento que apresenta a motivação, a pergunta inicial e o
+  ponto de partida de uma família experimental.
+- **Exemplo atual:** `report/Relatório_Final_FAPESP.pdf` é o documento de origem
+  do E01.
+- **Não confundir com:** um relatório posterior de resultados ou a configuração
+  persistida de uma execução.
+
+### Relatório experimental
+
+- **Definição:** documento que consolida resultados, decisões ou evolução de um
+  ou mais estudos.
+- **Limite:** um relatório pode explicar o protocolo, mas a configuração e os
+  artefatos persistidos continuam sendo a fonte operacional do resultado.
+
 ## Atores e sistemas
 
 ### Cliente federado
@@ -335,8 +534,8 @@ severidades solicitadas.
 
 ### Plot
 
-`experiments/plot_smoke_drift.py`: aceita um par validado e produz a
-visualização temporal.
+`experiments/plot_smoke_drift.py`: aceita um par validado ou um diretório de
+cenário e produz uma visualização temporal individual ou agregada.
 
 ## Fronteiras importantes
 

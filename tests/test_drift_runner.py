@@ -35,6 +35,12 @@ class TestDriftRunMatrix(unittest.TestCase):
         self.assertEqual(DriftEpisodeConfig().client_speed_profile, "uniform")
         self.assertEqual(parse_args([]).client_speed_profile, "uniform")
 
+    def test_matrix_cli_defaults_to_the_temporary_e07_namespace(self):
+        self.assertEqual(
+            parse_args([]).output_dir,
+            "output/e07-drift-agent/cifar-10/uniform/matrix-v1",
+        )
+
     def test_matrix_cli_accepts_the_heterogeneous_speed_profile_alias(self):
         args = parse_args(["--speed-profile", "heterogeneous"])
 

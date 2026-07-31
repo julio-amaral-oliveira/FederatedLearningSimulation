@@ -31,12 +31,15 @@ DATASET_INFO = {
 VALID_DATASETS = list(DATASET_INFO.keys())
 
 
-def get_dataset_info(dataset_name: str) -> dict:
+def get_dataset_info(dataset_name: str, output_dir: str | None = None) -> dict:
     if dataset_name not in DATASET_INFO:
         raise ValueError(
             f"Dataset inválido '{dataset_name}'. Opções: {VALID_DATASETS}"
         )
-    return DATASET_INFO[dataset_name]
+    info = DATASET_INFO[dataset_name].copy()
+    if output_dir is not None:
+        info["output_dir"] = str(output_dir)
+    return info
 
 
 def load_dataset(dataset_name: str):

@@ -28,6 +28,7 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
         sys.path.insert(0, _path)
 
 from synchronous.constants import SPEED_PROFILES
+from experiments.registry import temporary_output_path
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
 DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
@@ -63,7 +64,9 @@ class DriftEpisodeConfig:
     corruption: str = "gaussian_noise"
     severity: int = 3
     seed: int = 42
-    output_dir: str = "output/cifar-10/drift-agent"
+    output_dir: str = str(
+        temporary_output_path("e07-drift-agent", "cifar-10") / "episode"
+    )
     baseline: bool = False
     production_horizon_seconds: float | None = None
     end_time_seconds: float | None = None
@@ -667,12 +670,15 @@ def save_drift_result(result: dict, output_dir: str, filename: str = "smoke_drif
     return path
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Synchronous corrupted-data drift episode")
     parser.add_argument("--dataset", default="cifar10")
     parser.add_argument("--corruption", default="gaussian_noise")
     parser.add_argument("--severity", type=int, default=3)
-    parser.add_argument("--output-dir", default="output/cifar-10/drift-agent")
+    parser.add_argument(
+        "--output-dir",
+        default=str(temporary_output_path("e07-drift-agent", "cifar-10") / "episode"),
+    )
     parser.add_argument(
         "--client-speed-profile",
         "--speed-profile",
@@ -684,7 +690,7 @@ def main() -> None:
         type=float,
         default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         # Deferred on purpose: the corruption module belongs to a parallel task.
         from src.utils.corruptions import apply_corruption

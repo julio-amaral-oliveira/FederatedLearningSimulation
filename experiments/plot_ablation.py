@@ -15,6 +15,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from utils.ema import exponential_moving_average
+from experiments.registry import temporary_output_path
 
 
 def parse_experiment_metadata(filename):
@@ -228,9 +229,13 @@ def plot_grid(
     plt.close(fig)
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Gera gráficos de ablação")
-    parser.add_argument("--output-dir", type=str, default="output-cifar-10")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=str(temporary_output_path("e02-ablation", "cifar-10")),
+    )
     parser.add_argument("--distribution", type=str, default="iid", help="iid, non_iid, ou all")
     parser.add_argument("--percentile", type=str, default="50")
     parser.add_argument("--vary", type=str, default="all",
@@ -239,7 +244,7 @@ if __name__ == "__main__":
                         help="isolated = one-at-a-time (padrão), grid = grid search completo")
     parser.add_argument("--prefix", type=str, default="async", help="Prefixo (só para modo grid)")
     parser.add_argument("--show-raw", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     distributions = ["iid", "non_iid"] if args.distribution == "all" else [args.distribution]
 
@@ -252,3 +257,7 @@ if __name__ == "__main__":
         for dist in distributions:
             plot_grid(args.output_dir, dist, args.prefix, args.percentile,
                       show_raw=args.show_raw)
+
+
+if __name__ == "__main__":
+    main()

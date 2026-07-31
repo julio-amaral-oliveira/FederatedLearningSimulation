@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.join(_SRC, "asynchronous"))
 import numpy as np
 import torch
 
+from experiments.registry import temporary_output_path
+
 np.random.seed(42)
 torch.manual_seed(42)
 
@@ -196,7 +198,7 @@ def _save_drift_json(accuracy_history, key, output_dir, distribution_name,
     print(f"Dados salvos em {filepath}")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Experimento de Temporal Drift — Sync vs Async"
     )
@@ -220,7 +222,8 @@ def main():
     parser.add_argument("--base-alpha", type=float, default=0.8)
     parser.add_argument("--decay-of-base-alpha", type=float, default=0.999)
     parser.add_argument("--tardiness-sensivity", type=float, default=0.075)
-    args = parser.parse_args()
+    parser.add_argument("--output-dir", type=str, default=None)
+    args = parser.parse_args(argv)
 
     from utils.data_loader import get_dataset_info, load_dataset
     from utils.drift import PhaseSchedule, precompute_phase_indices
@@ -238,10 +241,12 @@ def main():
             f"mas --T-drift tem {len(T_drifts)}. Devem ter o mesmo numero."
         )
 
-    dataset_info = get_dataset_info(args.dataset)
+    output_dir = args.output_dir or str(
+        temporary_output_path("e05-temporal-drift", args.dataset)
+    )
+    dataset_info = get_dataset_info(args.dataset, output_dir=output_dir)
     training_data, testing_data = load_dataset(args.dataset)
     _, y_train = training_data
-    output_dir = dataset_info["output_dir"]
 
     for T_drift, num_phases in zip(T_drifts, num_phases_list):
         schedule = PhaseSchedule.create(
