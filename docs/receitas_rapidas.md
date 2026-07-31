@@ -110,9 +110,10 @@ e usam a matriz vigente.
 
 A matriz científica publicada está em
 `results/e07-drift-agent/cifar-10/uniform/matrix-v1/`. A matriz de origem
-permanece em `output/cifar-10/drift-agent-2/final-matrix-rerun/`. A calibração
-publicada está em `results/e07-drift-agent/cifar-10/calibration/`. A calibração
-de origem permanece em `output/cifar-10/severity-calibration/`.
+está em `results/e07-drift-agent/cifar-10/provenance/matrix-source/`. A
+calibração publicada está em `results/e07-drift-agent/cifar-10/calibration/`.
+A calibração de origem está em
+`results/e07-drift-agent/cifar-10/provenance/calibration-source/`.
 O diretório `omp-smoke/` é um smoke separado e não entra na matriz.
 
 ### Calibrar severidades

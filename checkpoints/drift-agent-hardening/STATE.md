@@ -43,12 +43,12 @@ checkpoint, stream e horizonte virtual.
 ## Estado do código
 
 - Branch: `feature/drift-agent-hardening`.
-- Último commit de código observado: `b059545`
-  (`feat: enhance plotting functions with improved legends and bar representation`).
+- Último commit de código observado: `266aa55`
+  (`chore: migrate legacy experiment outputs`).
 - Base da implementação endurecida: `c9e9355`.
 - A revisão final e a re-revisão concluíram **Ready**.
-- A última verificação completa executou 142 testes.
-- A verificação passou em 140 testes.
+- A última verificação completa executou 143 testes.
+- A verificação passou em 141 testes.
 - A verificação ignorou 2 testes condicionais de CUDA/MPS.
 - O experimento usa `uniform` como default.
 - Os módulos legados síncrono e assíncrono usam `heterogeneous` como default.
@@ -132,10 +132,11 @@ Referências principais:
     e os nomes E01 a E07 para leitura humana. Ele não substitui este estado,
     o diário ou o glossário.
 18. **Reorganização por família.** `output/` é a área temporária e ignorada.
-    A raiz futura de resultados oficiais usa
+    A raiz de resultados publicados usa
     `results/<experiment-id>/<dataset>/`. O código de entrada usa namespaces
-    `experiments/eXX_*`. A migração começa pelo E07 e copia os resultados antes
-    de alterar ou remover qualquer origem.
+    `experiments/eXX_*`. A migração física de E04, E05 e E07 foi concluída
+    depois da cópia, dos hashes e da validação dos PDFs. `output/` agora
+    contém somente seu README operacional.
 19. **Origem documental do E01.** `report/Relatório_Final_FAPESP.pdf` é a
     origem do E01. `report/` mantém documentos de origem, relatórios históricos
     e fontes LaTeX. Esses documentos não substituem a configuração persistida
@@ -185,7 +186,7 @@ Referências principais:
 ### Calibração oficial uniforme
 
 O arquivo oficial é
-`output/cifar-10/severity-calibration/severity_calibration.json`.
+`results/e07-drift-agent/cifar-10/provenance/calibration-source/severity_calibration.json`.
 Ele usa a seed base 42, a seed de teste 10041 e schema 1.
 O checkpoint da calibração é `de2fe6b5...`.
 
@@ -226,7 +227,8 @@ Um round ainda causou uma perda limpa de 0.2123.
 
 ### Saída uniforme anterior
 
-A árvore `output/cifar-10/drift-agent/final-matrix` existe, mas não está limpa.
+A árvore `results/e07-drift-agent/cifar-10/legacy/matrix-v0/` preserva a
+matriz anterior, mas não é a matriz oficial atual.
 Ela contém 25 pares e cinco grupos: `frosted_glass_blur:4`, `motion_blur:1`,
 `fog:4`, o controle `identity:0` e o resíduo `gaussian_noise:3`.
 Ela é uma saída anterior e não é a matriz oficial atual.
@@ -239,7 +241,7 @@ de seed.
 ### Matriz científica oficial importada: `drift-agent-2`
 
 Em 2026-07-31, o usuário informou que refez a execução em outra máquina e
-importou os artefatos em `output/cifar-10/drift-agent-2/`.
+importou os artefatos em `results/e07-drift-agent/cifar-10/provenance/matrix-source/`.
 
 - `final-matrix-rerun/` contém 25 pares: cinco seeds para cada grupo
   `fog_sev4`, `frosted_glass_blur_sev4`, `gaussian_noise_sev3`, `identity_sev0`
@@ -252,8 +254,8 @@ importou os artefatos em `output/cifar-10/drift-agent-2/`.
 - O runtime registrado é Python 3.11.14 do Anaconda, Torch 2.5.1+cu121 e
   `cuda:0`. Algoritmos determinísticos e `cudnn_deterministic` estão
   desativados.
-- A calibração correspondente está no repositório em
-  `output/cifar-10/severity-calibration/severity_calibration.json`.
+- A calibração correspondente está preservada separadamente em
+  `results/e07-drift-agent/cifar-10/provenance/calibration-source/severity_calibration.json`.
 - O digest do checkpoint limpo varia entre cenários para as seeds 42, 43 e 46.
   As seeds 44 e 45 compartilham o digest entre os cinco grupos. A validação
   de um par não prova a reutilização do mesmo checkpoint entre cenários.
@@ -403,18 +405,21 @@ os scripts, módulos, diretórios de saída e comandos por E01 a E07.
   cruzado em `results/` depois de uma validação byte a byte de 14 arquivos.
 - `drift-agent/` não existe no checkout atual. O README do destino E06 registra
   que os oito arquivos schema v2 não estavam disponíveis para a migração.
-- `output/cifar-10/severity-calibration/` contém a calibração oficial schema 1.
-- `output/cifar-10/drift-agent/` contém uma saída anterior e não oficial.
-- `output/cifar-10/drift-agent-2/final-matrix-rerun/` contém a matriz
-  científica oficial schema v3 com 25 pares.
+- `results/e07-drift-agent/cifar-10/provenance/calibration-source/` contém a
+  calibração oficial schema 1.
+- `results/e07-drift-agent/cifar-10/legacy/matrix-v0/` contém a matriz
+  anterior e não oficial.
+- `results/e07-drift-agent/cifar-10/provenance/matrix-source/final-matrix-rerun/`
+  preserva a origem importada da matriz científica oficial schema v3 com 25
+  pares.
 - `handoff-7MZns2.md` está marcado como documento histórico e aponta para as
   fontes atuais.
 - `docs/receitas_rapidas.md` identifica as famílias históricas E02 e E05,
   corrige os nomes dos JSONs do E05 e aponta para o runbook do E07.
 - O runbook e as receitas do E07 usam `output/` como origem de novas execuções
   e `results/e07-drift-agent/` como raiz publicada para auditoria.
-- A saída antiga em `output/cifar-10/drift-agent/` permanece separada da
-  matriz científica final.
+- A saída antiga permanece separada em
+  `results/e07-drift-agent/cifar-10/legacy/matrix-v0/`.
 - `report/README.md` foi criado como índice dos relatórios. Ele registra que
   `comparacao_sync_async.tex` e `drift_temporal_sync_async.tex` compilam fora
   do sandbox e que `relatorio.tex` e `resultados.tex` apontam para imagens
@@ -426,11 +431,11 @@ os scripts, módulos, diretórios de saída e comandos por E01 a E07.
   calibração e 3 arquivos do smoke. Os 25 pares da matriz e o par do smoke
   foram carregados novamente com `load_persisted_pair`, e os digests SHA-256
   de origem e destino coincidiram.
-- A primeira etapa física da reorganização foi concluída para E07. O layout
-  está documentado em `docs/experimentos.md`; `output/` foi preservado como
-  origem e `results/e07-drift-agent/` contém as cópias publicadas. Os arquivos
-  em `results/` ainda estão não rastreados pelo Git até uma decisão explícita
-  de staging e commit.
+- A reorganização física de E04, E05 e E07 foi concluída. O layout está
+  documentado em `docs/experimentos.md`; `results/` contém as cópias
+  publicadas, históricas e de proveniência. `output/` contém somente
+  `output/README.md`. Os arquivos novos em `results/` ainda estão não
+  rastreados pelo Git até uma decisão explícita de staging e commit.
 - Os namespaces `experiments/e01_static` até `experiments/e07_drift_agent`
   foram criados. Os adapters preservam os módulos planos enquanto os imports
   são migrados.
@@ -502,3 +507,33 @@ nenhum arquivo foi staged ou commitado.
 O próximo ponto de revisão é decidir se a publicação E07 será staged/commitada
 como um conjunto e, depois, continuar a análise dos 25 pares ou implementar
 namespaces e argumentos de saída explícitos nos entrypoints.
+
+## 2026-07-31 — migração completa, validação e retenção final
+
+A migração das raízes históricas e de proveniência foi concluída depois de
+calcular e registrar os hashes SHA-256 de 253 arquivos em
+`results/output-migration-2026-07-31.md`.
+
+- E04 foi organizado em `results/e04-static-comparison/` com 18 arquivos de
+  gráficos e dados auxiliares.
+- E05 foi organizado em `results/e05-temporal-drift/` com 56 gráficos
+  temporais, 9 gráficos da variante corrompida e 4 gráficos legados da raiz.
+- A matriz anterior do E07 foi preservada em
+  `results/e07-drift-agent/cifar-10/legacy/matrix-v0/` com 81 arquivos.
+- A origem importada da matriz atual foi preservada em
+  `results/e07-drift-agent/cifar-10/provenance/matrix-source/` com 84
+  arquivos, incluindo o smoke separado.
+- A origem da calibração foi preservada em
+  `results/e07-drift-agent/cifar-10/provenance/calibration-source/`.
+- Os 253 destinos passaram por nova verificação pós-movimento: 253 hashes
+  coincidentes e nenhuma raiz antiga restante em `output/`.
+- Os 51 pares E07 foram carregados novamente com `load_persisted_pair`.
+- `comparacao_sync_async.tex` e `drift_temporal_sync_async.tex` compilaram
+  fora do sandbox com Tectonic 0.16.9. Cada PDF tem 9 páginas A4 e as 18
+  páginas renderizadas foram inspecionadas visualmente.
+- A suíte completa passou em 143 testes, com 2 testes condicionais ignorados;
+  `compileall` e `git diff --check` também passaram.
+- A quarentena temporária das raízes antigas foi removida somente depois
+  dessas verificações. Os três `.DS_Store` não foram publicados.
+
+Não houve staging, commit ou alteração das mudanças locais preexistentes.

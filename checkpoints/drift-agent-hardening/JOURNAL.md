@@ -1082,3 +1082,42 @@ Os defaults das UIs de E04, E05 e E06 agora apontam para os caminhos nomeados.
 O carregador de datasets usa `output/e01-static/<dataset>/` quando não recebe
 uma raiz explícita. O catálogo e o README de `results/` documentam a nova
 fronteira entre saída temporária, histórico e publicação oficial.
+
+## 2026-07-31 — migração integral de outputs e validação final
+
+A reorganização das raízes de saída foi concluída depois da revisão do
+inventário e da validação dos destinos. O inventário completo está em
+`results/output-migration-2026-07-31.md` e registra SHA-256 para 253 arquivos.
+
+### Destinos
+
+- E04: 18 arquivos em `results/e04-static-comparison/`.
+- E05: 56 gráficos temporais, 9 gráficos da variante corrompida e 4 gráficos
+  legados em `results/e05-temporal-drift/`.
+- E07 anterior: 81 arquivos em
+  `results/e07-drift-agent/cifar-10/legacy/matrix-v0/`.
+- E07 importado: 84 arquivos em
+  `results/e07-drift-agent/cifar-10/provenance/matrix-source/`, incluindo o
+  smoke separado.
+- Calibração oficial: preservada em
+  `results/e07-drift-agent/cifar-10/provenance/calibration-source/`.
+
+### Evidências de validação
+
+- A verificação final após o movimento confirmou 253/253 hashes coincidentes.
+- Os 51 pares E07 passaram novamente por `load_persisted_pair`.
+- `comparacao_sync_async.tex` e `drift_temporal_sync_async.tex` compilaram
+  fora do sandbox com Tectonic 0.16.9. Cada PDF tem 9 páginas A4; as 18
+  páginas renderizadas foram inspecionadas visualmente.
+- A suíte completa passou em 143 testes, com 2 testes condicionais
+  ignorados. `compileall` e `git diff --check` também passaram.
+- Os três `.DS_Store` foram excluídos do inventário publicado.
+
+### Retenção
+
+Depois das verificações, as raízes antigas foram removidas. A quarentena
+temporária explícita também foi removida. `output/` agora contém somente
+`output/README.md`, que explica seu uso para novas execuções temporárias.
+
+Os documentos e artefatos locais preexistentes permaneceram sem staging e sem
+commit.

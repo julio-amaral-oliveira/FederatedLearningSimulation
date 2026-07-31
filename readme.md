@@ -33,11 +33,12 @@ Os comandos de simulação base deste README cobrem E01 a E04. Use as
 [runbook do E07](docs/literatura/15.%20handoff-experimento-drift-agent.md) para
 o experimento de drift atual.
 
-A calibração de origem do E07 está em
-`output/cifar-10/severity-calibration/`. Sua cópia publicada está em
-`results/e07-drift-agent/cifar-10/calibration/`. A matriz de origem está em
-`output/cifar-10/drift-agent-2/final-matrix-rerun/`. Sua cópia publicada está
-em `results/e07-drift-agent/cifar-10/uniform/matrix-v1/`.
+A calibração publicada do E07 está em
+`results/e07-drift-agent/cifar-10/calibration/`. A cópia de proveniência está
+em `results/e07-drift-agent/cifar-10/provenance/calibration-source/`. A matriz
+publicada está em `results/e07-drift-agent/cifar-10/uniform/matrix-v1/`. A
+origem importada está em
+`results/e07-drift-agent/cifar-10/provenance/matrix-source/`.
 
 ## O que este repositorio faz
 

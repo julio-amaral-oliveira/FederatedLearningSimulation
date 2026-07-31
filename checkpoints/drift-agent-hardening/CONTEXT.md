@@ -76,6 +76,14 @@
 - **Não confundir com:** uma publicação oficial atual ou um par E07 auditado.
 - **Local:** subdiretório `raw/`, `legacy/` ou `legacy-v2/` em `results/`.
 
+### Proveniência publicada
+
+- **Definição:** cópia preservada da origem de uma matriz ou calibração atual,
+  separada da publicação canônica.
+- **Local:** `results/e07-drift-agent/cifar-10/provenance/`.
+- **Não confundir com:** `uniform/matrix-v1/`, que é a publicação oficial,
+  `legacy/matrix-v0/`, que é a matriz anterior, ou `output/`, que é temporário.
+
 ### QA cruzado
 
 - **Definição:** comparação ou verificação que usa dados de duas famílias de

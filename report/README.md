@@ -39,9 +39,9 @@ seus caminhos de imagens e dependências estejam verificados.
 Nesta verificação:
 
 - `comparacao_sync_async.tex` encontrou os seis gráficos esperados em
-  `output/`.
+  `results/e04-static-comparison/<dataset>/plots/`.
 - `drift_temporal_sync_async.tex` encontrou os nove gráficos esperados em
-  `output/drift/`.
+  `results/e05-temporal-drift/cifar-10/plots/temporal/`.
 - `relatorio.tex` aponta para diretórios antigos em
   `synchronous/output-cifar-10/` e `asynchronous/output-cifar-10/`. Esses
   diretórios não existem no checkout atual.
@@ -78,5 +78,6 @@ Os caminhos `synchronous/output-cifar-10/`, `asynchronous/output-cifar-10/`
 e `output-cifar-10/` citados acima pertencem ao layout histórico dos relatórios.
 Eles não são raízes válidas para novas execuções.
 
-Uma futura movimentação deve preservar os pares PDF e `.tex`, quando existirem,
-e atualizar os caminhos relativos antes de remover qualquer cópia antiga.
+A migração dos gráficos históricos foi concluída em 2026-07-31. Os pares PDF e
+`.tex` continuam em `report/`. As fontes usam os artefatos publicados em
+`results/`.
