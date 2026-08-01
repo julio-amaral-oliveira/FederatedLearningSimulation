@@ -1,6 +1,7 @@
 # Comparacao de Resultados
 
-Use `experiments/compare_results.py` ou `experiments/comparison_ui.py` para
+Use `experiments.e04_static_comparison.compare` ou
+`experiments.e04_static_comparison.ui` para
 comparar dois ou mais JSONs de resultado de FL por tempo virtual simulado.
 
 A regra principal e: o comparador nao infere significado pelo nome do arquivo.
@@ -10,23 +11,23 @@ chave interna do JSON.
 ## CLI
 
 ```bash
-python experiments/compare_results.py \
-  --scenario "Sync IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
-  --scenario "Async IID p75=output-cifar-10/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
+python -m experiments.e04_static_comparison.compare \
+  --scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_sync.json#75" \
+  --scenario "Async IID p75=results/e04-static-comparison/cifar-10/raw/accuracy_data_iid_compare_5000_eval10_p75_async.json#75" \
   --target-accuracy 0.50 \
   --target-accuracy 0.60 \
   --horizon-seconds 4000 \
   --horizon-seconds 5000 \
   --title "Sync vs Async - CIFAR-10 IID p75" \
-  --output output/comparison_iid_p75_5000
+  --output output/e04-static-comparison/cifar-10/comparison_iid_p75_5000
 ```
 
 Saidas sempre geradas:
 
 ```text
-output/comparison_iid_p75_5000.md
-output/comparison_iid_p75_5000.csv
-output/comparison_iid_p75_5000.png
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.md
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.csv
+output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.png
 ```
 
 ## Formato de `--scenario`
@@ -38,8 +39,8 @@ output/comparison_iid_p75_5000.png
 Exemplos:
 
 ```bash
---scenario "Sync IID p75=output-cifar-10/sync.json#75"
---scenario "Async Non-IID p50=output-cifar-10/async.json#50"
+--scenario "Sync IID p75=results/e04-static-comparison/cifar-10/raw/sync.json#75"
+--scenario "Async Non-IID p50=results/e04-static-comparison/cifar-10/raw/async.json#50"
 ```
 
 Regras:
@@ -53,7 +54,7 @@ Regras:
 ## UI Streamlit
 
 ```bash
-python -m streamlit run experiments/comparison_ui.py
+python -m streamlit run experiments/e04_static_comparison/ui.py
 ```
 
 Campos:

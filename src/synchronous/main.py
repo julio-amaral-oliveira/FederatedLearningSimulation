@@ -30,6 +30,7 @@ from utils.experiment_runner import (
     save_accuracy_json,
 )
 from utils.plot_accuracy import generate_all_plots
+from experiments.shared.registry import temporary_output_path
 
 np.random.seed(42)
 torch.manual_seed(42)
@@ -46,12 +47,15 @@ def main(
     single_percentile=None,
     include_no_timeout=False,
     evaluation_frequency=1,
+    experiment_id="e01-static",
+    output_dir=None,
 ):
     accuracy_history = []
     selected_percentiles = [single_percentile] if single_percentile else PERCENTILE_LIST
     local_epochs = epochs
 
-    dataset_info = get_dataset_info(dataset)
+    output_dir = output_dir or temporary_output_path(experiment_id, dataset)
+    dataset_info = get_dataset_info(dataset, output_dir=output_dir)
     training_data, testing_data = load_dataset(dataset)
     training_data_clients = prepare_client_data(
         training_data, num_clients, dataset_info["num_classes"], is_non_iid
@@ -118,7 +122,7 @@ def main(
 
     if not output_prefix:
         generate_all_plots(
-            output_dir,
+            dataset_info["output_dir"],
             is_non_iid,
             alpha=0.1,
             mode="Sincrono",
@@ -152,6 +156,8 @@ if __name__ == "__main__":
         help="Percentil unico (ex: 50). Padrao: todos de PERCENTILE_LIST",
     )
     parser.add_argument("--output-prefix", type=str, default="")
+    parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--experiment-id", type=str, default="e01-static")
     parser.add_argument("--eval-every", type=int, default=1)
     args = parser.parse_args()
 
@@ -174,4 +180,6 @@ if __name__ == "__main__":
             single_percentile=args.percentile,
             include_no_timeout=args.include_no_timeout,
             evaluation_frequency=args.eval_every,
+            experiment_id=args.experiment_id,
+            output_dir=args.output_dir,
         )

@@ -6,37 +6,40 @@ DATASET_INFO = {
         "num_classes": 10,
         "input_shape": (3, 32, 32),
         "model": "cnn_cifar10",
-        "output_dir": "output-cifar-10",
+        "output_dir": "output/e01-static/cifar-10",
     },
     "mnist": {
         "num_classes": 10,
         "input_shape": (1, 28, 28),
         "model": "cnn_mnist",
-        "output_dir": "output-mnist",
+        "output_dir": "output/e01-static/mnist",
     },
     "fashion_mnist": {
         "num_classes": 10,
         "input_shape": (1, 28, 28),
         "model": "cnn_fashion_mnist",
-        "output_dir": "output-fashion-mnist",
+        "output_dir": "output/e01-static/fashion-mnist",
     },
     "gtsrb": {
         "num_classes": 43,
         "input_shape": (3, 32, 32),
         "model": "cnn_gtsrb",
-        "output_dir": "output-gtsrb",
+        "output_dir": "output/e01-static/gtsrb",
     },
 }
 
 VALID_DATASETS = list(DATASET_INFO.keys())
 
 
-def get_dataset_info(dataset_name: str) -> dict:
+def get_dataset_info(dataset_name: str, output_dir: str | None = None) -> dict:
     if dataset_name not in DATASET_INFO:
         raise ValueError(
             f"Dataset inválido '{dataset_name}'. Opções: {VALID_DATASETS}"
         )
-    return DATASET_INFO[dataset_name]
+    info = DATASET_INFO[dataset_name].copy()
+    if output_dir is not None:
+        info["output_dir"] = str(output_dir)
+    return info
 
 
 def load_dataset(dataset_name: str):

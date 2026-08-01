@@ -15,7 +15,7 @@ def apply_corruption(
     """
     
     # 1. Validação de Severidade
-    if not isinstance(severity, int) or not (1 <= severity <= 5):
+    if isinstance(severity, bool) or not isinstance(severity, int) or not (1 <= severity <= 5):
         raise ValueError(f"Severidade inválida: {severity}. Deve ser um número inteiro de 1 a 5.")
         
     # 2. Validação do Tipo de Corrupção
@@ -38,7 +38,7 @@ def apply_corruption(
 
     # 5. Aplicação da Corrupção
     if kind == 'gaussian_noise':
-        std_levels = [0.04, 0.06, 0.08, 0.09, 0.10]
+        std_levels = [0.08, 0.10, 0.14, 0.18, 0.24]
         std = std_levels[severity - 1]
         
         if gen is not None:
@@ -50,8 +50,7 @@ def apply_corruption(
 
     elif kind == 'frosted_glass_blur':
         # Simula o efeito de vidro fosco aplicando permutações locais de pixels (shuffle)
-        d_levels = [1, 1, 2, 2, 3] # Distância máxima de embaralhamento dos pixels
-        d = d_levels[severity - 1]
+        d = 3
         
         # Cria as matrizes de coordenadas espaciais
         yy, xx = torch.meshgrid(torch.arange(height, device=device), torch.arange(width, device=device), indexing='ij')
@@ -68,13 +67,14 @@ def apply_corruption(
         yy = torch.clamp(yy + dy, 0, height - 1)
         xx = torch.clamp(xx + dx, 0, width - 1)
         
-        # Reposiciona os pixels
-        out = out[..., yy, xx]
+        # Reposiciona os pixels e mistura progressivamente a mesma distorção
+        # aleatória, para que a intensidade aumente com a severidade.
+        distorted = out[..., yy, xx]
         
         # Aplica um leve desfoque para emular a dispersão da luz no vidro e suavizar as arestas vivas
-        blur_radii = [0.1, 0.3, 0.5, 0.7, 1.0]
-        sigma = blur_radii[severity - 1]
-        out = F.gaussian_blur(out, kernel_size=[3, 3], sigma=[sigma, sigma])
+        blurred = F.gaussian_blur(distorted, kernel_size=[3, 3], sigma=[1.0, 1.0])
+        strength = [0.2, 0.4, 0.6, 0.8, 1.0][severity - 1]
+        out = torch.lerp(out, blurred, strength)
 
     elif kind == 'motion_blur':
         # Cria um kernel de convolução direcional para simular rastros de movimento
@@ -108,10 +108,8 @@ def apply_corruption(
             out = out.squeeze(0)
 
     elif kind == 'fog':
-        # Valores de calibração baseados no benchmark oficial CIFAR-10-C
-        # Cada tupla mapeia para uma severidade e contém: (intensity, wibbledecay)
-        c_levels = [(1.5, 2.0), (2.0, 2.0), (2.5, 1.7), (2.5, 1.5), (3.0, 1.4)]
-        intensity, wibbledecay = c_levels[severity - 1]
+        intensity = 3.0
+        wibbledecay = 1.4
         
         # Extrai propriedades do tensor considerando o suporte a batches inserido anteriormente
         is_batched = out.ndim == 4
@@ -150,8 +148,11 @@ def apply_corruption(
         if not is_batched:
             fog_map = fog_map.squeeze(0)
             
-        # Equação oficial de sobreposição de névoa (ImageNet-C / CIFAR-10-C)
-        out = (out + intensity * fog_map) / (1.0 + intensity)
+        # Mistura uma única névoa aleatória com intensidade crescente, mantendo
+        # a progressão de severidade independente das variações da amostra.
+        fogged = (out + intensity * fog_map) / (1.0 + intensity)
+        strength = [0.2, 0.4, 0.6, 0.8, 1.0][severity - 1]
+        out = torch.lerp(out, fogged, strength)
 
     # 6. Normalização Final
     out = torch.clamp(out, 0.0, 1.0)

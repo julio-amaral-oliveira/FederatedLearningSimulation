@@ -12,14 +12,20 @@ BASE_ALPHA = 0.8
 DECAY_OF_BASE_ALPHA = 0.999
 TARDINESS_SENSITIVITY = 0.075
 
-# Heterogeneidade intrinseca de capacidade computacional dos clientes.
 # Cada tier: (nome, min_train_time, max_train_time, proporcao_de_clientes)
-SPEED_TIERS = [
-    ("fast",      1,  5,  0.50),
-    ("medium",    5,  12, 0.20),
-    ("slow",      12, 25, 0.20),
-    ("very_slow", 25, 40, 0.10),
-]
+SPEED_PROFILES = {
+    "uniform": [
+        ("uniform", 0, 10, 1.0),
+    ],
+    "heterogeneous": [
+        ("fast", 1, 5, 0.50),
+        ("medium", 5, 12, 0.20),
+        ("slow", 12, 25, 0.20),
+        ("very_slow", 25, 40, 0.10),
+    ],
+}
+
+DEFAULT_SPEED_PROFILE = "heterogeneous"
+SPEED_TIERS = SPEED_PROFILES[DEFAULT_SPEED_PROFILE]
 SPEED_TIER_SEED = 42
 SIMULATION_SEED = 42
-

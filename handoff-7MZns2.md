@@ -1,5 +1,14 @@
 ﻿# Handoff - FederatedLearningSimulation
 
+> **Documento histórico.** Este handoff descreve a comparação estática E04 em
+> um checkout antigo do projeto, com caminhos e comandos de uma sessão no
+> Windows. Ele não é o runbook do drift agent atual.
+>
+> Consulte o [catálogo de experimentos](docs/experimentos.md) para localizar
+> a família correta e o [runbook oficial do E07](docs/literatura/15.%20handoff-experimento-drift-agent.md)
+> para a matriz de drift atual. O script `experiments/plot_comparison.py`
+> citado abaixo não existe no checkout atual.
+
 ## Contexto
 Projeto em C:\Users\julio\Documents\Códigos\FederatedLearningSimulation. O usuário está comparando FL síncrono vs assíncrono no CIFAR-10, com foco em tempo virtual, stragglers e métricas por JSON {loss, accuracy, time}.
 

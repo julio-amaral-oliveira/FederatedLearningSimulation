@@ -1,5 +1,5 @@
 import unittest
-from experiments.comparison_core import compute_downtime
+from experiments.shared.comparison_core import compute_downtime
 
 
 class TestComputeDowntime(unittest.TestCase):
