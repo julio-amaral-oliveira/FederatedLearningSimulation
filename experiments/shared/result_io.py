@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping
 
 if TYPE_CHECKING:
-    from experiments.drift_results import DriftResult
+    from experiments.shared.drift_results import DriftResult
 
 
 def _stage_json(path: Path, payload: Mapping[str, Any]) -> tuple[Path, bytes]:
@@ -57,7 +57,7 @@ def save_validated_pair(
 ) -> tuple[Path, Path]:
     """Publish a validated canonical pair and its completion manifest."""
 
-    from experiments.drift_results import validate_pair
+    from experiments.shared.drift_results import validate_pair
 
     validate_pair(agent, baseline)
     directory = Path(output_dir)
@@ -106,7 +106,7 @@ def load_persisted_pair(
 ) -> tuple["DriftResult", "DriftResult"]:
     """Load a complete pair only when its manifest and byte digests are valid."""
 
-    from experiments.drift_results import DriftResult, validate_pair
+    from experiments.shared.drift_results import DriftResult, validate_pair
 
     directory = Path(output_dir)
     manifest_path = directory / "pair-manifest.json"

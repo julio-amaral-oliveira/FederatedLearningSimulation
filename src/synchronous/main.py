@@ -30,7 +30,7 @@ from utils.experiment_runner import (
     save_accuracy_json,
 )
 from utils.plot_accuracy import generate_all_plots
-from experiments.registry import temporary_output_path
+from experiments.shared.registry import temporary_output_path
 
 np.random.seed(42)
 torch.manual_seed(42)

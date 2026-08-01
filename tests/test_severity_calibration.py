@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from experiments.severity_calibration import calibrate_severities, save_calibration
+from experiments.e07_drift_agent.calibrate import calibrate_severities, save_calibration
 
 
 class TestCalibrateSeverities(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestCalibrateSeverities(unittest.TestCase):
             destination.write_text('{"previous": true}', encoding="utf-8")
 
             with patch(
-                "experiments.result_io.os.fsync",
+                "experiments.shared.result_io.os.fsync",
                 side_effect=OSError("injected calibration write failure"),
             ):
                 with self.assertRaisesRegex(
@@ -98,7 +98,7 @@ class TestCalibrateSeverities(unittest.TestCase):
         )
 
     def test_calibrates_every_copy_with_episode_test_seed_from_one_clean_server(self):
-        from experiments.severity_calibration import calibrate_clean_checkpoint
+        from experiments.e07_drift_agent.calibrate import calibrate_clean_checkpoint
 
         class FakeServer:
             def __init__(self):
@@ -124,7 +124,7 @@ class TestCalibrateSeverities(unittest.TestCase):
             self.assertEqual(seed, 10_016)
             return inputs + severity / 10
 
-        with patch("experiments.smoke_drift._build_server", return_value=server) as build_server:
+        with patch("experiments.e07_drift_agent.episode._build_server", return_value=server) as build_server:
             result = calibrate_clean_checkpoint(
                 config,
                 corruption_names=["noise", "fog"],

@@ -6,23 +6,23 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from experiments.drift_results import (
+from experiments.e07_drift_agent.episode import (
+    DriftEpisodeConfig,
+    main as smoke_drift_main,
+    save_drift_result,
+)
+from experiments.e07_drift_agent.plot import plot_scenario
+from experiments.e07_drift_agent.run_matrix import run_matrix
+from experiments.shared.drift_results import (
     DriftResult,
     load_drift_result,
     summarize_pair,
     validate_pair,
 )
-from experiments.result_io import (
+from experiments.shared.result_io import (
     atomic_write_json,
     load_persisted_pair,
     save_validated_pair,
-)
-from experiments.plot_smoke_drift import plot_scenario
-from experiments.run_smoke_drift import run_matrix
-from experiments.smoke_drift import (
-    DriftEpisodeConfig,
-    main as smoke_drift_main,
-    save_drift_result,
 )
 
 
@@ -561,7 +561,7 @@ class TestDriftResultPersistence(unittest.TestCase):
             destination.write_text('{"previous": true}', encoding="utf-8")
 
             with mock.patch(
-                "experiments.result_io.os.fsync",
+                "experiments.shared.result_io.os.fsync",
                 side_effect=OSError("injected write failure"),
             ):
                 with self.assertRaisesRegex(OSError, "injected write failure"):
@@ -579,7 +579,7 @@ class TestDriftResultPersistence(unittest.TestCase):
             destination.write_text('{"previous": true}', encoding="utf-8")
 
             with mock.patch(
-                "experiments.result_io.os.fsync",
+                "experiments.shared.result_io.os.fsync",
                 side_effect=OSError("injected standalone write failure"),
             ):
                 with self.assertRaisesRegex(
@@ -609,7 +609,7 @@ class TestDriftResultPersistence(unittest.TestCase):
                 return real_replace(source, destination)
 
             with mock.patch(
-                "experiments.result_io.os.replace",
+                "experiments.shared.result_io.os.replace",
                 side_effect=fail_baseline_publication,
             ):
                 with self.assertRaisesRegex(
@@ -637,7 +637,7 @@ class TestDriftResultPersistence(unittest.TestCase):
                 return real_replace(source, destination)
 
             with mock.patch(
-                "experiments.result_io.os.replace",
+                "experiments.shared.result_io.os.replace",
                 side_effect=record_publication,
             ):
                 agent_path, baseline_path = save_validated_pair(
@@ -700,7 +700,7 @@ class TestDriftResultPersistence(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with (
                 mock.patch(
-                    "experiments.smoke_drift.run_drift_comparison",
+                    "experiments.e07_drift_agent.episode.run_drift_comparison",
                     return_value=results,
                 ),
                 mock.patch(
@@ -731,7 +731,7 @@ class TestDriftResultPersistence(unittest.TestCase):
                 return real_replace(source, destination)
 
             with mock.patch(
-                "experiments.result_io.os.replace",
+                "experiments.shared.result_io.os.replace",
                 side_effect=fail_summary_publication,
             ):
                 with self.assertRaisesRegex(

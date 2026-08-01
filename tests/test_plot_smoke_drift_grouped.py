@@ -10,7 +10,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from experiments.plot_smoke_drift import (
+from experiments.e07_drift_agent.plot import (
     ScenarioError,
     build_figure,
     forward_fill_steps,

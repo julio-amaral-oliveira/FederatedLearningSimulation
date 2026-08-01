@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from experiments.registry import ExperimentSpec, get_experiment
+from experiments.shared.registry import ExperimentSpec, get_experiment
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ def _pair_directories(root: Path) -> tuple[Path, ...]:
 
 
 def _validate_pairs(root: Path) -> int:
-    from experiments.result_io import load_persisted_pair
+    from experiments.shared.result_io import load_persisted_pair
 
     pair_directories = _pair_directories(root)
     for pair_directory in pair_directories:

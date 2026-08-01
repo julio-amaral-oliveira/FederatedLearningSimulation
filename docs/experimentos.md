@@ -65,29 +65,28 @@ E01 e histórico para E07.
 | `src/utils/drift_detector.py` | E06, E07 | `suporte` | Detector de drift baseado em incerteza. |
 | `src/utils/plot_accuracy.py` | E01 a E04 | `suporte` | Gera gráficos de acurácia do simulador base. |
 | `src/utils/corruptions.py` | E06, E07 | `suporte` | Implementa o contrato das corrupções visuais. |
-| `experiments/ablation_study.py` | E02 | `histórico` | Executa a ablação da agregação assíncrona. |
-| `experiments/plot_ablation.py` | E02 | `histórico` | Plota os resultados da ablação. |
-| `experiments/compare_results.py` | E01, E03, E04 | `suporte` | Compara JSONs de acurácia do simulador base. |
-| `experiments/comparison_core.py` | E01, E03, E04, E07 | `suporte` | Compartilha métricas e leitura de resultados. |
-| `experiments/comparison_ui.py` | E04 | `histórico` | UI para comparação estática. |
-| `experiments/temporal_drift.py` | E05 | `histórico` | Executa fases de drift temporal. |
-| `experiments/plot_drift.py` | E05 | `histórico` | Plota o drift temporal. |
-| `experiments/drift_ui.py` | E05 | `histórico` | UI para os resultados do drift temporal. |
-| `experiments/smoke_drift.py` | E07 | `atual` | Motor de um episódio e comparação dos braços. A CLI direta é diagnóstica. |
-| `experiments/run_smoke_drift.py` | E07 | `atual` | Entrada oficial da matriz de cenários e seeds. |
-| `experiments/severity_calibration.py` | E07 | `atual` | Entrada oficial da calibração. |
-| `experiments/drift_controls.py` | E07 | `suporte` | Controles `identity` e Oracle. |
-| `experiments/drift_results.py` | E07 | `suporte` | Valida pares e resume resultados v2 e v3. |
-| `experiments/result_io.py` | E07 | `suporte` | Publica artefatos de forma atômica. |
-| `experiments/registry.py` | E01 a E07 | `suporte` | Registro operacional de IDs, estados e raízes em `results/`. |
-| `experiments/migrate_outputs.py` | E07 | `suporte` | Planeja e publica cópias validadas de resultados. |
-| `experiments/plot_smoke_drift.py` | E07 | `atual` | Entrada oficial da visualização individual ou agregada. |
-| `experiments/smoke_drift_ui.py` | E06 | `legado` | UI para JSONs antigos `smoke_drift*.json`. |
+| `experiments/e02_ablation/run.py` | E02 | `histórico` | Executa a ablação da agregação assíncrona. |
+| `experiments/e02_ablation/plot.py` | E02 | `histórico` | Plota os resultados da ablação. |
+| `experiments/e04_static_comparison/compare.py` | E01, E03, E04 | `suporte` | Compara JSONs de acurácia do simulador base. |
+| `experiments/shared/comparison_core.py` | E01, E03, E04, E07 | `suporte` | Compartilha métricas e leitura de resultados. |
+| `experiments/e04_static_comparison/ui.py` | E04 | `histórico` | UI para comparação estática. |
+| `experiments/e05_temporal_drift/run.py` | E05 | `histórico` | Executa fases de drift temporal. |
+| `experiments/e05_temporal_drift/plot.py` | E05 | `histórico` | Plota o drift temporal. |
+| `experiments/e05_temporal_drift/ui.py` | E05 | `histórico` | UI para os resultados do drift temporal. |
+| `experiments/e07_drift_agent/episode.py` | E07 | `atual` | Motor de um episódio e comparação dos braços. A CLI direta é diagnóstica. |
+| `experiments/e07_drift_agent/run_matrix.py` | E07 | `atual` | Entrada oficial da matriz de cenários e seeds. |
+| `experiments/e07_drift_agent/calibrate.py` | E07 | `atual` | Entrada oficial da calibração. |
+| `experiments/shared/drift_controls.py` | E07 | `suporte` | Controles `identity` e Oracle. |
+| `experiments/shared/drift_results.py` | E07 | `suporte` | Valida pares e resume resultados v2 e v3. |
+| `experiments/shared/result_io.py` | E07 | `suporte` | Publica artefatos de forma atômica. |
+| `experiments/shared/registry.py` | E01 a E07 | `suporte` | Registro operacional de IDs, estados e raízes em `results/`. |
+| `experiments/shared/migrate_outputs.py` | E07 | `suporte` | Planeja e publica cópias validadas de resultados. |
+| `experiments/e07_drift_agent/plot.py` | E07 | `atual` | Entrada oficial da visualização individual ou agregada. |
+| `experiments/e06_drift_agent_prototype/ui.py` | E06 | `legado` | UI para JSONs antigos `smoke_drift*.json`. |
 
-Os novos namespaces em `experiments/eXX_*` são os pontos de entrada organizados.
-Nesta etapa eles funcionam como adapters de compatibilidade para os módulos
-planos existentes. A implementação ainda fica nos módulos antigos até que os
-imports e os comandos históricos sejam migrados sem quebrar usuários.
+Os namespaces em `experiments/eXX_*` contêm as implementações canônicas de
+cada família. Os módulos compartilhados entre famílias vivem em
+`experiments/shared/`. A raiz de `experiments/` não contém código executável.
 
 Os módulos de dados, modelos e servidores são infraestrutura compartilhada.
 Eles não definem sozinhos uma família de experimento.
@@ -139,7 +138,7 @@ Use os comandos abaixo para iniciar uma execução da família correta.
 | E03 | `python src/synchronous/main.py --experiment-id e03-timeout --include-no-timeout` | `output/e03-timeout/<dataset>/` |
 | E04 | Entradas Sync/Async com `--experiment-id e04-static-comparison`, depois `python -m experiments.e04_static_comparison.compare ...` | `output/e04-static-comparison/<dataset>/` ou o caminho explícito. |
 | E05 | `python -m experiments.e05_temporal_drift.run --mode both ...` | `output/e05-temporal-drift/<dataset>/`. |
-| E06 | `python -m experiments.e06_drift_agent_prototype.prototype ...` | Episódio legado em `output/e06-drift-agent-prototype/<dataset>/`. |
+| E06 | `python -m streamlit run experiments/e06_drift_agent_prototype/ui.py` | UI legada para JSONs `smoke_drift*.json`. O protótipo de episódio não tem entrada própria; o episódio atual é o E07. |
 | E07 calibração | `MPLCONFIGDIR=/private/tmp/fl-mpl .venv/bin/python -m experiments.e07_drift_agent.calibrate ...` | `output/e07-drift-agent/cifar-10/calibration/`. |
 | E07 matriz | `MPLCONFIGDIR=/private/tmp/fl-mpl .venv/bin/python -m experiments.e07_drift_agent.run_matrix ...` | `output/e07-drift-agent/cifar-10/uniform/matrix-v1/`. |
 | E07 plot | `MPLCONFIGDIR=/private/tmp/fl-mpl .venv/bin/python -m experiments.e07_drift_agent.plot --scenario-dir <dir> --output <png>` | PNG do cenário. |
@@ -151,11 +150,13 @@ preservar a resolução do pacote `experiments`.
 
 Não use estes comandos para iniciar o E07 atual:
 
-- `python experiments/temporal_drift.py`. Ele executa E05.
-- `python experiments/ablation_study.py`. Ele executa E02.
-- `python experiments/smoke_drift_ui.py`. Ele lê o formato antigo de E06.
-- `python experiments/compare_results.py` para pares agente/baseline v3. Use
-  `experiments.drift_results` e `experiments.e07_drift_agent.plot` para E07.
+- `python -m experiments.e05_temporal_drift.run`. Ele executa E05.
+- `python -m experiments.e02_ablation.run`. Ele executa E02.
+- `python -m streamlit run experiments/e06_drift_agent_prototype/ui.py`. Ele lê
+  o formato antigo de E06.
+- `python -m experiments.e04_static_comparison.compare` para pares
+  agente/baseline v3. Use `experiments.shared.drift_results` e
+  `experiments.e07_drift_agent.plot` para E07.
 - `experiments/plot_comparison.py`. O arquivo aparece em
   `handoff-7MZns2.md`, mas não existe no checkout atual.
 
@@ -194,8 +195,8 @@ mudança temporal na distribuição dos dados?
 - `src/utils/data_loader.py`.
 - `src/utils/data_split.py`.
 - `src/utils/models.py`.
-- `experiments/comparison_core.py`.
-- `experiments/compare_results.py`.
+- `experiments/shared/comparison_core.py`.
+- `experiments/e04_static_comparison/compare.py`.
 
 ### Estado
 
@@ -243,8 +244,8 @@ e Non-IID.
 
 ### Código
 
-- `experiments/ablation_study.py`.
-- `experiments/plot_ablation.py`.
+- `experiments/e02_ablation/run.py`.
+- `experiments/e02_ablation/plot.py`.
 - `src/asynchronous/server.py`.
 - `src/asynchronous/client.py`.
 - `src/asynchronous/constants.py`.
@@ -296,7 +297,7 @@ timeouts por Monte Carlo. Eles não representam o quorum do drift agent.
 - `src/synchronous/server.py`.
 - `src/synchronous/monte_carlo.py`.
 - `src/synchronous/constants.py`.
-- `experiments/comparison_core.py`.
+- `experiments/shared/comparison_core.py`.
 
 ### Estado
 
@@ -335,9 +336,9 @@ vantagem de velocidade e estabilidade da cauda.
 
 ### Código
 
-- `experiments/comparison_core.py`.
-- `experiments/compare_results.py`.
-- `experiments/comparison_ui.py`.
+- `experiments/shared/comparison_core.py`.
+- `experiments/e04_static_comparison/compare.py`.
+- `experiments/e04_static_comparison/ui.py`.
 - `src/utils/plot_accuracy.py`.
 
 ### Estado
@@ -383,9 +384,9 @@ corrupção visual em imagens de produção.
 
 ### Código
 
-- `experiments/temporal_drift.py`.
-- `experiments/plot_drift.py`.
-- `experiments/drift_ui.py`.
+- `experiments/e05_temporal_drift/run.py`.
+- `experiments/e05_temporal_drift/plot.py`.
+- `experiments/e05_temporal_drift/ui.py`.
 - `src/utils/drift.py`.
 
 ### Estado
@@ -421,20 +422,21 @@ avaliação offline.
 
 ### Código
 
-- `experiments/smoke_drift.py`.
-- `experiments/smoke_drift_ui.py`.
+- `experiments/e07_drift_agent/episode.py`.
+- `experiments/e06_drift_agent_prototype/ui.py`.
 - `src/orchestrator/orchestrator.py`.
 - `src/utils/drift_detector.py`.
 - `src/utils/corruptions.py`.
-- `experiments/comparison_core.py`.
+- `experiments/shared/comparison_core.py`.
 
 ### Estado
 
 Este estudo é um protótipo histórico. Ele provou o encadeamento técnico, mas
 não ofereceu evidência estatística suficiente para uma conclusão científica.
 
-O nome `smoke_drift.py` ficou inadequado. O arquivo ainda contém parte do fluxo
-principal usado pelo experimento endurecido E07.
+O nome `smoke_drift.py` ficou inadequado. O arquivo vive agora em
+`experiments/e07_drift_agent/episode.py` e contém parte do fluxo principal
+usado pelo experimento endurecido E07.
 
 ### Fontes
 
@@ -480,12 +482,12 @@ oficial.
 
 ### Código oficial
 
-- `experiments/smoke_drift.py`: execução de um episódio e comparação dos braços.
-- `experiments/run_smoke_drift.py`: matriz de seeds, cenários, controles e sensibilidades.
-- `experiments/severity_calibration.py`: calibração das severidades.
-- `experiments/drift_results.py`: leitura e validação de resultados.
-- `experiments/result_io.py`: publicação atômica dos artefatos.
-- `experiments/plot_smoke_drift.py`: visualização de um par ou de várias seeds.
+- `experiments/e07_drift_agent/episode.py`: execução de um episódio e comparação dos braços.
+- `experiments/e07_drift_agent/run_matrix.py`: matriz de seeds, cenários, controles e sensibilidades.
+- `experiments/e07_drift_agent/calibrate.py`: calibração das severidades.
+- `experiments/shared/drift_results.py`: leitura e validação de resultados.
+- `experiments/shared/result_io.py`: publicação atômica dos artefatos.
+- `experiments/e07_drift_agent/plot.py`: visualização de um par ou de várias seeds.
 - `src/orchestrator/orchestrator.py`: monitor local e decisão coletiva.
 - `src/utils/corruptions.py`: contrato das corrupções.
 
@@ -601,9 +603,9 @@ proveniência importada está em
 
 ### Registro operacional
 
-`experiments/registry.py` define o ID, o estado e a raiz de resultados de cada
-experimento. `experiments/__init__.py` exporta `get_experiment()` e
-`output_path()` para os novos entrypoints.
+`experiments/shared/registry.py` define o ID, o estado e a raiz de resultados
+de cada experimento. Ele exporta `get_experiment()` e `output_path()` para os
+entrypoints. `experiments` é um namespace package e não reexporta módulos.
 
 | ID | Estado | Raiz de resultados |
 |---|---|---|
@@ -618,14 +620,15 @@ experimento. `experiments/__init__.py` exporta `get_experiment()` e
 O registro define caminhos. Ele não substitui a configuração persistida, os
 manifests ou a validação científica dos resultados.
 
-Use `experiments/migrate_outputs.py` com `--dry-run` para revisar cada origem
-e destino. Use `--copy` somente depois de revisar o plano. O modo de cópia
-recusa destinos existentes, valida os digests e valida os pares publicados.
+Use `experiments/shared/migrate_outputs.py` com `--dry-run` para revisar cada
+origem e destino. Use `--copy` somente depois de revisar o plano. O modo de
+cópia recusa destinos existentes, valida os digests e valida os pares
+publicados.
 
-### Layout alvo do código de experimento
+### Layout aplicado do código de experimento
 
-As entradas devem mostrar a família no caminho. Os módulos compartilhados
-continuam fora dessas pastas até a migração de imports passar nos testes.
+As entradas mostram a família no caminho. Os módulos compartilhados ficam em
+`experiments/shared/`:
 
 ```text
 experiments/
@@ -639,14 +642,11 @@ experiments/
 └── shared/
 ```
 
-Na primeira fase, cada pasta recebe um README curto e uma entrada explícita.
-As entradas antigas podem permanecer como wrappers temporários. O wrapper deve
-apontar para a entrada nova e deve mostrar uma mensagem de migração.
-
-As entradas criadas nesta fase são adapters sem mensagem obrigatória: elas
-preservam o comportamento dos comandos antigos e tornam a família visível no
-comando. A mensagem e a remoção dos adapters ficam para uma etapa posterior,
-depois da migração dos imports.
+A migração de código foi concluída em 2026-07-31. As implementações canônicas
+foram movidas dos módulos planos para os namespaces `experiments/eXX_*`. Os
+módulos de suporte compartilhado foram movidos para `experiments/shared/`. A
+raiz de `experiments/` não contém mais wrappers, adapters ou código executável.
+Os imports usam os caminhos canônicos em todo o repositório.
 
 ### Mapa de migração concluído
 
@@ -704,8 +704,9 @@ versionado pelo Git e não deve ser copiado para cada experimento.
 | `src/federated_learning_sim.egg-info/` | Metadados gerados do pacote | Infraestrutura | Não classificar como código de experimento. |
 
 As entradas e configurações específicas ficam em `experiments/eXX_*`. Os
-imports antigos devem continuar funcionando durante a migração. Não mova os
-motores compartilhados antes de validar os testes e os comandos oficiais.
+módulos compartilhados entre famílias ficam em `experiments/shared/`. A
+migração dos imports foi concluída; os motores compartilhados permanecem em
+`src/` e não foram duplicados.
 
 ### Relatórios em `report/`
 

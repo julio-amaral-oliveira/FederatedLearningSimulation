@@ -25,7 +25,7 @@ class OracleMonitor:
     """A monitor that deterministically triggers once at production onset.
 
     It implements the same narrow monitor protocol consumed by
-    :func:`experiments.smoke_drift.run_drift_episode`, without consulting
+    :func:`experiments.e07_drift_agent.episode.run_drift_episode`, without consulting
     labels or the model.  Warm-up ticks are recorded but never trigger.
     """
 

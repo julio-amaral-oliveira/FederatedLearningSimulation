@@ -8,15 +8,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from experiments.comparison_core import compute_downtime
-from experiments import smoke_drift
-from experiments.smoke_drift import (
+from experiments.e07_drift_agent import episode as smoke_drift
+from experiments.e07_drift_agent.episode import (
     DriftEpisodeConfig,
     capture_random_state,
     restore_random_state,
     run_drift_comparison,
     run_drift_episode,
 )
+from experiments.shared.comparison_core import compute_downtime
 from src.orchestrator.orchestrator import DriftMonitor
 
 

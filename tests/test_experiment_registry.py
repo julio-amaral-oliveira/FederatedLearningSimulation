@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from experiments.registry import (
+from experiments.shared.registry import (
     EXPERIMENTS,
     get_experiment,
     output_path,

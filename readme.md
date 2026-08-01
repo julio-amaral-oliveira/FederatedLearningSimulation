@@ -13,8 +13,8 @@ O projeto contém sete familias de experimento. Leia o [catalogo de
 experimentos](docs/experimentos.md) antes de executar um script em
 `experiments/` ou comparar resultados.
 
-O registro operacional em `experiments/registry.py` define os IDs e as raízes
-em `results/`. Ele não move resultados por conta própria.
+O registro operacional em `experiments/shared/registry.py` define os IDs e as
+raízes em `results/`. Ele não move resultados por conta própria.
 
 - E01 a E04: simulador federado estatico, ablação, timeout e comparação Sync
   contra Async.
@@ -95,16 +95,14 @@ um dataset sem uma raiz explícita:
 │       ├── models.py
 │       └── plot_accuracy.py
 ├── experiments/
-│   ├── ablation_study.py
-│   ├── plot_ablation.py
-│   ├── comparison_core.py
-│   ├── compare_results.py
-│   ├── comparison_ui.py
-│   ├── temporal_drift.py
-│   ├── smoke_drift.py
-│   ├── run_smoke_drift.py
-│   ├── severity_calibration.py
-│   └── plot_smoke_drift.py
+│   ├── e01_static/
+│   ├── e02_ablation/
+│   ├── e03_timeout/
+│   ├── e04_static_comparison/
+│   ├── e05_temporal_drift/
+│   ├── e06_drift_agent_prototype/
+│   ├── e07_drift_agent/
+│   └── shared/
 ├── docs/
 ├── checkpoints/
 └── output-*/
@@ -175,12 +173,12 @@ Comportamento:
 Comandos:
 
 ```bash
-python src/synchronous/main.py --experiment-id e01-static
-python src/synchronous/main.py --experiment-id e01-static --dataset mnist --iid
-python src/synchronous/main.py --experiment-id e01-static --dataset fashion_mnist --non-iid
-python src/synchronous/main.py --experiment-id e01-static --dataset gtsrb --iid --percentile 50
-python src/synchronous/main.py --experiment-id e03-timeout --dataset cifar10 --include-no-timeout
-python src/synchronous/main.py --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-rounds 5000 --eval-every 10 --output-prefix compare_5000_p75_sync
+python -m src.synchronous.main --experiment-id e01-static
+python -m src.synchronous.main --experiment-id e01-static --dataset mnist --iid
+python -m src.synchronous.main --experiment-id e01-static --dataset fashion_mnist --non-iid
+python -m src.synchronous.main --experiment-id e01-static --dataset gtsrb --iid --percentile 50
+python -m src.synchronous.main --experiment-id e03-timeout --dataset cifar10 --include-no-timeout
+python -m src.synchronous.main --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-rounds 5000 --eval-every 10 --output-prefix compare_5000_p75_sync
 ```
 
 Argumentos principais:
@@ -212,11 +210,11 @@ Comportamento:
 Comandos:
 
 ```bash
-python src/asynchronous/main.py --experiment-id e01-static
-python src/asynchronous/main.py --experiment-id e01-static --dataset mnist --percentile 50
-python src/asynchronous/main.py --experiment-id e01-static --dataset gtsrb --non-iid --num-updates 40
-python src/asynchronous/main.py --experiment-id e02-ablation --base-alpha 0.5 --decay-of-base-alpha 0.99 --tardiness-sensivity 0.1
-python src/asynchronous/main.py --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-updates 5000 --eval-every 10 --output-prefix compare_5000_p75_async
+python -m src.asynchronous.main --experiment-id e01-static
+python -m src.asynchronous.main --experiment-id e01-static --dataset mnist --percentile 50
+python -m src.asynchronous.main --experiment-id e01-static --dataset gtsrb --non-iid --num-updates 40
+python -m src.asynchronous.main --experiment-id e02-ablation --base-alpha 0.5 --decay-of-base-alpha 0.99 --tardiness-sensivity 0.1
+python -m src.asynchronous.main --experiment-id e04-static-comparison --dataset cifar10 --iid --percentile 75 --num-updates 5000 --eval-every 10 --output-prefix compare_5000_p75_async
 ```
 
 Argumentos principais:
@@ -259,8 +257,8 @@ python -m experiments.e02_ablation.run --num-clients 20 --epochs 1 --batch-size 
 Graficos de acuracia gerais:
 
 ```bash
-python -m utils.plot_accuracy --output-dir output/e01-static/cifar-10
-python -m utils.plot_accuracy --output-dir output/e01-static/mnist --non-iid --x-label atualizacoes
+python -m src.utils.plot_accuracy --output-dir output/e01-static/cifar-10
+python -m src.utils.plot_accuracy --output-dir output/e01-static/mnist --non-iid --x-label atualizacoes
 ```
 
 Graficos do estudo de ablacao:
@@ -287,7 +285,7 @@ python -m experiments.e04_static_comparison.compare \
 UI simples em Streamlit:
 
 ```bash
-python -m streamlit run experiments/comparison_ui.py
+python -m streamlit run experiments/e04_static_comparison/ui.py
 ```
 
 Mais detalhes:
@@ -362,8 +360,9 @@ O mapeamento dataset -> modelo e feito em `src/utils/data_loader.py`.
 - Prefira `--percentile 50` e `--eval-every 10` em testes rapidos.
 - Reduza `--num-rounds` ou `--num-updates` durante debug inicial.
 - Use `--output-prefix` para separar experimentos sem sobrescrever arquivos.
-- Use `experiments/compare_results.py` para comparacoes reproduziveis.
-- Use a UI apenas como atalho; a logica oficial esta em `comparison_core.py`.
+- Use `experiments.e04_static_comparison.compare` para comparacoes reproduziveis.
+- Use a UI apenas como atalho; a logica oficial esta em
+  `experiments/shared/comparison_core.py`.
 
 ## Troubleshooting rapido
 

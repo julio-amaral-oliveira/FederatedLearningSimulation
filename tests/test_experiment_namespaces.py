@@ -14,12 +14,17 @@ class TestExperimentNamespaces(unittest.TestCase):
             "experiments.e05_temporal_drift.run",
             "experiments.e05_temporal_drift.plot",
             "experiments.e05_temporal_drift.ui",
-            "experiments.e06_drift_agent_prototype.prototype",
             "experiments.e06_drift_agent_prototype.ui",
             "experiments.e07_drift_agent.episode",
             "experiments.e07_drift_agent.calibrate",
             "experiments.e07_drift_agent.run_matrix",
             "experiments.e07_drift_agent.plot",
+            "experiments.shared.comparison_core",
+            "experiments.shared.drift_controls",
+            "experiments.shared.drift_results",
+            "experiments.shared.migrate_outputs",
+            "experiments.shared.registry",
+            "experiments.shared.result_io",
         ]
 
         for module_name in modules:

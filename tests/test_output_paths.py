@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from experiments.registry import temporary_output_path
+from experiments.shared.registry import temporary_output_path
 from src.utils.data_loader import get_dataset_info
 
 

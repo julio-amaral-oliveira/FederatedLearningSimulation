@@ -8,11 +8,11 @@ from types import SimpleNamespace
 import numpy as np
 import torch.nn as nn
 
-from experiments.drift_results import validate_pair
-from experiments.plot_smoke_drift import plot_scenario
-from experiments.result_io import load_persisted_pair
-from experiments.run_smoke_drift import run_matrix
-from experiments.smoke_drift import DriftEpisodeConfig, run_drift_comparison
+from experiments.e07_drift_agent.episode import DriftEpisodeConfig, run_drift_comparison
+from experiments.e07_drift_agent.plot import plot_scenario
+from experiments.e07_drift_agent.run_matrix import run_matrix
+from experiments.shared.drift_results import validate_pair
+from experiments.shared.result_io import load_persisted_pair
 
 
 class _SmokeClient:

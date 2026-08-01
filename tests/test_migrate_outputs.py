@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from experiments.migrate_outputs import build_plan, copy_plan, render_dry_run
+from experiments.shared.migrate_outputs import build_plan, copy_plan, render_dry_run
 
 
 class TestMigrateOutputs(unittest.TestCase):

@@ -204,7 +204,7 @@ output/e04-static-comparison/cifar-10/comparison_iid_p75_5000.png
 ## UI de comparacao
 
 ```bash
-python -m streamlit run experiments/comparison_ui.py
+python -m streamlit run experiments/e04_static_comparison/ui.py
 ```
 
 Campos principais:

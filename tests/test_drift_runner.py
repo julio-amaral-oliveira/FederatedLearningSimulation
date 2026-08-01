@@ -6,15 +6,15 @@ from unittest.mock import patch
 
 import torch
 
-from experiments.drift_controls import OracleMonitor, identity_corruption
-from experiments.run_smoke_drift import (
+from experiments.e07_drift_agent.episode import DriftEpisodeConfig
+from experiments.e07_drift_agent.run_matrix import (
     aggregate_runs,
     build_run_matrix,
     main,
     parse_args,
     run_matrix,
 )
-from experiments.smoke_drift import DriftEpisodeConfig
+from experiments.shared.drift_controls import OracleMonitor, identity_corruption
 from src.asynchronous.constants import (
     DEFAULT_SPEED_PROFILE as ASYNC_DEFAULT_SPEED_PROFILE,
     SPEED_PROFILES as ASYNC_SPEED_PROFILES,
@@ -392,7 +392,7 @@ class TestDriftRunMatrix(unittest.TestCase):
             captured.extend(configs)
             return []
 
-        with patch("experiments.run_smoke_drift.run_matrix", side_effect=fake_run_matrix):
+        with patch("experiments.e07_drift_agent.run_matrix.run_matrix", side_effect=fake_run_matrix):
             main([
                 "--seeds", "11", "12",
                 "--scenario", "noise:3",
