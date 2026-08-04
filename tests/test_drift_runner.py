@@ -7,7 +7,12 @@ from unittest.mock import patch
 import torch
 
 from experiments.e07_drift_agent.episode import DriftEpisodeConfig
-from experiments.e07_drift_agent.run_ablation import AblationPlan, build_ablation_matrix
+from experiments.e07_drift_agent.run_ablation import (
+    AblationPlan,
+    DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS,
+    build_ablation_matrix,
+    parse_args as parse_ablation_args,
+)
 from experiments.e07_drift_agent.run_matrix import (
     aggregate_runs,
     build_run_matrix,
@@ -46,6 +51,14 @@ class TestDriftRunMatrix(unittest.TestCase):
         args = parse_args(["--speed-profile", "heterogeneous"])
 
         self.assertEqual(args.client_speed_profile, "heterogeneous")
+
+    def test_ablation_cli_defaults_to_a_horizon_that_fits_ten_retraining_rounds(self):
+        args = parse_ablation_args([])
+
+        self.assertEqual(
+            args.production_horizon_seconds,
+            DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS,
+        )
 
     def test_build_run_matrix_preserves_the_requested_speed_profile(self):
         configs = build_run_matrix(
@@ -105,6 +118,13 @@ class TestDriftRunMatrix(unittest.TestCase):
         )
 
         self.assertEqual(len(configs), 11 * 2)
+        self.assertTrue(
+            all(
+                config.production_horizon_seconds
+                == DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS
+                for config in configs
+            )
+        )
         arms = {
             (
                 config.trigger_threshold,

@@ -9,7 +9,6 @@ from typing import Iterable
 
 from experiments.e07_drift_agent.episode import (
     DEFAULT_CLIENT_SPEED_PROFILE,
-    DEFAULT_PRODUCTION_HORIZON_SECONDS,
     DriftEpisodeConfig,
 )
 from experiments.e07_drift_agent.run_matrix import (
@@ -18,6 +17,9 @@ from experiments.e07_drift_agent.run_matrix import (
     run_matrix,
 )
 from experiments.shared.registry import temporary_output_path
+
+
+DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS = 800.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +43,10 @@ def build_ablation_matrix(
     base_config: DriftEpisodeConfig | None = None,
 ) -> list[DriftEpisodeConfig]:
     """Build unique one-at-a-time arms with one official baseline."""
-    base = base_config or DriftEpisodeConfig(retrain_rounds=1)
+    base = base_config or DriftEpisodeConfig(
+        retrain_rounds=1,
+        production_horizon_seconds=DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS,
+    )
     arms = [
         replace(base, trigger_threshold=quorum)
         for quorum in plan.quorums
@@ -103,7 +108,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--production-horizon-seconds",
         type=float,
-        default=DEFAULT_PRODUCTION_HORIZON_SECONDS,
+        default=DEFAULT_ABLATION_PRODUCTION_HORIZON_SECONDS,
     )
     parser.add_argument("--include-controls", action="store_true")
     return parser.parse_args(argv)
