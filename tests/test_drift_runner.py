@@ -7,6 +7,7 @@ from unittest.mock import patch
 import torch
 
 from experiments.e07_drift_agent.episode import DriftEpisodeConfig
+from experiments.e07_drift_agent.run_ablation import AblationPlan, build_ablation_matrix
 from experiments.e07_drift_agent.run_matrix import (
     aggregate_runs,
     build_run_matrix,
@@ -89,6 +90,45 @@ class TestDriftRunMatrix(unittest.TestCase):
         self.assertEqual(
             [(config.trigger_threshold, config.retrain_rounds) for config in configs],
             [(0.2, 3), (0.2, 7), (0.5, 3), (0.5, 7)],
+        )
+
+    def test_builds_one_at_a_time_sensitivity_arms_in_ablation_runner(self):
+        configs = build_ablation_matrix(
+            seeds=[42, 43],
+            scenarios=[("noise", 2)],
+            plan=AblationPlan(
+                quorums=(0.2, 0.3, 0.5),
+                retrain_rounds=(1, 3, 5, 10),
+                windows=(1, 2, 5),
+                dropout_T=(5, 10, 25, 50),
+            ),
+        )
+
+        self.assertEqual(len(configs), 11 * 2)
+        arms = {
+            (
+                config.trigger_threshold,
+                config.retrain_rounds,
+                config.trigger_window_ticks,
+                config.detector_T,
+            )
+            for config in configs
+        }
+        self.assertEqual(
+            arms,
+            {
+                (0.2, 1, 2, 5),
+                (0.3, 1, 2, 5),
+                (0.5, 1, 2, 5),
+                (0.3, 3, 2, 5),
+                (0.3, 5, 2, 5),
+                (0.3, 10, 2, 5),
+                (0.3, 1, 1, 5),
+                (0.3, 1, 5, 5),
+                (0.3, 1, 2, 10),
+                (0.3, 1, 2, 25),
+                (0.3, 1, 2, 50),
+            },
         )
 
     def test_oracle_triggers_once_on_the_first_production_tick(self):

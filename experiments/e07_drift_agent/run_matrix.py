@@ -106,6 +106,8 @@ def _summary_dimensions(
         "trigger_policy": trigger_policy,
         "quorum": config.trigger_threshold,
         "retrain_rounds": config.retrain_rounds,
+        "window_ticks": config.trigger_window_ticks,
+        "dropout_T": config.detector_T,
         "client_speed_profile": config.client_speed_profile,
         "production_horizon_seconds": config.production_horizon_seconds,
     }
@@ -169,10 +171,15 @@ def _result_directory(
     config: DriftEpisodeConfig,
     duplicates: Counter[tuple[str, int, int]],
 ) -> Path:
-    """Return the canonical location, with a suffix only for sensitivities."""
+    """Return a unique location for every scenario, seed, and sensitivity arm."""
     path = output_dir / f"{config.corruption}_sev{config.severity}" / f"seed_{config.seed}"
     if duplicates[(config.corruption, config.severity, config.seed)] > 1:
-        return path / f"quorum_{config.trigger_threshold:g}" / f"retrain_rounds_{config.retrain_rounds}"
+        return path / (
+            f"quorum_{config.trigger_threshold:g}"
+            f"_retrain_rounds_{config.retrain_rounds}"
+            f"_window_{config.trigger_window_ticks}"
+            f"_dropout_T_{config.detector_T}"
+        )
     return path
 
 
@@ -200,10 +207,16 @@ def run_matrix(
 
     root = Path(output_dir).expanduser()
     all_configs = list(configs)
-    controls: set[tuple[int, float, int]] = set()
+    controls: set[tuple[int, float, int, int, int]] = set()
     if include_controls:
         for config in configs:
-            control_key = (config.seed, config.trigger_threshold, config.retrain_rounds)
+            control_key = (
+                config.seed,
+                config.trigger_threshold,
+                config.retrain_rounds,
+                config.trigger_window_ticks,
+                config.detector_T,
+            )
             if control_key not in controls:
                 controls.add(control_key)
                 all_configs.append(
