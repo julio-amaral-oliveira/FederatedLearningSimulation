@@ -29,6 +29,7 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
 
 from synchronous.constants import SPEED_PROFILES
 from experiments.shared.registry import temporary_output_path
+from experiments.e07_drift_agent.drift_schedule import is_client_drifted_at_tick
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
 DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
@@ -123,7 +124,9 @@ def _monitor_batches(
     batches: dict[str, torch.Tensor] = {}
     for position, (x, _y) in enumerate(client_datasets):
         batch = _sample_batch(x, config.batch_size, rng)
-        if corruption_fn is not None:
+        if corruption_fn is not None and is_client_drifted_at_tick(
+            position, tick, config
+        ):
             batch = _call_corruption(
                 corruption_fn, batch, config, seed=config.seed + 10_000 * tick + position
             )

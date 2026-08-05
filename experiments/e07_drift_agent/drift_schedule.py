@@ -7,9 +7,10 @@ first production tick", which reproduces the E07 behavior exactly.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from experiments.e07_drift_agent.episode import DriftEpisodeConfig
+if TYPE_CHECKING:
+    from experiments.e07_drift_agent.episode import DriftEpisodeConfig
 
 
 def drifted_clients(config: DriftEpisodeConfig) -> tuple[int, ...]:

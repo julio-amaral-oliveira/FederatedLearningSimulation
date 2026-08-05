@@ -610,6 +610,35 @@ class TestDriftEpisode(unittest.TestCase):
             monitor.tick_history[0]["clients"]["0"]["score"],
         )
 
+    def test_monitor_corrupts_only_drifted_clients_after_their_onset(self):
+        from experiments.e07_drift_agent.episode import _monitor_batches
+
+        def tagging_corruption(batch, _kind, _severity, seed=None):
+            return batch + 1.0
+
+        rng = np.random.default_rng(42)
+        x_clean = np.zeros((64, 32, 32, 3), dtype=np.float32)
+        y_clean = np.zeros(64, dtype=np.int64)
+        datasets = [(x_clean, y_clean) for _ in range(4)]
+        config = _config(
+            num_clients=4,
+            drifted_client_ids=(0, 2),
+            drift_onset_ticks={0: 3, 2: 5},
+            batch_size=8,
+            seed=42,
+        )
+        batches_tick4 = _monitor_batches(
+            datasets, config, tagging_corruption, rng, tick=4
+        )
+        self.assertGreater(float(batches_tick4["0"].sum()), 0.0)   # onset 3
+        self.assertEqual(float(batches_tick4["1"].sum()), 0.0)     # nunca drift
+        self.assertEqual(float(batches_tick4["2"].sum()), 0.0)     # onset 5
+        self.assertEqual(float(batches_tick4["3"].sum()), 0.0)     # nunca drift
+        batches_tick6 = _monitor_batches(
+            datasets, config, tagging_corruption, rng, tick=6
+        )
+        self.assertGreater(float(batches_tick6["2"].sum()), 0.0)   # onset 5
+
     def test_drift_schedule_fields_default_to_none_and_serialize(self):
         config = _config()
         self.assertIsNone(config.drifted_client_ids)
