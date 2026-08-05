@@ -297,8 +297,9 @@ class TestDriftEpisode(unittest.TestCase):
                 "batch_size": 4,
                 "timeout_percentile": 80,
                 "client_speed_profile": "uniform",
-                "client_speed_tiers": [["uniform", 0, 10, 1.0]],
-                "max_train_samples_per_client": 9,
+                "drifted_client_ids": None,
+                "drift_onset_ticks": None,
+                "client_speed_tiers": [["uniform", 0, 10, 1.0]],                "max_train_samples_per_client": 9,
                 "tau": 0.6,
                 "corruption": "gaussian_blur",
                 "severity": 4,
@@ -608,6 +609,25 @@ class TestDriftEpisode(unittest.TestCase):
             result["tick_history"][0]["clients"]["0"]["score"],
             monitor.tick_history[0]["clients"]["0"]["score"],
         )
+
+    def test_drift_schedule_fields_default_to_none_and_serialize(self):
+        config = _config()
+        self.assertIsNone(config.drifted_client_ids)
+        self.assertIsNone(config.drift_onset_ticks)
+        payload = smoke_drift._experiment_config(config)
+        self.assertIsNone(payload["drifted_client_ids"])
+        self.assertIsNone(payload["drift_onset_ticks"])
+
+    def test_drift_schedule_fields_survive_replace(self):
+        from dataclasses import replace
+
+        config = replace(
+            _config(),
+            drifted_client_ids=(0, 1, 2),
+            drift_onset_ticks={0: 1, 1: 4},
+        )
+        self.assertEqual(config.drifted_client_ids, (0, 1, 2))
+        self.assertEqual(config.drift_onset_ticks, {0: 1, 1: 4})
 
 
 if __name__ == "__main__":

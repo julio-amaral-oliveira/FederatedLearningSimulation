@@ -59,6 +59,8 @@ class DriftEpisodeConfig:
     batch_size: int = 32
     timeout_percentile: int = 75
     client_speed_profile: str = DEFAULT_CLIENT_SPEED_PROFILE
+    drifted_client_ids: tuple[int, ...] | None = None
+    drift_onset_ticks: dict[int, int] | None = None
     max_train_samples_per_client: int | None = None
     tau: float = 0.50
     corruption: str = "gaussian_noise"
@@ -163,6 +165,8 @@ def _experiment_config(config: DriftEpisodeConfig) -> dict:
         "batch_size": config.batch_size,
         "timeout_percentile": config.timeout_percentile,
         "client_speed_profile": config.client_speed_profile,
+        "drifted_client_ids": config.drifted_client_ids,
+        "drift_onset_ticks": config.drift_onset_ticks,
         "client_speed_tiers": [
             list(tier) for tier in _speed_tiers_for_profile(config.client_speed_profile)
         ],
