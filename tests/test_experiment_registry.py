@@ -10,7 +10,7 @@ from experiments.shared.registry import (
 
 
 class TestExperimentRegistry(unittest.TestCase):
-    def test_registers_all_seven_experiments(self):
+    def test_registers_all_eight_experiments(self):
         self.assertEqual(
             [spec.experiment_id for spec in EXPERIMENTS],
             [
@@ -21,6 +21,7 @@ class TestExperimentRegistry(unittest.TestCase):
                 "e05-temporal-drift",
                 "e06-drift-agent-prototype",
                 "e07-drift-agent",
+                "e08-partial-drift",
             ],
         )
 
@@ -28,6 +29,12 @@ class TestExperimentRegistry(unittest.TestCase):
         self.assertEqual(
             output_path("e07-drift-agent", "cifar-10"),
             Path("results/e07-drift-agent/cifar-10"),
+        )
+
+    def test_e08_uses_the_new_results_namespace(self):
+        self.assertEqual(
+            output_path("e08-partial-drift", "cifar-10"),
+            Path("results/e08-partial-drift/cifar-10"),
         )
 
     def test_unknown_experiment_is_rejected(self):
@@ -42,6 +49,16 @@ class TestExperimentRegistry(unittest.TestCase):
         self.assertNotEqual(
             temporary_output_path("e07-drift-agent", "cifar-10"),
             output_path("e07-drift-agent", "cifar-10"),
+        )
+
+    def test_e08_temporary_path_is_separate_from_published_path(self):
+        self.assertEqual(
+            temporary_output_path("e08-partial-drift", "cifar-10"),
+            Path("output/e08-partial-drift/cifar-10"),
+        )
+        self.assertNotEqual(
+            temporary_output_path("e08-partial-drift", "cifar-10"),
+            output_path("e08-partial-drift", "cifar-10"),
         )
 
     def test_dataset_must_be_one_directory_name(self):

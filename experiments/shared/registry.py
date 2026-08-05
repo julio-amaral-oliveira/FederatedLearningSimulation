@@ -59,6 +59,12 @@ _EXPERIMENTS = (
         "current",
         Path("results/e07-drift-agent"),
     ),
+    ExperimentSpec(
+        "e08-partial-drift",
+        "Drift parcial escalonado e política de gatilho coletivo",
+        "current",
+        Path("results/e08-partial-drift"),
+    ),
 )
 
 EXPERIMENTS: tuple[ExperimentSpec, ...] = _EXPERIMENTS
