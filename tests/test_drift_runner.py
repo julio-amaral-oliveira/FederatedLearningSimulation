@@ -463,6 +463,19 @@ class TestDriftRunMatrix(unittest.TestCase):
             [400.0, 400.0],
         )
 
+    def test_summary_dimensions_include_drift_schedule(self):
+        from experiments.e07_drift_agent.run_matrix import _summary_dimensions
+
+        config = DriftEpisodeConfig(
+            drifted_client_ids=(0, 1, 2, 3, 4),
+            drift_onset_ticks={0: 1, 1: 4, 2: 7, 3: 10, 4: 13},
+        )
+        dims = _summary_dimensions(config, population="visual", trigger_policy="detector")
+        self.assertEqual(dims["drifted_client_ids"], [0, 1, 2, 3, 4])
+        self.assertEqual(
+            dims["drift_onset_ticks"], {0: 1, 1: 4, 2: 7, 3: 10, 4: 13}
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

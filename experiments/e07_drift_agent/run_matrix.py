@@ -108,6 +108,12 @@ def _summary_dimensions(
         "retrain_rounds": config.retrain_rounds,
         "window_ticks": config.trigger_window_ticks,
         "dropout_T": config.detector_T,
+        "drifted_client_ids": (
+            list(config.drifted_client_ids)
+            if config.drifted_client_ids is not None
+            else None
+        ),
+        "drift_onset_ticks": config.drift_onset_ticks,
         "client_speed_profile": config.client_speed_profile,
         "production_horizon_seconds": config.production_horizon_seconds,
     }
