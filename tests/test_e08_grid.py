@@ -2,6 +2,8 @@
 
 import json
 import unittest
+from collections import Counter
+from pathlib import Path
 
 from experiments.e08_partial_drift.run_grid import build_grid
 
@@ -26,6 +28,17 @@ class TestBuildGrid(unittest.TestCase):
             self.assertEqual(config.retrain_rounds, 1)
             self.assertEqual(config.detector_T, 5)
             self.assertEqual(config.seed, 42)
+
+    def test_result_directories_disambiguate_by_drift_schedule(self):
+        from experiments.e07_drift_agent.run_matrix import _result_directory
+
+        configs = build_grid()
+        duplicates = Counter((c.corruption, c.severity, c.seed) for c in configs)
+        directories = {
+            _result_directory(Path("/tmp/e08-grid"), config, duplicates)
+            for config in configs
+        }
+        self.assertEqual(len(directories), 27)
 
 
 class TestRunGridSmoke(unittest.TestCase):

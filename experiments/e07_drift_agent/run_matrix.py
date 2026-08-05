@@ -177,15 +177,30 @@ def _result_directory(
     config: DriftEpisodeConfig,
     duplicates: Counter[tuple[str, int, int]],
 ) -> Path:
-    """Return a unique location for every scenario, seed, and sensitivity arm."""
+    """Return a unique location for every scenario, seed, and sensitivity arm.
+
+    Duplicate scenario/seed arms are disambiguated by their sensitivity
+    dimensions plus the drift schedule, so staggered schedules never
+    overwrite one another on disk.
+    """
     path = output_dir / f"{config.corruption}_sev{config.severity}" / f"seed_{config.seed}"
     if duplicates[(config.corruption, config.severity, config.seed)] > 1:
-        return path / (
+        disambiguators = (
             f"quorum_{config.trigger_threshold:g}"
             f"_retrain_rounds_{config.retrain_rounds}"
             f"_window_{config.trigger_window_ticks}"
             f"_dropout_T_{config.detector_T}"
         )
+        if config.drift_onset_ticks is not None:
+            schedule = "_".join(
+                f"{client}-{onset}"
+                for client, onset in sorted(config.drift_onset_ticks.items())
+            )
+            disambiguators += f"_schedule_{schedule}"
+        if config.drifted_client_ids is not None:
+            drifted = "-".join(str(client) for client in sorted(config.drifted_client_ids))
+            disambiguators += f"_drifted_{drifted}"
+        return path / disambiguators
     return path
 
 
