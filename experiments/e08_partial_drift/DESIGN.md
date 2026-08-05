@@ -131,8 +131,9 @@ futura.
 ## Status da implementação — CONCLUÍDA
 
 As mudanças de código listadas abaixo foram implementadas e registradas no
-registry. A suíte completa passa, com a única exceção pré-existente de
-hardware (MPS device, presente no commit base dd42c1c). O diff no E07 toca
+registry. A suíte completa passa, com exceções pré-existentes e sensíveis
+ao ambiente (MPS device e backend matplotlib, presentes no commit base
+dd42c1c). O diff no E07 toca
 apenas `episode.py`, `run_matrix.py`, `drift_schedule.py` e testes; nada em
 `experiments/shared/drift_results.py` nem em `result_io.py`.
 
