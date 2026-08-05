@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import itertools
 import sys
-from dataclasses import replace
 from pathlib import Path
 
 _BASE = Path(__file__).resolve().parent.parent.parent
@@ -18,7 +17,10 @@ for _path in (str(_BASE), str(_BASE / "src")):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from experiments.e07_drift_agent.episode import DriftEpisodeConfig
+from experiments.e07_drift_agent.episode import (
+    DEFAULT_PRODUCTION_HORIZON_SECONDS,
+    DriftEpisodeConfig,
+)
 from experiments.e07_drift_agent.run_matrix import run_matrix
 from experiments.shared.registry import temporary_output_path
 
@@ -39,17 +41,16 @@ def build_grid(
 ) -> list[DriftEpisodeConfig]:
     """Materialize the 27-config grid (3 x 3 x 3) for one seed."""
     return [
-        replace(
-            DriftEpisodeConfig(
-                corruption="motion_blur",
-                severity=1,
-                drifted_client_ids=tuple(range(NUM_DRIFTED)),
-                drift_onset_ticks=onset_ticks_for(rhythm),
-                seed=seed,
-                trigger_threshold=quorum,
-                trigger_window_ticks=window,
-                retrain_rounds=1,
-            )
+        DriftEpisodeConfig(
+            corruption="motion_blur",
+            severity=1,
+            drifted_client_ids=tuple(range(NUM_DRIFTED)),
+            drift_onset_ticks=onset_ticks_for(rhythm),
+            seed=seed,
+            trigger_threshold=quorum,
+            trigger_window_ticks=window,
+            retrain_rounds=1,
+            production_horizon_seconds=DEFAULT_PRODUCTION_HORIZON_SECONDS,
         )
         for seed in seeds
         for quorum, window, rhythm in itertools.product(quorums, windows, rhythms)
