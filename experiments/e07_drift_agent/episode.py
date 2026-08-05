@@ -141,8 +141,25 @@ def _run_retraining(
     corrupted_client_datasets: list[tuple[np.ndarray, np.ndarray]],
     corrupted_test: tuple[np.ndarray, np.ndarray],
     rounds: int,
+    config: DriftEpisodeConfig,
+    production_start_time: float,
 ) -> None:
-    for client, dataset in zip(server.clients, corrupted_client_datasets):
+    from experiments.e07_drift_agent.drift_schedule import build_retrain_datasets
+
+    clean_client_datasets = [
+        (np.asarray(client.dataset[0]).copy(), np.asarray(client.dataset[1]).copy())
+        for client in server.clients
+    ]
+    current_tick = int(
+        (float(server.virtual_time) - production_start_time) // config.monitor_tick_seconds
+    )
+    retrain_datasets = build_retrain_datasets(
+        clean_client_datasets,
+        corrupted_client_datasets,
+        current_tick,
+        config=config,
+    )
+    for client, dataset in zip(server.clients, retrain_datasets):
         client.dataset = dataset
         if hasattr(client, "reset_optimizer"):
             client.reset_optimizer()
@@ -609,6 +626,8 @@ def run_drift_episode(
                 corrupted_client_datasets,
                 corrupted_test,
                 config.retrain_rounds,
+                config,
+                production_start,
             )
             retrained = True
             if target_time is None:

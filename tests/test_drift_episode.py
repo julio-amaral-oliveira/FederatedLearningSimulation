@@ -343,6 +343,46 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(len(result["retrain_decisions"]), 1)
         self.assertEqual(len(result["retrain_round_events"]), 5)
 
+    def test_retraining_uses_clean_data_for_clients_not_yet_drifted(self):
+        from experiments.e07_drift_agent.episode import _run_retraining
+
+        class _MiniClient:
+            def __init__(self, dataset):
+                self.dataset = dataset
+                self.reset_calls = 0
+
+            def reset_optimizer(self):
+                self.reset_calls += 1
+
+        class _MiniServer:
+            def __init__(self):
+                self.virtual_time = 100.0
+                clean = (np.zeros(4, dtype=np.float32), np.zeros(4, dtype=np.int64))
+                self.clients = [
+                    _MiniClient((clean[0].copy(), clean[1].copy())) for _ in range(2)
+                ]
+
+            def run_one_round(self, *, record_default_metrics=False):
+                return {"completed_time": float(self.virtual_time)}
+
+            def evaluate_dataset(self, _dataset):
+                return (0.5, 0.5)
+
+        server = _MiniServer()
+        clean = (np.zeros(4, dtype=np.float32), np.zeros(4, dtype=np.int64))
+        corrupted = (np.ones(4, dtype=np.float32), np.zeros(4, dtype=np.int64))
+        corrupted_test = (np.ones(4, dtype=np.float32), np.zeros(4, dtype=np.int64))
+        result = {"retrain_round_events": [], "corrupted_accuracy_history": []}
+        config = _config(num_clients=2, drifted_client_ids=(0,), drift_onset_ticks={0: 1})
+        _run_retraining(
+            result, server, [corrupted, corrupted], corrupted_test, 1,
+            config, production_start_time=0.0,
+        )
+        self.assertTrue(np.array_equal(server.clients[0].dataset[0], np.ones(4)))   # driftado
+        self.assertTrue(np.array_equal(server.clients[1].dataset[0], np.zeros(4)))  # limpo
+        self.assertEqual(server.clients[0].reset_calls, 1)
+        self.assertEqual(server.clients[1].reset_calls, 1)
+
     def test_fixed_horizon_rejects_retraining_before_any_round_when_budget_cannot_fit(self):
         server = _FakeServer(
             round_durations=(2.0, 10.0, 10.0, 10.0, 10.0, 10.0),
