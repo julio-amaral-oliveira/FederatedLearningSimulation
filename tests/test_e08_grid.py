@@ -18,6 +18,19 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(quorums, {0.2, 0.3, 0.5})
         self.assertEqual(windows, {1, 2, 5})
         self.assertEqual(rhythms, {(1, 2, 3, 4, 5), (1, 4, 7, 10, 13), (1, 6, 11, 16, 21)})
+        self.assertEqual(
+            len(
+                {
+                    (
+                        c.trigger_threshold,
+                        c.trigger_window_ticks,
+                        tuple(sorted(c.drift_onset_ticks.values())),
+                    )
+                    for c in configs
+                }
+            ),
+            27,
+        )
 
     def test_build_grid_fixes_scenario_constants(self):
         configs = build_grid()

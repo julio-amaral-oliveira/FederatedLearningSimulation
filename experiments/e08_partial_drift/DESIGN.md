@@ -84,17 +84,22 @@ Opcional na primeira rodada.
 ## Linha de disparo esperada
 
 O atraso de detecção do motion_blur no E07 é de cerca de 88 s (tick 9).
-No E08, a flag de cada cliente chega cerca de 9 ticks depois do onset dele.
+No E08, a flag de cada cliente chega cerca de 9 ticks depois do onset dele,
+com os onsets no frame de produção (0 = primeiro tick corrompido da
+produção; o warm-up não conta).
 
 | Ritmo (ticks entre onsets) | Flags chegam nos ticks | q=0.2 (2 flags) | q=0.3 (3 flags) | q=0.5 (5 flags) |
 |---|---|---|---|---|
-| 1 | 9, 10, 11, 12, 13 | dispara com W >= 2 | dispara com W >= 3 | dispara com W = 5 |
+| 1 | 10, 11, 12, 13, 14 | dispara com W >= 2 | dispara com W >= 3 | dispara com W = 5 |
 | 3 | 10, 13, 16, 19, 22 | dispara com W >= 4 | nunca com W <= 5 | nunca |
-| 5 | 10, 15, 20, 25, 30 | dispara com W >= 4 | nunca com W <= 5 | nunca |
+| 5 | 10, 15, 20, 25, 30 | nunca com W <= 5 | nunca | nunca |
 
 Leitura esperada: a relação teórica publicada se confirma. Drift rápido
-exige janela pequena. Drift lento com janela curta entra no regime de
-falha: a política nunca dispara apesar de 5 de 10 clientes driftarem.
+(ritmo 1) exige janela pequena e dispara até para q=0.5 com W=5. No ritmo 3
+apenas q=0.2 com W=5 dispara (2 flags a 3 ticks de distância exigem W >= 4).
+O ritmo 5 entra no regime de falha: flags a 5 ticks de distância, então 2
+flags na janela exigem W >= 6 e nenhum quorum dispara com W <= 5, apesar de
+5 de 10 clientes driftarem.
 
 Os valores exatos dependem do atraso de detecção real por cliente. A
 tabela é previsão, não promessa.
@@ -137,9 +142,9 @@ apenas `episode.py`, `run_matrix.py`, `drift_schedule.py` e testes; nada em
 3. Retreino: dataset por cliente. Driftado treina com a partição
    corrompida. Limpo treina com a partição limpa — `build_retrain_datasets`
    em `drift_schedule.py`.
-4. Schema: campos novos e `validate_pair` atualizado — sumarização das
-   dimensões do schedule em `run_matrix.py` (dimensões reportadas por
-   configuração, sem mudança no `validate_pair`).
+4. Schema: campos novos na sumarização — as dimensões do schedule são
+   reportadas por configuração em `run_matrix.py`; não houve mudança no
+   `validate_pair`.
 5. Métricas: linha de disparo e custo da mistura — a grade calcula a linha
    de disparo por par; o custo da mistura usa as métricas existentes
    (`clean_retention_delta`, `corrupted_accuracy_gain`).
