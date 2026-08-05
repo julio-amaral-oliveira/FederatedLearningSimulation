@@ -29,7 +29,10 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
 
 from synchronous.constants import SPEED_PROFILES
 from experiments.shared.registry import temporary_output_path
-from experiments.e07_drift_agent.drift_schedule import is_client_drifted_at_tick
+from experiments.e07_drift_agent.drift_schedule import (
+    build_retrain_datasets,
+    is_client_drifted_at_tick,
+)
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
 DEFAULT_PRODUCTION_HORIZON_SECONDS = 400.0
@@ -121,11 +124,19 @@ def _monitor_batches(
     *,
     tick: int,
 ) -> dict[str, torch.Tensor]:
+    """Sample per-client monitor batches, corrupting drifted clients.
+
+    ``tick`` is the absolute monitor tick (warm-up included).  The drift
+    schedule is evaluated in the production-relative frame so that onset 0
+    lands on the first corrupted production tick; the corruption seed stays
+    on the absolute tick to keep the E07 sequence byte-identical.
+    """
     batches: dict[str, torch.Tensor] = {}
+    schedule_tick = tick - config.warmup_ticks
     for position, (x, _y) in enumerate(client_datasets):
         batch = _sample_batch(x, config.batch_size, rng)
         if corruption_fn is not None and is_client_drifted_at_tick(
-            position, tick, config
+            position, schedule_tick, config
         ):
             batch = _call_corruption(
                 corruption_fn, batch, config, seed=config.seed + 10_000 * tick + position
@@ -144,8 +155,6 @@ def _run_retraining(
     config: DriftEpisodeConfig,
     production_start_time: float,
 ) -> None:
-    from experiments.e07_drift_agent.drift_schedule import build_retrain_datasets
-
     clean_client_datasets = [
         (np.asarray(client.dataset[0]).copy(), np.asarray(client.dataset[1]).copy())
         for client in server.clients

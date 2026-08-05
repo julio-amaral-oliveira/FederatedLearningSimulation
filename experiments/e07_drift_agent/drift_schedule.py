@@ -1,8 +1,10 @@
 """Per-client drift schedule helpers.
 
 A schedule says which clients drift and on which production tick their
-corruption starts. ``None`` fields mean "every client drifts from the
-first production tick", which reproduces the E07 behavior exactly.
+corruption starts.  Ticks are production-relative: 0 is the first
+corrupted production tick and the warm-up phase does not count.  ``None``
+fields mean "every client drifts from the first production tick", which
+reproduces the E07 behavior exactly.
 """
 
 from __future__ import annotations
@@ -21,7 +23,12 @@ def drifted_clients(config: DriftEpisodeConfig) -> tuple[int, ...]:
 
 
 def onset_tick(client_index: int, config: DriftEpisodeConfig) -> int:
-    """Return the production tick at which ``client_index`` starts drifting."""
+    """Return the production tick at which ``client_index`` starts drifting.
+
+    Onsets are production-relative: 0 is the first corrupted production
+    tick; the warm-up phase does not count.  With no schedule configured,
+    every drifted client starts at production tick 0.
+    """
     if config.drift_onset_ticks is None:
         return 0
     return config.drift_onset_ticks.get(client_index, 0)
@@ -32,7 +39,11 @@ def is_client_drifted_at_tick(
     tick: int,
     config: DriftEpisodeConfig,
 ) -> bool:
-    """Return True when the client's corruption is active at ``tick``."""
+    """Return True when the client's corruption is active at ``tick``.
+
+    ``tick`` must be production-relative (0 = first corrupted production
+    tick; warm-up excluded), matching the ``onset_tick`` frame.
+    """
     if client_index not in drifted_clients(config):
         return False
     return tick >= onset_tick(client_index, config)

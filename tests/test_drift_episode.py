@@ -662,6 +662,7 @@ class TestDriftEpisode(unittest.TestCase):
         datasets = [(x_clean, y_clean) for _ in range(4)]
         config = _config(
             num_clients=4,
+            warmup_ticks=0,
             drifted_client_ids=(0, 2),
             drift_onset_ticks={0: 3, 2: 5},
             batch_size=8,
@@ -678,6 +679,35 @@ class TestDriftEpisode(unittest.TestCase):
             datasets, config, tagging_corruption, rng, tick=6
         )
         self.assertGreater(float(batches_tick6["2"].sum()), 0.0)   # onset 5
+
+    def test_monitor_evaluates_schedule_in_production_relative_frame_with_warmup(self):
+        from experiments.e07_drift_agent.episode import _monitor_batches
+
+        def tagging_corruption(batch, _kind, _severity, seed=None):
+            return batch + 1.0
+
+        rng = np.random.default_rng(42)
+        x_clean = np.zeros((64, 32, 32, 3), dtype=np.float32)
+        y_clean = np.zeros(64, dtype=np.int64)
+        datasets = [(x_clean, y_clean) for _ in range(2)]
+        config = _config(
+            num_clients=2,
+            warmup_ticks=20,
+            drifted_client_ids=(0,),
+            drift_onset_ticks={0: 1},
+            batch_size=8,
+            seed=42,
+        )
+        first_production = _monitor_batches(
+            datasets, config, tagging_corruption, rng, tick=20
+        )
+        self.assertEqual(float(first_production["0"].sum()), 0.0)  # produção tick 0 < onset 1
+        self.assertEqual(float(first_production["1"].sum()), 0.0)  # nunca drift
+        second_production = _monitor_batches(
+            datasets, config, tagging_corruption, rng, tick=21
+        )
+        self.assertGreater(float(second_production["0"].sum()), 0.0)  # produção tick 1 >= onset 1
+        self.assertEqual(float(second_production["1"].sum()), 0.0)    # nunca drift
 
     def test_drift_schedule_fields_default_to_none_and_serialize(self):
         config = _config()
