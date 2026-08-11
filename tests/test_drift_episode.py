@@ -761,6 +761,66 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertGreater(float(second_production["0"].sum()), 0.0)  # produção tick 1 >= onset 1
         self.assertEqual(float(second_production["1"].sum()), 0.0)    # nunca drift
 
+    def test_ramp_corrupts_a_growing_fraction_of_monitor_batches(self):
+        from experiments.e07_drift_agent.episode import _monitor_batches
+
+        def tagging_corruption(batch, _kind, _severity, seed=None):
+            return batch + 1.0
+
+        rng = np.random.default_rng(42)
+        x_clean = np.zeros((64, 1, 1, 1), dtype=np.float32)
+        y_clean = np.zeros(64, dtype=np.int64)
+        datasets = [(x_clean, y_clean) for _ in range(2)]
+        config = _config(
+            num_clients=2,
+            drift_ramp_ticks=20,
+            batch_size=32,
+            seed=42,
+            warmup_ticks=2,
+        )
+        first = _monitor_batches(
+            datasets, config, tagging_corruption, rng,
+            tick=20, virtual_time=20.0,
+        )
+        self.assertEqual(float(first["0"].sum()), 0.0)  # fração 0
+        self.assertEqual(float(first["1"].sum()), 0.0)
+        mid = _monitor_batches(
+            datasets, config, tagging_corruption, rng,
+            tick=30, virtual_time=120.0,
+        )
+        self.assertEqual(float(mid["0"].sum()), 16.0)  # fração 0.5 -> 16 de 32
+        self.assertEqual(float(mid["1"].sum()), 16.0)
+        end = _monitor_batches(
+            datasets, config, tagging_corruption, rng,
+            tick=40, virtual_time=300.0,
+        )
+        self.assertEqual(float(end["0"].sum()), 32.0)  # fração 1
+        self.assertEqual(float(end["1"].sum()), 32.0)
+
+    def test_ramp_batch_is_deterministic_across_arms(self):
+        from experiments.e07_drift_agent.episode import _monitor_batches
+
+        def tagging_corruption(batch, _kind, _severity, seed=None):
+            return batch + 1.0
+
+        x_clean = np.zeros((64, 32, 32, 3), dtype=np.float32)
+        y_clean = np.zeros(64, dtype=np.int64)
+        datasets = [(x_clean, y_clean) for _ in range(2)]
+        config = _config(
+            num_clients=2, drift_ramp_ticks=20, batch_size=32, seed=7, warmup_ticks=2
+        )
+
+        first = _monitor_batches(
+            datasets, config, tagging_corruption, np.random.default_rng(7),
+            tick=30, virtual_time=120.0,
+        )
+        second = _monitor_batches(
+            datasets, config, tagging_corruption, np.random.default_rng(7),
+            tick=30, virtual_time=120.0,
+        )
+        self.assertTrue(torch.equal(first["0"], second["0"]))
+        self.assertTrue(torch.equal(first["1"], second["1"]))
+
     def test_drift_schedule_fields_default_to_none_and_serialize(self):
         config = _config()
         self.assertIsNone(config.drifted_client_ids)

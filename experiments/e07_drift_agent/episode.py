@@ -31,7 +31,9 @@ from synchronous.constants import SPEED_PROFILES
 from experiments.shared.registry import temporary_output_path
 from experiments.e07_drift_agent.drift_schedule import (
     build_retrain_datasets,
+    corrupt_count,
     is_client_drifted_at_tick,
+    ramp_fraction,
 )
 
 CorruptionFn = Callable[[torch.Tensor, str, int], torch.Tensor]
@@ -140,24 +142,46 @@ def _monitor_batches(
     rng: np.random.Generator,
     *,
     tick: int,
+    virtual_time: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Sample per-client monitor batches, corrupting drifted clients.
 
     ``tick`` is the absolute monitor tick (warm-up included).  The drift
     schedule is evaluated in the production-relative frame so that onset 0
     lands on the first corrupted production tick; the corruption seed stays
-    on the absolute tick to keep the E07 sequence byte-identical.
+    on the absolute tick to keep the E07 sequence byte-identical.  With a
+    configured ramp, the batch corrupts only ``round(fraction x batch)``
+    images chosen through ``rng``, where the fraction follows the virtual
+    time elapsed since production start.
     """
     batches: dict[str, torch.Tensor] = {}
     schedule_tick = tick - config.warmup_ticks
+    fraction = None
+    if config.drift_ramp_ticks is not None:
+        production_seconds = (
+            float(virtual_time - config.warmup_ticks * config.monitor_tick_seconds)
+            if virtual_time is not None
+            else schedule_tick * config.monitor_tick_seconds
+        )
+        fraction = ramp_fraction(production_seconds, config)
     for position, (x, _y) in enumerate(client_datasets):
         batch = _sample_batch(x, config.batch_size, rng)
         if corruption_fn is not None and is_client_drifted_at_tick(
             position, schedule_tick, config
         ):
-            batch = _call_corruption(
-                corruption_fn, batch, config, seed=config.seed + 10_000 * tick + position
-            )
+            corruption_seed = config.seed + 10_000 * tick + position
+            if fraction is None:
+                batch = _call_corruption(
+                    corruption_fn, batch, config, seed=corruption_seed
+                )
+            else:
+                count = corrupt_count(config.batch_size, fraction)
+                if count:
+                    indices = rng.choice(config.batch_size, size=count, replace=False)
+                    corrupted = _call_corruption(
+                        corruption_fn, batch, config, seed=corruption_seed
+                    )
+                    batch[indices] = corrupted[indices]
         # The monitor contract is deliberately x-only.
         batches[str(position)] = torch.from_numpy(batch)
     return batches
@@ -648,7 +672,9 @@ def run_drift_episode(
         server.virtual_time += advance
         outcome = monitor.observe_tick(
             _monitor_batches(
-                clean_client_datasets, config, corruption_fn, rng, tick=config.warmup_ticks + tick
+                clean_client_datasets, config, corruption_fn, rng,
+                tick=config.warmup_ticks + tick,
+                virtual_time=float(server.virtual_time),
             ),
             virtual_time=float(server.virtual_time),
             record_action=not config.baseline,
