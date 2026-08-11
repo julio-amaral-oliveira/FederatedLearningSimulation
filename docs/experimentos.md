@@ -31,6 +31,7 @@ mesmo protocolo de um resultado com `downtime`, `drift_events` e `retrain_decisi
 | Maio de 2026 | Drift temporal sazonal | Comparação Sync/Async com alternância de grupos de classes. |
 | Maio a julho de 2026 | Drift agent | Criação de detecção local, retreino reativo e métrica de downtime. |
 | 29 a 31 de julho de 2026 | Drift agent endurecido | Pareamento auditável, matriz de seeds, calibração, controles e schema v3. |
+| Agosto de 2026 | Drift gradual por fração de mistura | Rampa global de mistura na produção do drift agent, retreino reativo herdado do E07 e grid de duração da rampa. |
 
 O histórico confirma essa sequência. O commit `7fded57` criou o drift temporal.
 O commit `0540e21` criou o detector de drift e o monitoramento por incerteza.
@@ -616,6 +617,7 @@ entrypoints. `experiments` é um namespace package e não reexporta módulos.
 | `e05-temporal-drift` | `historical` | `results/e05-temporal-drift/` |
 | `e06-drift-agent-prototype` | `legacy` | `results/e06-drift-agent-prototype/` |
 | `e07-drift-agent` | `current` | `results/e07-drift-agent/` |
+| `e09-gradual-drift` | `current` | `results/e09-gradual-drift/` |
 
 O registro define caminhos. Ele não substitui a configuração persistida, os
 manifests ou a validação científica dos resultados.

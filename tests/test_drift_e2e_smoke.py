@@ -176,6 +176,50 @@ class TestDriftWorkflowEndToEndSmoke(unittest.TestCase):
             self.assertEqual(image_path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
         self.assertFalse(root.exists())
 
+    def test_ramp_pair_persists_validates_and_plots(self):
+        config = DriftEpisodeConfig(
+            dataset="e2e-smoke",
+            num_clients=1,
+            initial_rounds=1,
+            retrain_rounds=1,
+            warmup_ticks=20,
+            monitor_tick_seconds=1.0,
+            monitor_ticks=1,
+            batch_size=1,
+            corruption="gaussian_noise",
+            severity=1,
+            drift_ramp_ticks=20,
+            seed=17,
+            production_horizon_seconds=1.0,
+        )
+
+        def runner(run_config, *, corruption_fn, **_kwargs):
+            return run_drift_comparison(
+                run_config,
+                corruption_fn=corruption_fn,
+                server_factory=_SmokeServer,
+                monitor_factory=lambda _server, _baseline: _SmokeMonitor(),
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = run_matrix(
+                [config],
+                output_dir=root,
+                runner=runner,
+                corruption_fn=_identity_corruption,
+            )
+            agent, baseline = load_persisted_pair(paths[0][0].parent)
+            validate_pair(agent, baseline)
+            self.assertEqual(
+                agent.experiment_config["drift_ramp_ticks"], 20
+            )
+            image_path = plot_scenario(
+                paths[0][0].parent.parent,
+                root / "ramp-comparison.png",
+            )
+            self.assertGreater(image_path.stat().st_size, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
