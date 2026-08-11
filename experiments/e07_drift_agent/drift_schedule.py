@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 if TYPE_CHECKING:
     from experiments.e07_drift_agent.episode import DriftEpisodeConfig
 
@@ -96,3 +98,17 @@ def ramp_fraction(
 def corrupt_count(size: int, fraction: float) -> int:
     """Return how many of ``size`` items are corrupted at a fraction."""
     return min(size, round(fraction * size))
+
+
+def build_mixed_dataset(
+    clean: tuple[Any, Any],
+    corrupted: tuple[Any, Any],
+    fraction: float,
+    permutation: np.ndarray,
+) -> tuple[Any, Any]:
+    """Mix a dataset at a fraction using a deterministic permutation."""
+    x = np.asarray(clean[0]).copy()
+    y = np.asarray(clean[1]).copy()
+    count = corrupt_count(len(x), fraction)
+    x[permutation[:count]] = np.asarray(corrupted[0])[permutation[:count]]
+    return x, y

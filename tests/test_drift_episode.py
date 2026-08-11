@@ -426,8 +426,9 @@ class TestDriftEpisode(unittest.TestCase):
         result = {"retrain_round_events": [], "corrupted_accuracy_history": []}
         config = _config(num_clients=2, drifted_client_ids=(0,), drift_onset_ticks={0: 1})
         _run_retraining(
-            result, server, [corrupted, corrupted], corrupted_test, 1,
+            result, server, [corrupted, corrupted], 1,
             config, production_start_time=0.0,
+            current_test_fn=lambda: corrupted_test,
         )
         self.assertTrue(np.array_equal(server.clients[0].dataset[0], np.ones(4)))   # driftado
         self.assertTrue(np.array_equal(server.clients[1].dataset[0], np.zeros(4)))  # limpo
@@ -820,6 +821,59 @@ class TestDriftEpisode(unittest.TestCase):
         )
         self.assertTrue(torch.equal(first["0"], second["0"]))
         self.assertTrue(torch.equal(first["1"], second["1"]))
+
+    def test_ramp_records_fraction_metrics_and_uses_mixed_test(self):
+        config = _config(drift_ramp_ticks=20, production_horizon_seconds=400.0)
+        server = _FakeServer(
+            round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 2.0),
+            evaluation_accuracies=[
+                0.9,  # training round (clean)
+                0.9,  # pre-drift clean evaluation
+                0.9,  # drift onset (teste misto na fração 0 -> limpo)
+                0.6, 0.6, 0.6,  # monitor ticks antes da decisão
+                0.2, 0.2, 0.2, 0.2, 0.4,  # cinco rounds de retreino
+                0.4, 0.4, 0.4, 0.4,  # ticks pós-retreino
+                0.4, 0.9,  # episode end e final clean
+            ],
+        )
+        result = run_drift_episode(
+            config,
+            server=server,
+            monitor=_ScriptedMonitor([False, False, True]),
+            corruption_fn=_identity,
+        )
+
+        production_start = result["metadata"]["production_start_time"]
+        decision_time = result["retrain_decisions"][0]["time"]
+        self.assertAlmostEqual(
+            result["metrics"]["fraction_at_trigger"],
+            (decision_time - production_start) / 200.0,
+        )
+        crossing = next(
+            entry for entry in result["corrupted_accuracy_history"]
+            if entry["accuracy"] < 0.5
+        )
+        self.assertAlmostEqual(
+            result["metrics"]["fraction_at_tau_crossing"],
+            (crossing["time"] - production_start) / 200.0,
+        )
+        onset = next(
+            entry for entry in result["corrupted_accuracy_history"]
+            if entry["stage"] == "drift_onset"
+        )
+        self.assertEqual(onset["accuracy"], 0.9)
+
+    def test_ramp_metrics_are_absent_without_ramp(self):
+        result = run_drift_episode(
+            _config(production_horizon_seconds=400.0),
+            server=_FakeServer(
+                round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 2.0)
+            ),
+            monitor=_ScriptedMonitor([False, False, True]),
+            corruption_fn=_identity,
+        )
+        self.assertNotIn("fraction_at_trigger", result["metrics"])
+        self.assertNotIn("fraction_at_tau_crossing", result["metrics"])
 
     def test_drift_schedule_fields_default_to_none_and_serialize(self):
         config = _config()

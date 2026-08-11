@@ -30,6 +30,7 @@ for _path in (_ROOT, _SRC, os.path.join(_SRC, "synchronous")):
 from synchronous.constants import SPEED_PROFILES
 from experiments.shared.registry import temporary_output_path
 from experiments.e07_drift_agent.drift_schedule import (
+    build_mixed_dataset,
     build_retrain_datasets,
     corrupt_count,
     is_client_drifted_at_tick,
@@ -121,6 +122,47 @@ def _record_evaluation(
     destination.append(_evaluation_entry(server, dataset, stage))
 
 
+MIXTURE_PERMUTATION_SEED_OFFSET = 12_345
+
+
+def _mixed_evaluation_test(
+    clean_test: tuple[np.ndarray, np.ndarray],
+    corrupted_test: tuple[np.ndarray, np.ndarray],
+    permutation: np.ndarray | None,
+    fraction: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Mix the clean and corrupted tests at a fraction.
+
+    Without a permutation, the fully corrupted test is returned, which
+    reproduces the E07 evaluation.
+    """
+    if permutation is None:
+        return corrupted_test
+    count = corrupt_count(len(clean_test[0]), fraction)
+    x = clean_test[0].copy()
+    x[permutation[:count]] = corrupted_test[0][permutation[:count]]
+    return x, clean_test[1]
+
+
+def _current_evaluation_test(
+    server,
+    config: DriftEpisodeConfig,
+    production_start: float,
+    clean_test: tuple[np.ndarray, np.ndarray],
+    corrupted_test: tuple[np.ndarray, np.ndarray],
+    permutation: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the evaluation test for the current production fraction."""
+    if config.drift_ramp_ticks is None:
+        return corrupted_test
+    fraction = ramp_fraction(
+        float(server.virtual_time) - production_start, config
+    )
+    return _mixed_evaluation_test(
+        clean_test, corrupted_test, permutation, fraction
+    )
+
+
 def _run_training_rounds(server, rounds: int, clean_test) -> list[dict]:
     """Run initial training one round at a time, recording clean evaluations.
 
@@ -175,9 +217,9 @@ def _monitor_batches(
                     corruption_fn, batch, config, seed=corruption_seed
                 )
             else:
-                count = corrupt_count(config.batch_size, fraction)
+                count = corrupt_count(len(batch), fraction)
                 if count:
-                    indices = rng.choice(config.batch_size, size=count, replace=False)
+                    indices = rng.choice(len(batch), size=count, replace=False)
                     corrupted = _call_corruption(
                         corruption_fn, batch, config, seed=corruption_seed
                     )
@@ -191,24 +233,41 @@ def _run_retraining(
     result: dict,
     server,
     corrupted_client_datasets: list[tuple[np.ndarray, np.ndarray]],
-    corrupted_test: tuple[np.ndarray, np.ndarray],
     rounds: int,
     config: DriftEpisodeConfig,
     production_start_time: float,
+    *,
+    current_test_fn: Callable[[], tuple[np.ndarray, np.ndarray]],
+    client_permutations: list[np.ndarray] | None = None,
 ) -> None:
     clean_client_datasets = [
         (np.asarray(client.dataset[0]).copy(), np.asarray(client.dataset[1]).copy())
         for client in server.clients
     ]
-    current_tick = int(
-        (float(server.virtual_time) - production_start_time) // config.monitor_tick_seconds
-    )
-    retrain_datasets = build_retrain_datasets(
-        clean_client_datasets,
-        corrupted_client_datasets,
-        current_tick,
-        config=config,
-    )
+    if config.drift_ramp_ticks is None:
+        current_tick = int(
+            (float(server.virtual_time) - production_start_time)
+            // config.monitor_tick_seconds
+        )
+        retrain_datasets = build_retrain_datasets(
+            clean_client_datasets,
+            corrupted_client_datasets,
+            current_tick,
+            config=config,
+        )
+    else:
+        fraction = ramp_fraction(
+            float(server.virtual_time) - production_start_time, config
+        )
+        permutations = client_permutations or [
+            np.arange(len(x)) for x, _y in clean_client_datasets
+        ]
+        retrain_datasets = [
+            build_mixed_dataset(clean, corrupted, fraction, permutation)
+            for (clean, corrupted), permutation in zip(
+                zip(clean_client_datasets, corrupted_client_datasets), permutations
+            )
+        ]
     for client, dataset in zip(server.clients, retrain_datasets):
         client.dataset = dataset
         if hasattr(client, "reset_optimizer"):
@@ -217,7 +276,8 @@ def _run_retraining(
         event = server.run_one_round(record_default_metrics=False)
         result["retrain_round_events"].append(event)
         _record_evaluation(
-            result["corrupted_accuracy_history"], server, corrupted_test, "retrain_round"
+            result["corrupted_accuracy_history"], server, current_test_fn(),
+            "retrain_round",
         )
 
 
@@ -559,8 +619,30 @@ def _finish_result(result: dict, server, clean_test, config: DriftEpisodeConfig)
         )
         if recovery_time is not None:
             result["metrics"]["time_to_recovery_seconds"] = recovery_time - decision_time
+    if config.drift_ramp_ticks is not None:
+        if result["retrain_decisions"]:
+            decision_time = float(result["retrain_decisions"][0]["time"])
+            result["metrics"]["fraction_at_trigger"] = ramp_fraction(
+                decision_time - float(result["metadata"]["production_start_time"]),
+                config,
+            )
+        crossing = next(
+            (
+                float(entry["time"])
+                for entry in result["corrupted_accuracy_history"]
+                if float(entry["accuracy"]) < config.tau
+            ),
+            None,
+        )
+        if crossing is not None:
+            result["metrics"]["fraction_at_tau_crossing"] = ramp_fraction(
+                crossing - float(result["metadata"]["production_start_time"]),
+                config,
+            )
     del result["_monitor"]
     del result["_corrupted_test"]
+    del result["_mixture_permutation"]
+    del result["_client_permutations"]
     return result
 
 
@@ -624,6 +706,18 @@ def run_drift_episode(
     result = _new_result(config, server)
     result["_monitor"] = monitor
     result["_corrupted_test"] = corrupted_test
+    mixture_permutation = None
+    client_permutations = None
+    if config.drift_ramp_ticks is not None:
+        permutation_rng = np.random.default_rng(
+            config.seed + MIXTURE_PERMUTATION_SEED_OFFSET
+        )
+        mixture_permutation = permutation_rng.permutation(len(clean_test[0]))
+        client_permutations = [
+            permutation_rng.permutation(len(x)) for x, _y in clean_client_datasets
+        ]
+    result["_mixture_permutation"] = mixture_permutation
+    result["_client_permutations"] = client_permutations
 
     if not _initial_training_complete:
         result["clean_training_history"] = _run_training_rounds(
@@ -649,7 +743,15 @@ def run_drift_episode(
     result["metadata"]["warmup_completed_time"] = production_start
     result["metadata"]["production_start_time"] = production_start
     result["metadata"]["preproduction_server_state"] = _preproduction_server_state(server)
-    _record_evaluation(result["corrupted_accuracy_history"], server, corrupted_test, "drift_onset")
+    _record_evaluation(
+        result["corrupted_accuracy_history"],
+        server,
+        _current_evaluation_test(
+            server, config, production_start, clean_test, corrupted_test,
+            mixture_permutation,
+        ),
+        "drift_onset",
+    )
 
     tick = 0
     retrained = False
@@ -679,7 +781,15 @@ def run_drift_episode(
             virtual_time=float(server.virtual_time),
             record_action=not config.baseline,
         )
-        _record_evaluation(result["corrupted_accuracy_history"], server, corrupted_test, "monitor_tick")
+        _record_evaluation(
+            result["corrupted_accuracy_history"],
+            server,
+            _current_evaluation_test(
+                server, config, production_start, clean_test, corrupted_test,
+                mixture_permutation,
+            ),
+            "monitor_tick",
+        )
         tick += 1
         if outcome.should_retrain and not config.baseline and not retrained:
             if config.production_horizon_seconds is not None:
@@ -694,10 +804,14 @@ def run_drift_episode(
                 result,
                 server,
                 corrupted_client_datasets,
-                corrupted_test,
                 config.retrain_rounds,
                 config,
                 production_start,
+                current_test_fn=lambda: _current_evaluation_test(
+                    server, config, production_start, clean_test,
+                    corrupted_test, mixture_permutation,
+                ),
+                client_permutations=client_permutations,
             )
             retrained = True
             if target_time is None:
