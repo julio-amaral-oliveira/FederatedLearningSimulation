@@ -65,6 +65,7 @@ class DriftEpisodeConfig:
     client_speed_profile: str = DEFAULT_CLIENT_SPEED_PROFILE
     drifted_client_ids: tuple[int, ...] | None = None
     drift_onset_ticks: dict[int, int] | None = None
+    drift_ramp_ticks: int | None = None
     max_train_samples_per_client: int | None = None
     tau: float = 0.50
     corruption: str = "gaussian_noise"
@@ -565,6 +566,18 @@ def run_drift_episode(
         and config.production_horizon_seconds <= 0
     ):
         raise ValueError("production_horizon_seconds must be positive")
+    if config.drift_ramp_ticks is not None and (
+        isinstance(config.drift_ramp_ticks, bool) or config.drift_ramp_ticks < 1
+    ):
+        raise ValueError("drift_ramp_ticks must be None or an integer >= 1")
+    if config.drift_ramp_ticks is not None and (
+        config.drift_onset_ticks is not None
+        or config.drifted_client_ids is not None
+    ):
+        raise ValueError(
+            "drift_ramp_ticks cannot be combined with drift_onset_ticks "
+            "or drifted_client_ids"
+        )
 
     server = server or _build_server(config)
     monitor = monitor or _make_monitor(server, config)

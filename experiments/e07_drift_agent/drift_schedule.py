@@ -75,3 +75,24 @@ def build_retrain_datasets(
             zip(clean_client_datasets, corrupted_client_datasets)
         )
     ]
+
+
+def ramp_fraction(
+    virtual_seconds_since_production: float,
+    config: DriftEpisodeConfig,
+) -> float:
+    """Return the mixture fraction at a production-relative virtual time.
+
+    Without a configured ramp, the fraction is always 1, which reproduces
+    the E07 all-corrupted regime.  With a ramp, the fraction grows linearly
+    from 0 to 1 over ``drift_ramp_ticks`` monitor ticks.
+    """
+    if config.drift_ramp_ticks is None:
+        return 1.0
+    duration = config.drift_ramp_ticks * config.monitor_tick_seconds
+    return min(1.0, max(0.0, virtual_seconds_since_production / duration))
+
+
+def corrupt_count(size: int, fraction: float) -> int:
+    """Return how many of ``size`` items are corrupted at a fraction."""
+    return min(size, round(fraction * size))

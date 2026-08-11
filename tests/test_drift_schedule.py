@@ -6,9 +6,11 @@ import numpy as np
 
 from experiments.e07_drift_agent.drift_schedule import (
     build_retrain_datasets,
+    corrupt_count,
     drifted_clients,
     is_client_drifted_at_tick,
     onset_tick,
+    ramp_fraction,
 )
 from experiments.e07_drift_agent.episode import DriftEpisodeConfig
 
@@ -53,6 +55,32 @@ class TestDriftSchedule(unittest.TestCase):
         self.assertTrue(np.array_equal(datasets[0][0], np.ones(4)))   # client 0, onset 1
         self.assertTrue(np.array_equal(datasets[1][0], np.ones(4)))   # client 1, onset 4
         self.assertTrue(np.array_equal(datasets[2][0], np.zeros(4)))  # client 2, onset 7
+
+
+class TestRampFraction(unittest.TestCase):
+    def setUp(self):
+        self.config = DriftEpisodeConfig(
+            drift_ramp_ticks=20, monitor_tick_seconds=10.0
+        )
+
+    def test_fraction_is_zero_at_production_start(self):
+        self.assertEqual(ramp_fraction(0.0, self.config), 0.0)
+
+    def test_fraction_is_half_after_ten_ticks(self):
+        self.assertEqual(ramp_fraction(100.0, self.config), 0.5)
+
+    def test_fraction_clamps_at_one(self):
+        self.assertEqual(ramp_fraction(300.0, self.config), 1.0)
+
+    def test_fraction_is_one_without_ramp(self):
+        config = DriftEpisodeConfig()
+        self.assertEqual(ramp_fraction(0.0, config), 1.0)
+
+    def test_corrupt_count_rounds_the_fraction(self):
+        self.assertEqual(corrupt_count(32, 0.0), 0)
+        self.assertEqual(corrupt_count(32, 0.5), 16)
+        self.assertEqual(corrupt_count(32, 1.0), 32)
+        self.assertEqual(corrupt_count(4, 0.75), 3)
 
 
 if __name__ == "__main__":

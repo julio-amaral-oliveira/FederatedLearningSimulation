@@ -780,6 +780,41 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(config.drifted_client_ids, (0, 1, 2))
         self.assertEqual(config.drift_onset_ticks, {0: 1, 1: 4})
 
+    def test_drift_ramp_ticks_rejects_invalid_values_and_combinations(self):
+        cases = (
+            dict(drift_ramp_ticks=0),
+            dict(drift_ramp_ticks=True),
+            dict(drift_ramp_ticks=-3),
+        )
+        for overrides in cases:
+            with self.subTest(overrides=overrides):
+                with self.assertRaisesRegex(ValueError, "drift_ramp_ticks"):
+                    run_drift_episode(
+                        _config(**overrides),
+                        server=_FakeServer(),
+                        monitor=_ScriptedMonitor([]),
+                        corruption_fn=_identity,
+                    )
+
+    def test_drift_ramp_ticks_rejects_combination_with_onset_fields(self):
+        with self.assertRaisesRegex(ValueError, "drift_ramp_ticks"):
+            run_drift_episode(
+                _config(
+                    drift_ramp_ticks=20,
+                    drifted_client_ids=(0, 1),
+                ),
+                server=_FakeServer(),
+                monitor=_ScriptedMonitor([]),
+                corruption_fn=_identity,
+            )
+        with self.assertRaisesRegex(ValueError, "drift_ramp_ticks"):
+            run_drift_episode(
+                _config(drift_ramp_ticks=20, drift_onset_ticks={0: 1}),
+                server=_FakeServer(),
+                monitor=_ScriptedMonitor([]),
+                corruption_fn=_identity,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
