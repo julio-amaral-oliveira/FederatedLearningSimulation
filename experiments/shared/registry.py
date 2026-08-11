@@ -65,6 +65,12 @@ _EXPERIMENTS = (
         "current",
         Path("results/e08-partial-drift"),
     ),
+    ExperimentSpec(
+        "e09-gradual-drift",
+        "Drift gradual por fração de mistura",
+        "current",
+        Path("results/e09-gradual-drift"),
+    ),
 )
 
 EXPERIMENTS: tuple[ExperimentSpec, ...] = _EXPERIMENTS

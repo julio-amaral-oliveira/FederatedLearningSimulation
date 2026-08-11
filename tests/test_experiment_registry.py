@@ -10,7 +10,7 @@ from experiments.shared.registry import (
 
 
 class TestExperimentRegistry(unittest.TestCase):
-    def test_registers_all_eight_experiments(self):
+    def test_registers_all_nine_experiments(self):
         self.assertEqual(
             [spec.experiment_id for spec in EXPERIMENTS],
             [
@@ -22,7 +22,18 @@ class TestExperimentRegistry(unittest.TestCase):
                 "e06-drift-agent-prototype",
                 "e07-drift-agent",
                 "e08-partial-drift",
+                "e09-gradual-drift",
             ],
+        )
+
+    def test_e09_uses_the_new_results_namespace(self):
+        self.assertEqual(
+            output_path("e09-gradual-drift", "cifar-10"),
+            Path("results/e09-gradual-drift/cifar-10"),
+        )
+        self.assertEqual(
+            temporary_output_path("e09-gradual-drift", "cifar-10"),
+            Path("output/e09-gradual-drift/cifar-10"),
         )
 
     def test_e07_uses_the_new_results_namespace(self):
