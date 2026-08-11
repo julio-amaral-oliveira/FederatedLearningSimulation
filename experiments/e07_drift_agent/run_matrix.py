@@ -114,6 +114,7 @@ def _summary_dimensions(
             else None
         ),
         "drift_onset_ticks": config.drift_onset_ticks,
+        "drift_ramp_ticks": config.drift_ramp_ticks,
         "client_speed_profile": config.client_speed_profile,
         "production_horizon_seconds": config.production_horizon_seconds,
     }
@@ -197,6 +198,8 @@ def _result_directory(
                 for client, onset in sorted(config.drift_onset_ticks.items())
             )
             disambiguators += f"_schedule_{schedule}"
+        if config.drift_ramp_ticks is not None:
+            disambiguators += f"_ramp_{config.drift_ramp_ticks}"
         if config.drifted_client_ids is not None:
             drifted = "-".join(str(client) for client in sorted(config.drifted_client_ids))
             disambiguators += f"_drifted_{drifted}"

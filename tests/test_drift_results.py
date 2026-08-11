@@ -379,6 +379,30 @@ class TestDriftResultLoading(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, field):
                     DriftResult.from_payload(payload)
 
+    def test_v3_accepts_ramp_ticks_and_rejects_bad_values(self):
+        payload = _v3_payload()
+        payload["experiment_config"]["drift_ramp_ticks"] = 20
+        DriftResult.from_payload(payload)
+
+        for bad in (0, -1, True, 2.5):
+            with self.subTest(value=bad):
+                payload = _v3_payload()
+                payload["experiment_config"]["drift_ramp_ticks"] = bad
+                with self.assertRaisesRegex(ValueError, "drift_ramp_ticks"):
+                    DriftResult.from_payload(payload)
+
+    def test_v3_rejects_ramp_ticks_combined_with_onset_fields(self):
+        for field, value in (
+            ("drift_onset_ticks", {0: 1}),
+            ("drifted_client_ids", [0, 1]),
+        ):
+            with self.subTest(field=field):
+                payload = _v3_payload()
+                payload["experiment_config"]["drift_ramp_ticks"] = 20
+                payload["experiment_config"][field] = value
+                with self.assertRaisesRegex(ValueError, "drift_ramp_ticks"):
+                    DriftResult.from_payload(payload)
+
     def test_v3_accepts_optional_clean_training_history_before_production(self):
         payload = _v3_payload()
         payload["clean_training_history"] = [

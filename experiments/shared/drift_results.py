@@ -197,6 +197,22 @@ def _validate_v3_internal_consistency(payload: dict[str, Any]) -> None:
     if config["retrain_rounds"] < 1:
         raise ValueError("schema v3 retrain_rounds must be at least 1")
 
+    ramp = config.get("drift_ramp_ticks")
+    if ramp is not None and (
+        not isinstance(ramp, int) or isinstance(ramp, bool) or ramp < 1
+    ):
+        raise ValueError(
+            "schema v3 drift_ramp_ticks must be None or an integer >= 1"
+        )
+    if ramp is not None and (
+        config.get("drift_onset_ticks") is not None
+        or config.get("drifted_client_ids") is not None
+    ):
+        raise ValueError(
+            "schema v3 drift_ramp_ticks cannot be combined with "
+            "drift_onset_ticks or drifted_client_ids"
+        )
+
     _validate_detector_config(detector)
     _validate_runtime(runtime)
     _validate_v3_histories(payload, production_start, end_time)

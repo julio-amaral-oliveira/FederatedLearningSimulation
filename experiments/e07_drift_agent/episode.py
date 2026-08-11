@@ -297,6 +297,7 @@ def _experiment_config(config: DriftEpisodeConfig) -> dict:
         "client_speed_profile": config.client_speed_profile,
         "drifted_client_ids": config.drifted_client_ids,
         "drift_onset_ticks": config.drift_onset_ticks,
+        "drift_ramp_ticks": config.drift_ramp_ticks,
         "client_speed_tiers": [
             list(tier) for tier in _speed_tiers_for_profile(config.client_speed_profile)
         ],

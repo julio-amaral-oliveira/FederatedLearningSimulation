@@ -299,6 +299,7 @@ class TestDriftEpisode(unittest.TestCase):
                 "client_speed_profile": "uniform",
                 "drifted_client_ids": None,
                 "drift_onset_ticks": None,
+                "drift_ramp_ticks": None,
                 "client_speed_tiers": [["uniform", 0, 10, 1.0]],
                 "max_train_samples_per_client": 9,
                 "tau": 0.6,

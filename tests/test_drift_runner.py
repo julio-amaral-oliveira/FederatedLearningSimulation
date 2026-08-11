@@ -1,6 +1,8 @@
 import json
 import tempfile
 import unittest
+from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -475,6 +477,34 @@ class TestDriftRunMatrix(unittest.TestCase):
         self.assertEqual(
             dims["drift_onset_ticks"], {0: 1, 1: 4, 2: 7, 3: 10, 4: 13}
         )
+
+    def test_summary_and_directories_partition_by_ramp_duration(self):
+        from experiments.e07_drift_agent.run_matrix import (
+            _result_directory,
+            _summary_dimensions,
+            _summary_group_key,
+        )
+
+        base = DriftEpisodeConfig(corruption="fog", severity=4, seed=42)
+        configs = [
+            replace(base, drift_ramp_ticks=5),
+            replace(base, drift_ramp_ticks=20),
+        ]
+        duplicates = Counter((c.corruption, c.severity, c.seed) for c in configs)
+        directories = {
+            _result_directory(Path("/tmp/e09"), config, duplicates)
+            for config in configs
+        }
+        self.assertEqual(len(directories), 2)
+        keys = {
+            _summary_group_key(
+                _summary_dimensions(
+                    config, population="visual", trigger_policy="detector"
+                )
+            )
+            for config in configs
+        }
+        self.assertEqual(len(keys), 2)
 
 
 if __name__ == "__main__":
