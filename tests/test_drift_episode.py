@@ -272,7 +272,7 @@ class TestDriftEpisode(unittest.TestCase):
         )
         server = _FakeServer(
             global_model=nn.Linear(4, 2),
-            evaluation_accuracies=[0.8, 0.2, 0.3, 0.5, 0.5, 0.7],
+            evaluation_accuracies=[0.9, 0.8, 0.2, 0.3, 0.5, 0.5, 0.7],
         )
 
         result = run_drift_episode(
@@ -339,10 +339,60 @@ class TestDriftEpisode(unittest.TestCase):
             _config(), server=server, monitor=monitor, corruption_fn=_identity
         )
 
-        self.assertEqual(server.run_round_calls, [1])
+        self.assertEqual(server.run_round_calls, [])
         self.assertEqual(server.run_one_round_calls, 6)
         self.assertEqual(len(result["retrain_decisions"]), 1)
         self.assertEqual(len(result["retrain_round_events"]), 5)
+
+    def test_training_rounds_are_recorded_as_clean_training_history(self):
+        config = _config(initial_rounds=3)
+        server = _FakeServer(round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 2.0, 2.0))
+        monitor = _ScriptedMonitor([False, False, True])
+
+        result = run_drift_episode(
+            config, server=server, monitor=monitor, corruption_fn=_identity
+        )
+
+        self.assertEqual(len(result["clean_training_history"]), 3)
+        self.assertEqual(
+            [entry["stage"] for entry in result["clean_training_history"]],
+            ["train_round", "train_round", "train_round"],
+        )
+        self.assertEqual(
+            [entry["time"] for entry in result["clean_training_history"]],
+            [2.0, 5.0, 10.0],
+        )
+        self.assertLessEqual(
+            result["clean_training_history"][-1]["time"],
+            result["metadata"]["production_start_time"],
+        )
+        self.assertEqual(
+            [entry["stage"] for entry in result["clean_evaluations"]],
+            ["pre_drift", "final"],
+        )
+
+    def test_comparison_shares_the_same_training_history_between_arms(self):
+        results = run_drift_comparison(
+            _config(initial_rounds=2, production_horizon_seconds=400.0),
+            corruption_fn=_identity,
+            server_factory=lambda: _FakeServer(
+                round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 2.0),
+                global_model=nn.Linear(4, 2),
+            ),
+            monitor_factory=lambda _server, _baseline: _ScriptedMonitor(
+                [False, False, True]
+            ),
+        )
+
+        self.assertEqual(
+            results["agent"]["clean_training_history"],
+            results["baseline"]["clean_training_history"],
+        )
+        self.assertEqual(len(results["agent"]["clean_training_history"]), 2)
+        self.assertEqual(
+            [entry["time"] for entry in results["agent"]["clean_training_history"]],
+            [2.0, 5.0],
+        )
 
     def test_retraining_uses_clean_data_for_clients_not_yet_drifted(self):
         from experiments.e07_drift_agent.episode import _run_retraining
@@ -405,6 +455,7 @@ class TestDriftEpisode(unittest.TestCase):
         server = _FakeServer(
             round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0),
             evaluation_accuracies=[
+                0.9,  # training round (clean)
                 0.9,  # pre-drift clean evaluation
                 0.2,  # drift onset
                 0.2, 0.2, 0.2,  # monitor ticks before decision

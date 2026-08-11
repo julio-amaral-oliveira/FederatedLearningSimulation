@@ -200,6 +200,7 @@ def _validate_v3_internal_consistency(payload: dict[str, Any]) -> None:
     _validate_detector_config(detector)
     _validate_runtime(runtime)
     _validate_v3_histories(payload, production_start, end_time)
+    _validate_v3_training_history(payload, production_start)
     _validate_v3_actions(payload, production_start, end_time)
 
 
@@ -328,6 +329,35 @@ def _validate_v3_histories(
         end=end_time,
         allow_warmup=True,
     )
+
+
+def _validate_v3_training_history(
+    payload: dict[str, Any],
+    production_start: float,
+) -> None:
+    """Validate the pre-production clean training history when present.
+
+    The field is optional so published schema-v3 artifacts without it stay
+    loadable.  When present, every timestamp must be finite, ordered, and
+    precede production start.
+    """
+    entries = payload.get("clean_training_history", [])
+    if not isinstance(entries, list):
+        raise ValueError("schema v3 clean_training_history must be a list")
+    previous: float | None = None
+    for index, entry in enumerate(entries):
+        timestamp = _timestamp(entry, field=f"clean_training_history[{index}]")
+        if previous is not None and timestamp < previous:
+            raise ValueError(
+                "schema v3 clean_training_history timestamps must be "
+                "monotonically non-decreasing"
+            )
+        if timestamp > production_start:
+            raise ValueError(
+                "schema v3 clean_training_history timestamps must not follow "
+                "production start"
+            )
+        previous = timestamp
 
 
 def _validate_v3_actions(
@@ -517,6 +547,11 @@ def _validate_v3_pair(agent: DriftResult, baseline: DriftResult) -> None:
         "detector configuration",
         agent.detector_config,
         baseline.detector_config,
+    )
+    _require_equal(
+        "training history",
+        agent.get("clean_training_history", []),
+        baseline.get("clean_training_history", []),
     )
 
     agent_decision = _first_event(agent, "retrain_decisions")

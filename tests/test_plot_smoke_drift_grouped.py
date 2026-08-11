@@ -27,6 +27,9 @@ def _payload(seed: int, baseline: bool, *, tau: float = 0.5) -> dict:
             "seed": seed,
             "tau": tau,
             "baseline": baseline,
+            "initial_rounds": 4,
+            "warmup_ticks": 5,
+            "monitor_tick_seconds": 10.0,
             "production_horizon_seconds": 40.0,
         },
         "metadata": {
@@ -43,6 +46,16 @@ def _payload(seed: int, baseline: bool, *, tau: float = 0.5) -> dict:
             "downtime_seconds": 0.0,
             "clean_retention_delta": 0.0 if baseline else 0.02,
         },
+        "clean_evaluations": [
+            {"time": onset, "loss": 0.3, "accuracy": 0.6, "stage": "pre_drift"},
+            {"time": 140.0, "loss": 0.3, "accuracy": 0.6, "stage": "final"},
+        ],
+        "clean_training_history": [
+            {"time": 25.0, "loss": 0.9, "accuracy": 0.2, "stage": "train_round"},
+            {"time": 50.0, "loss": 0.7, "accuracy": 0.35, "stage": "train_round"},
+            {"time": 75.0, "loss": 0.5, "accuracy": 0.5, "stage": "train_round"},
+            {"time": 100.0, "loss": 0.35, "accuracy": 0.6, "stage": "train_round"},
+        ],
         "corrupted_accuracy_history": [
             {"time": onset, "accuracy": 0.6, "stage": "drift_onset"},
             {"time": 110.0, "accuracy": 0.6, "stage": "monitor_tick"},
@@ -89,13 +102,28 @@ class PlotSmokeDriftTests(unittest.TestCase):
             figure = build_figure(pairs)
             self.assertEqual([pair.seed for pair in pairs], [42, 43])
             self.assertIn("oracle-trigger control", figure._suptitle.get_text())
-            trajectory_legend = figure.axes[0].get_legend()
+            trajectory_axis = figure.axes[0]
+            self.assertEqual(trajectory_axis.get_xlim(), (0.0, 140.0))
+            self.assertEqual(
+                trajectory_axis.get_ylabel(), "Accuracy"
+            )
+            self.assertEqual(
+                trajectory_axis.get_xlabel(), "Simulated time (s)"
+            )
+            trajectory_legend = trajectory_axis.get_legend()
             self.assertIsNotNone(trajectory_legend)
+            legend_labels = [text.get_text() for text in trajectory_legend.get_texts()]
             self.assertIn(
                 "Baseline mean (dashed, no retraining)",
-                [text.get_text() for text in trajectory_legend.get_texts()],
+                legend_labels,
             )
-            seed_legend = figure.axes[0].artists[0]
+            self.assertIn("Clean accuracy (training)", legend_labels)
+            axis_labels = [text.get_text() for text in trajectory_axis.texts]
+            self.assertIn("training", axis_labels)
+            self.assertIn("warm-up (5 ticks)", axis_labels)
+            self.assertIn("drift onset", axis_labels)
+            self.assertIn("horizon", axis_labels)
+            seed_legend = trajectory_axis.artists[0]
             self.assertIn(
                 "Agent (solid, with retraining)",
                 [text.get_text() for text in seed_legend.get_texts()],
@@ -104,6 +132,52 @@ class PlotSmokeDriftTests(unittest.TestCase):
                 "Baseline (dashed, no retraining)",
                 [text.get_text() for text in seed_legend.get_texts()],
             )
+
+    def test_trajectory_shows_the_training_phase_band_and_curve(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_pair(root, "seed_42", 42)
+            figure = build_figure(load_scenario(root))
+            trajectory_axis = figure.axes[0]
+            spans = [
+                patch
+                for patch in trajectory_axis.patches
+                if patch.get_width() > 0 and patch.get_alpha() != 0.08
+            ]
+            training_span = next(
+                (span for span in spans if span.get_x() == 0.0), None
+            )
+            self.assertIsNotNone(training_span)
+            self.assertEqual(training_span.get_width(), 100.0)
+            training_steps = [
+                line
+                for line in trajectory_axis.lines
+                if line.get_linestyle() == "-" and len(line.get_xdata()) == 4
+            ]
+            self.assertEqual(len(training_steps), 1)
+            np.testing.assert_array_equal(
+                training_steps[0].get_xdata(),
+                [25.0, 50.0, 75.0, 100.0],
+            )
+
+    def test_trajectory_without_training_history_marks_clean_accuracy_at_onset(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_pair(root, "seed_42", 42)
+            for arm in ("agent", "baseline"):
+                payload_path = root / "seed_42" / f"{arm}.json"
+                payload = json.loads(payload_path.read_text(encoding="utf-8"))
+                del payload["clean_training_history"]
+                payload_path.write_text(json.dumps(payload), encoding="utf-8")
+            figure = build_figure(load_scenario(root))
+            trajectory_legend = figure.axes[0].get_legend()
+            legend_labels = [
+                text.get_text() for text in trajectory_legend.get_texts()
+            ]
+            self.assertIn("Clean accuracy at onset", legend_labels)
+            self.assertNotIn("Clean accuracy (training)", legend_labels)
 
     def test_zero_downtime_uses_horizon_scale_and_keeps_both_bars_visible(
         self,

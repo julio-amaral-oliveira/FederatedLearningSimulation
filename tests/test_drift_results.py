@@ -379,6 +379,42 @@ class TestDriftResultLoading(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, field):
                     DriftResult.from_payload(payload)
 
+    def test_v3_accepts_optional_clean_training_history_before_production(self):
+        payload = _v3_payload()
+        payload["clean_training_history"] = [
+            {"time": -30.0, "loss": 1.0, "accuracy": 0.1, "stage": "train_round"},
+            {"time": -20.0, "loss": 0.5, "accuracy": 0.5, "stage": "train_round"},
+            {"time": -10.0, "loss": 0.3, "accuracy": 0.6, "stage": "train_round"},
+        ]
+
+        result = DriftResult.from_payload(payload)
+
+        self.assertEqual(len(result.get("clean_training_history")), 3)
+
+    def test_v3_rejects_training_history_inside_production(self):
+        cases = (
+            lambda payload: payload["clean_training_history"].append(
+                {"time": 41.0, "accuracy": 0.6, "stage": "train_round"}
+            ),
+            lambda payload: payload["clean_training_history"][1].update(
+                time=10.0
+            ),
+            lambda payload: payload["clean_training_history"][1].update(
+                time=float("nan")
+            ),
+        )
+        for mutate in cases:
+            with self.subTest(mutate=mutate):
+                payload = _v3_payload()
+                payload["clean_training_history"] = [
+                    {"time": -20.0, "accuracy": 0.4, "stage": "train_round"},
+                    {"time": -10.0, "accuracy": 0.5, "stage": "train_round"},
+                ]
+                mutate(payload)
+
+                with self.assertRaisesRegex(ValueError, "clean_training_history"):
+                    DriftResult.from_payload(payload)
+
     def test_v3_does_not_apply_horizon_tolerance_to_event_ordering(self):
         cases = (
             lambda payload: payload["tick_history"][3].update(
@@ -513,6 +549,16 @@ class TestDriftPairValidation(unittest.TestCase):
         summary = summarize_pair(agent, baseline)
 
         self.assertTrue(summary["audited_pair"])
+
+    def test_rejects_a_pair_with_divergent_training_history(self):
+        agent = _v3_payload()
+        agent["clean_training_history"] = [
+            {"time": -10.0, "accuracy": 0.5, "stage": "train_round"}
+        ]
+        baseline = _v3_payload(baseline=True)
+
+        with self.assertRaisesRegex(ValueError, "training history"):
+            validate_pair(agent, baseline)
 
     def test_accepts_v2_only_as_legacy_unverified_pair(self):
         agent = _v2_payload()

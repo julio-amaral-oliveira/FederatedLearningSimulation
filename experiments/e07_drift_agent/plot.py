@@ -29,7 +29,16 @@ class ScenarioError(ValueError):
 
 @dataclass(frozen=True)
 class Episode:
-    """The plotting fields from one result arm."""
+    """The plotting fields from one result arm.
+
+    Times are absolute virtual seconds: the timeline spans from 0 (training
+    start) through the production horizon end.  ``training_times`` and
+    ``training_accuracies`` hold the recorded clean-test trajectory of the
+    initial training rounds (empty for artifacts published without it).  The
+    simulator's warm-up phase runs 20 monitor ticks without advancing the
+    virtual clock, so it renders as an annotation at ``onset``, where
+    training ends and corrupted production begins.
+    """
 
     seed: int
     arm: str
@@ -38,8 +47,13 @@ class Episode:
     tau: float
     onset: float
     horizon: float
+    end: float
     times: np.ndarray
     accuracies: np.ndarray
+    training_times: np.ndarray
+    training_accuracies: np.ndarray
+    warmup_ticks: int | None
+    pre_drift_accuracy: float | None
     final_accuracy: float
     downtime: float
     clean_retention_delta: float
@@ -144,33 +158,78 @@ def _episode_from_payload(path: Path, arm: str, directory_seed: int) -> Episode:
     if horizon <= 0 or not math.isclose(end - onset, horizon, abs_tol=1e-6):
         raise ScenarioError(f"{path}: incompatible production horizon")
 
+    warmup_ticks = config.get("warmup_ticks")
+    if warmup_ticks is not None and (
+        isinstance(warmup_ticks, bool) or not isinstance(warmup_ticks, int)
+    ):
+        raise ScenarioError(f"{path}: warmup_ticks must be an integer")
+
     points: list[tuple[float, float]] = []
     for index, entry in enumerate(history):
         if not isinstance(entry, dict):
             raise ScenarioError(f"{path}: history entry {index} must be an object")
         time = _finite_number(entry.get("time"), f"{path}: history time")
         accuracy = _finite_number(entry.get("accuracy"), f"{path}: history accuracy")
-        points.append((time - onset, accuracy))
+        points.append((time, accuracy))
     if not points:
         raise ScenarioError(f"{path} has an empty corrupted_accuracy_history")
     if any(right[0] < left[0] for left, right in zip(points, points[1:])):
         raise ScenarioError(f"{path}: corrupted accuracy times must be ordered")
-    if points[0][0] < -1e-6 or points[-1][0] > horizon + 1e-6:
-        raise ScenarioError(f"{path}: trajectory lies outside the production horizon")
+    if points[0][0] < onset - 1e-6 or points[-1][0] > end + 1e-6:
+        raise ScenarioError(f"{path}: trajectory lies outside the production interval")
 
     decisions = tuple(
-        _finite_number(item.get("time"), f"{path}: decision time") - onset
+        _finite_number(item.get("time"), f"{path}: decision time")
         for item in _object_list(payload, "retrain_decisions", path)
     )
     periods = tuple(
         (
-            _finite_number(item.get("started_time"), f"{path}: retraining start") - onset,
-            _finite_number(item.get("completed_time"), f"{path}: retraining end") - onset,
+            _finite_number(item.get("started_time"), f"{path}: retraining start"),
+            _finite_number(item.get("completed_time"), f"{path}: retraining end"),
         )
         for item in _object_list(payload, "retrain_round_events", path)
     )
-    if any(start > finish or start < 0 or finish > horizon + 1e-6 for start, finish in periods):
+    if any(
+        start > finish or start < onset - 1e-6 or finish > end + 1e-6
+        for start, finish in periods
+    ):
         raise ScenarioError(f"{path}: retraining period lies outside the horizon")
+
+    training_times: list[float] = []
+    training_accuracies: list[float] = []
+    training_history = payload.get("clean_training_history")
+    if training_history is not None:
+        if not isinstance(training_history, list):
+            raise ScenarioError(f"{path}: clean_training_history must be a list")
+        for index, entry in enumerate(training_history):
+            if not isinstance(entry, dict):
+                raise ScenarioError(
+                    f"{path}: training history entry {index} must be an object"
+                )
+            training_times.append(
+                _finite_number(entry.get("time"), f"{path}: training history time")
+            )
+            training_accuracies.append(
+                _finite_number(
+                    entry.get("accuracy"), f"{path}: training history accuracy"
+                )
+            )
+        if any(
+            right < left for left, right in zip(training_times, training_times[1:])
+        ):
+            raise ScenarioError(f"{path}: training history times must be ordered")
+        if any(time > onset + 1e-6 for time in training_times):
+            raise ScenarioError(
+                f"{path}: training history lies inside the production interval"
+            )
+
+    pre_drift_accuracy: float | None = None
+    for entry in _object_list(payload, "clean_evaluations", path):
+        if entry.get("stage") == "pre_drift":
+            pre_drift_accuracy = _finite_number(
+                entry.get("accuracy"), f"{path}: pre-drift clean accuracy"
+            )
+            break
     drift_events = _object_list(payload, "drift_events", path)
     oracle_trigger = any(
         str(event.get("client_id", "")).casefold() == "oracle" for event in drift_events
@@ -184,8 +243,13 @@ def _episode_from_payload(path: Path, arm: str, directory_seed: int) -> Episode:
         tau=tau,
         onset=onset,
         horizon=horizon,
+        end=end,
         times=np.asarray([point[0] for point in points]),
         accuracies=np.asarray([point[1] for point in points]),
+        training_times=np.asarray(training_times),
+        training_accuracies=np.asarray(training_accuracies),
+        warmup_ticks=warmup_ticks,
+        pre_drift_accuracy=pre_drift_accuracy,
         final_accuracy=_last_final_accuracy(history, path),
         downtime=_finite_number(metrics.get("downtime_seconds"), f"{path}: downtime"),
         clean_retention_delta=_finite_number(
@@ -268,6 +332,14 @@ def forward_fill_steps(
 
 
 def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -> None:
+    sample = pairs[0].agent
+    start = 0.0
+    end = sample.end
+    onset = sample.onset
+
+    if onset > start:
+        axis.axvspan(start, onset, color="#ececec", linewidth=0, zorder=0)
+
     all_episodes = [episode for pair in pairs for episode in (pair.agent, pair.baseline)]
     union, _ = forward_fill_steps(
         [episode.times for episode in all_episodes],
@@ -315,29 +387,83 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
             label=f"{arm.title()} mean",
         )
 
-    sample = pairs[0].agent
-    axis.axhline(sample.tau, color="#555555", linestyle=":", linewidth=1.4)
-    axis.axvline(0, color="#222222", linewidth=1.1)
-    axis.axvline(sample.horizon, color="#222222", linestyle=":", linewidth=1.1)
+    for pair, color in zip(pairs, colors):
+        episode = pair.agent
+        if len(episode.training_times):
+            axis.step(
+                episode.training_times,
+                episode.training_accuracies,
+                where="post",
+                color=color,
+                linewidth=1.2,
+                alpha=0.85,
+                zorder=4,
+            )
+        elif episode.pre_drift_accuracy is not None:
+            axis.plot(
+                [onset],
+                [episode.pre_drift_accuracy],
+                color=color,
+                marker="x",
+                markersize=6,
+                linewidth=0,
+                alpha=0.85,
+                zorder=4,
+            )
+
+    axis.hlines(sample.tau, onset, end, color="#555555", linestyle=":", linewidth=1.4)
+    axis.axvline(onset, color="#222222", linewidth=1.1)
+    axis.axvline(end, color="#222222", linestyle=":", linewidth=1.1)
     for pair, color in zip(pairs, colors):
         for decision in pair.agent.decisions:
             axis.axvline(decision, color=color, alpha=0.28, linewidth=0.9)
-        for start, finish in pair.agent.retraining_periods:
-            axis.axvspan(start, finish, color=color, alpha=0.08, linewidth=0)
+        for start_retrain, finish in pair.agent.retraining_periods:
+            axis.axvspan(start_retrain, finish, color=color, alpha=0.08, linewidth=0)
 
-    axis.set_xlim(0, sample.horizon)
+    axis.set_xlim(start, end)
     axis.set_ylim(0, 1)
-    axis.set_ylabel("Corrupted accuracy")
-    axis.set_xlabel("Time since drift onset (s)")
+    axis.set_ylabel("Accuracy")
+    axis.set_xlabel("Simulated time (s)")
     axis.yaxis.set_major_formatter(PercentFormatter(1.0))
     axis.grid(True, alpha=0.2)
-    axis.text(0, 1.015, "drift onset", transform=axis.get_xaxis_transform(), ha="left")
+    if onset > start:
+        axis.text(
+            start,
+            1.015,
+            "training",
+            transform=axis.get_xaxis_transform(),
+            ha="left",
+            fontsize=9,
+        )
+    warmup_label = (
+        f"warm-up ({sample.warmup_ticks} ticks)"
+        if sample.warmup_ticks is not None
+        else "warm-up"
+    )
+    gap = 0.02 * (end - start)
     axis.text(
-        sample.horizon,
+        onset - gap,
+        1.015,
+        warmup_label,
+        transform=axis.get_xaxis_transform(),
+        ha="right",
+        fontsize=9,
+    )
+    axis.text(
+        onset + gap,
+        1.015,
+        "drift onset",
+        transform=axis.get_xaxis_transform(),
+        ha="left",
+        fontsize=9,
+    )
+    axis.text(
+        end,
         1.015,
         "horizon",
         transform=axis.get_xaxis_transform(),
         ha="right",
+        fontsize=9,
     )
 
     seed_handles = [
@@ -381,6 +507,14 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         Line2D([0], [0], color="#555555", linestyle=":", label=f"τ = {sample.tau:g}"),
         Line2D([0], [0], color="#777777", alpha=0.4, label="Decision / retraining"),
     ]
+    if len(sample.training_times):
+        semantic_handles.append(
+            Line2D([0], [0], color="#444444", linewidth=2, label="Clean accuracy (training)")
+        )
+    elif sample.pre_drift_accuracy is not None:
+        semantic_handles.append(
+            Line2D([0], [0], color="#444444", marker="x", linewidth=0, label="Clean accuracy at onset")
+        )
     first_legend = axis.legend(
         handles=[*seed_handles, *style_handles],
         loc="lower right",

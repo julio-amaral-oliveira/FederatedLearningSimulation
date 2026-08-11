@@ -103,17 +103,33 @@ def _sample_batch(x: np.ndarray, batch_size: int, rng: np.random.Generator) -> n
     return x[indices]
 
 
+def _evaluation_entry(server, dataset, stage: str) -> dict:
+    loss, accuracy = server.evaluate_dataset(dataset)
+    return {
+        "time": float(server.virtual_time),
+        "loss": float(loss),
+        "accuracy": float(accuracy),
+        "stage": stage,
+    }
+
+
 def _record_evaluation(
     destination: list[dict], server, dataset, stage: str) -> None:
-    loss, accuracy = server.evaluate_dataset(dataset)
-    destination.append(
-        {
-            "time": float(server.virtual_time),
-            "loss": float(loss),
-            "accuracy": float(accuracy),
-            "stage": stage,
-        }
-    )
+    destination.append(_evaluation_entry(server, dataset, stage))
+
+
+def _run_training_rounds(server, rounds: int, clean_test) -> list[dict]:
+    """Run initial training one round at a time, recording clean evaluations.
+
+    Each entry stores the clean-test accuracy right after the round so the
+    plot can show the training period, not only the production phase.  The
+    times are absolute virtual times and always precede production start.
+    """
+    history: list[dict] = []
+    for _ in range(rounds):
+        server.run_one_round(record_default_metrics=False)
+        history.append(_evaluation_entry(server, clean_test, "train_round"))
+    return history
 
 
 def _monitor_batches(
@@ -280,6 +296,7 @@ def _new_result(config: DriftEpisodeConfig, server) -> dict:
         },
         "corrupted_accuracy_history": [],
         "clean_evaluations": [],
+        "clean_training_history": [],
         "drift_events": [],
         "retrain_decisions": [],
         "counterfactual_triggers": [],
@@ -530,6 +547,7 @@ def run_drift_episode(
     monitor=None,
     _initial_training_complete: bool = False,
     _clean_checkpoint_digest: str | None = None,
+    _clean_training_history: list[dict] | None = None,
 ) -> dict:
     """Run one clean-warmup/corrupted-production episode.
 
@@ -571,7 +589,11 @@ def run_drift_episode(
     result["_corrupted_test"] = corrupted_test
 
     if not _initial_training_complete:
-        server.run_rounds(config.initial_rounds, record_default_metrics=False)
+        result["clean_training_history"] = _run_training_rounds(
+            server, config.initial_rounds, clean_test
+        )
+    elif _clean_training_history is not None:
+        result["clean_training_history"] = copy.deepcopy(_clean_training_history)
     result["runtime"]["clean_checkpoint_digest"] = (
         _clean_checkpoint_digest
         if _clean_checkpoint_digest is not None
@@ -665,7 +687,11 @@ def run_drift_comparison(
 
     seed_everything()
     checkpoint_source = make_server()
-    checkpoint_source.run_rounds(config.initial_rounds, record_default_metrics=False)
+    training_history = _run_training_rounds(
+        checkpoint_source,
+        config.initial_rounds,
+        checkpoint_source.testing_data,
+    )
     checkpoint = _snapshot_clean_checkpoint(checkpoint_source)
 
     agent_server = make_server()
@@ -678,6 +704,7 @@ def run_drift_comparison(
         monitor=agent_monitor,
         _initial_training_complete=True,
         _clean_checkpoint_digest=checkpoint.get("clean_checkpoint_digest"),
+        _clean_training_history=training_history,
     )
     baseline_server = make_server()
     _restore_clean_checkpoint(baseline_server, checkpoint)
@@ -689,6 +716,7 @@ def run_drift_comparison(
         monitor=baseline_monitor,
         _initial_training_complete=True,
         _clean_checkpoint_digest=checkpoint.get("clean_checkpoint_digest"),
+        _clean_training_history=training_history,
     )
     from experiments.shared.drift_results import validate_pair
 
