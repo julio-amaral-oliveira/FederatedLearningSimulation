@@ -184,7 +184,7 @@ def _monitor_batches(
     rng: np.random.Generator,
     *,
     tick: int,
-    virtual_time: float | None = None,
+    production_seconds: float | None = None,
 ) -> dict[str, torch.Tensor]:
     """Sample per-client monitor batches, corrupting drifted clients.
 
@@ -193,19 +193,20 @@ def _monitor_batches(
     lands on the first corrupted production tick; the corruption seed stays
     on the absolute tick to keep the E07 sequence byte-identical.  With a
     configured ramp, the batch corrupts only ``round(fraction x batch)``
-    images chosen through ``rng``, where the fraction follows the virtual
-    time elapsed since production start.
+    images chosen through ``rng``, where the fraction follows
+    ``production_seconds``, the virtual time elapsed since production
+    start (the warm-up phase has zero virtual duration).
     """
     batches: dict[str, torch.Tensor] = {}
     schedule_tick = tick - config.warmup_ticks
     fraction = None
     if config.drift_ramp_ticks is not None:
-        production_seconds = (
-            float(virtual_time - config.warmup_ticks * config.monitor_tick_seconds)
-            if virtual_time is not None
+        production_seconds_value = (
+            float(production_seconds)
+            if production_seconds is not None
             else schedule_tick * config.monitor_tick_seconds
         )
-        fraction = ramp_fraction(production_seconds, config)
+        fraction = ramp_fraction(production_seconds_value, config)
     for position, (x, _y) in enumerate(client_datasets):
         batch = _sample_batch(x, config.batch_size, rng)
         if corruption_fn is not None and is_client_drifted_at_tick(
@@ -674,7 +675,9 @@ def run_drift_episode(
     ):
         raise ValueError("production_horizon_seconds must be positive")
     if config.drift_ramp_ticks is not None and (
-        isinstance(config.drift_ramp_ticks, bool) or config.drift_ramp_ticks < 1
+        not isinstance(config.drift_ramp_ticks, int)
+        or isinstance(config.drift_ramp_ticks, bool)
+        or config.drift_ramp_ticks < 1
     ):
         raise ValueError("drift_ramp_ticks must be None or an integer >= 1")
     if config.drift_ramp_ticks is not None and (
@@ -777,7 +780,7 @@ def run_drift_episode(
             _monitor_batches(
                 clean_client_datasets, config, corruption_fn, rng,
                 tick=config.warmup_ticks + tick,
-                virtual_time=float(server.virtual_time),
+                production_seconds=float(server.virtual_time) - production_start,
             ),
             virtual_time=float(server.virtual_time),
             record_action=not config.baseline,

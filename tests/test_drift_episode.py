@@ -782,19 +782,19 @@ class TestDriftEpisode(unittest.TestCase):
         )
         first = _monitor_batches(
             datasets, config, tagging_corruption, rng,
-            tick=20, virtual_time=20.0,
+            tick=20, production_seconds=0.0,
         )
         self.assertEqual(float(first["0"].sum()), 0.0)  # fração 0
         self.assertEqual(float(first["1"].sum()), 0.0)
         mid = _monitor_batches(
             datasets, config, tagging_corruption, rng,
-            tick=30, virtual_time=120.0,
+            tick=30, production_seconds=100.0,
         )
         self.assertEqual(float(mid["0"].sum()), 16.0)  # fração 0.5 -> 16 de 32
         self.assertEqual(float(mid["1"].sum()), 16.0)
         end = _monitor_batches(
             datasets, config, tagging_corruption, rng,
-            tick=40, virtual_time=300.0,
+            tick=40, production_seconds=300.0,
         )
         self.assertEqual(float(end["0"].sum()), 32.0)  # fração 1
         self.assertEqual(float(end["1"].sum()), 32.0)
@@ -814,14 +814,83 @@ class TestDriftEpisode(unittest.TestCase):
 
         first = _monitor_batches(
             datasets, config, tagging_corruption, np.random.default_rng(7),
-            tick=30, virtual_time=120.0,
+            tick=30, production_seconds=100.0,
         )
         second = _monitor_batches(
             datasets, config, tagging_corruption, np.random.default_rng(7),
-            tick=30, virtual_time=120.0,
+            tick=30, production_seconds=100.0,
         )
         self.assertTrue(torch.equal(first["0"], second["0"]))
         self.assertTrue(torch.equal(first["1"], second["1"]))
+
+    def test_ramp_served_batch_fraction_tracks_production_virtual_time(self):
+        from experiments.e07_drift_agent.drift_schedule import (
+            corrupt_count,
+            ramp_fraction,
+        )
+
+        def tagging_corruption(batch, _kind, _severity, seed=None):
+            return batch + 1.0
+
+        config = _config(
+            num_clients=2,
+            drift_ramp_ticks=20,
+            batch_size=32,
+            monitor_ticks=12,
+            production_horizon_seconds=400.0,
+        )
+        server = _FakeServer(round_durations=(2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 2.0))
+        monitor = _ScriptedMonitor([])
+        result = run_drift_episode(
+            config,
+            server=server,
+            monitor=monitor,
+            corruption_fn=tagging_corruption,
+        )
+
+        production_start = result["metadata"]["production_start_time"]
+        clients_per_tick = len(server.clients)
+        warmup_entries = config.warmup_ticks * clients_per_tick
+        pinned = {0: 0, 4: 1, 9: 2, 19: 4}
+        for tick, pinned_count in pinned.items():
+            # O avanço do relógio acontece antes do observe: no tick de
+            # produção t o tempo virtual é production_start + (t+1)*10.
+            virtual_seconds = (
+                production_start + (tick + 1) * config.monitor_tick_seconds
+            )
+            fraction = ramp_fraction(virtual_seconds - production_start, config)
+            expected = corrupt_count(4, fraction)
+            self.assertEqual(expected, pinned_count)
+            for client in (0, 1):
+                batch = monitor.observed_batches[
+                    warmup_entries + tick * clients_per_tick + client
+                ]
+                corrupted_images = float(
+                    (batch.reshape(batch.shape[0], -1).sum(axis=1) > 0).sum()
+                )
+                self.assertEqual(corrupted_images, float(expected))
+            undrifted = monitor.observed_batches[
+                warmup_entries + tick * clients_per_tick + 2
+            ]
+            self.assertEqual(float(undrifted.sum()), 0.0)
+
+    def test_mixed_evaluation_test_swaps_half_the_images_at_permutation_indices(self):
+        from experiments.e07_drift_agent.episode import _mixed_evaluation_test
+
+        clean = (
+            np.zeros((8, 1, 1, 1), dtype=np.float32),
+            np.arange(8, dtype=np.int64),
+        )
+        corrupted = (np.ones((8, 1, 1, 1), dtype=np.float32), clean[1].copy())
+        permutation = np.array([3, 5, 0, 7, 2, 6, 1, 4])
+
+        mixed = _mixed_evaluation_test(clean, corrupted, permutation, 0.5)
+
+        self.assertTrue(np.array_equal(mixed[1], clean[1]))  # rótulos inalterados
+        self.assertEqual(float(mixed[0].sum()), 4.0)  # exatamente metade corrompida
+        self.assertTrue(np.all(mixed[0][permutation[:4]] == 1.0))
+        kept = np.setdiff1d(np.arange(8), permutation[:4])
+        self.assertTrue(np.all(mixed[0][kept] == 0.0))
 
     def test_ramp_records_fraction_metrics_and_uses_mixed_test(self):
         config = _config(drift_ramp_ticks=20, production_horizon_seconds=400.0)
@@ -900,6 +969,8 @@ class TestDriftEpisode(unittest.TestCase):
             dict(drift_ramp_ticks=0),
             dict(drift_ramp_ticks=True),
             dict(drift_ramp_ticks=-3),
+            dict(drift_ramp_ticks=2.5),
+            dict(drift_ramp_ticks="5"),
         )
         for overrides in cases:
             with self.subTest(overrides=overrides):

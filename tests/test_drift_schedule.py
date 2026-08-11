@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 
 from experiments.e07_drift_agent.drift_schedule import (
+    build_mixed_dataset,
     build_retrain_datasets,
     corrupt_count,
     drifted_clients,
@@ -76,11 +77,30 @@ class TestRampFraction(unittest.TestCase):
         config = DriftEpisodeConfig()
         self.assertEqual(ramp_fraction(0.0, config), 1.0)
 
+    def test_fraction_clamps_negative_seconds_at_zero(self):
+        self.assertEqual(ramp_fraction(-10.0, self.config), 0.0)
+
     def test_corrupt_count_rounds_the_fraction(self):
         self.assertEqual(corrupt_count(32, 0.0), 0)
         self.assertEqual(corrupt_count(32, 0.5), 16)
         self.assertEqual(corrupt_count(32, 1.0), 32)
         self.assertEqual(corrupt_count(4, 0.75), 3)
+
+    def test_build_mixed_dataset_swaps_half_the_images_at_permutation_indices(self):
+        clean = (
+            np.zeros((8, 1, 1, 1), dtype=np.float32),
+            np.arange(8, dtype=np.int64),
+        )
+        corrupted = (np.ones((8, 1, 1, 1), dtype=np.float32), clean[1].copy())
+        permutation = np.array([3, 5, 0, 7, 2, 6, 1, 4])
+
+        mixed = build_mixed_dataset(clean, corrupted, 0.5, permutation)
+
+        self.assertTrue(np.array_equal(mixed[1], clean[1]))  # rótulos inalterados
+        self.assertEqual(float(mixed[0].sum()), 4.0)  # exatamente metade corrompida
+        self.assertTrue(np.all(mixed[0][permutation[:4]] == 1.0))
+        kept = np.setdiff1d(np.arange(8), permutation[:4])
+        self.assertTrue(np.all(mixed[0][kept] == 0.0))
 
 
 if __name__ == "__main__":
