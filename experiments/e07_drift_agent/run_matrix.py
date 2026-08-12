@@ -97,6 +97,7 @@ def _summary_dimensions(
     *,
     population: str,
     trigger_policy: str,
+    retrain_skipped: bool = False,
 ) -> dict:
     """Return the explicit run descriptor used to partition matrix summaries."""
     return {
@@ -117,6 +118,7 @@ def _summary_dimensions(
         "drift_ramp_ticks": config.drift_ramp_ticks,
         "client_speed_profile": config.client_speed_profile,
         "production_horizon_seconds": config.production_horizon_seconds,
+        "retrain_skipped": retrain_skipped,
     }
 
 
@@ -143,6 +145,9 @@ def _summarize_matrix_runs(
             config,
             population=population,
             trigger_policy=trigger_policy,
+            retrain_skipped=bool(
+                results["agent"]["metrics"].get("retrain_skipped_budget")
+            ),
         )
         key = _summary_group_key(dimensions)
         group = grouped.setdefault(

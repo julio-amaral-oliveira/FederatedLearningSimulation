@@ -25,7 +25,7 @@ class TestBuildGrid(unittest.TestCase):
             self.assertIsNone(config.drift_onset_ticks)
             self.assertIsNone(config.drifted_client_ids)
             self.assertEqual(config.retrain_rounds, 1)
-            self.assertEqual(config.production_horizon_seconds, 400.0)
+            self.assertEqual(config.production_horizon_seconds, 600.0)
 
     def test_result_directories_disambiguate_by_ramp_duration(self):
         from experiments.e07_drift_agent.run_matrix import _result_directory

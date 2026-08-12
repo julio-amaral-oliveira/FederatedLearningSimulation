@@ -439,6 +439,44 @@ class TestDriftResultLoading(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "clean_training_history"):
                     DriftResult.from_payload(payload)
 
+    def test_v3_accepts_an_agent_with_skipped_retraining_budget(self):
+        agent = _v3_payload()
+        agent["metrics"]["retrain_skipped_budget"] = True
+        agent["retrain_round_events"] = []
+        baseline = _v3_payload(baseline=True)
+
+        validate_pair(agent, baseline)
+
+    def test_v3_rejects_invalid_skipped_budget_markers(self):
+        cases = (
+            (
+                "must be a bool",
+                lambda payload: payload["metrics"].update(
+                    retrain_skipped_budget="yes"
+                ),
+            ),
+            (
+                "requires a retrain decision",
+                lambda payload: (
+                    payload["metrics"].update(retrain_skipped_budget=True),
+                    payload["retrain_decisions"].clear(),
+                ),
+            ),
+            (
+                "count mismatch",
+                lambda payload: payload["metrics"].update(
+                    retrain_skipped_budget=True
+                ),
+            ),
+        )
+        for message, mutate in cases:
+            with self.subTest(message=message):
+                payload = _v3_payload()
+                mutate(payload)
+
+                with self.assertRaisesRegex(ValueError, message):
+                    DriftResult.from_payload(payload)
+
     def test_v3_does_not_apply_horizon_tolerance_to_event_ordering(self):
         cases = (
             lambda payload: payload["tick_history"][3].update(

@@ -60,6 +60,7 @@ class Episode:
     decisions: tuple[float, ...]
     retraining_periods: tuple[tuple[float, float], ...]
     oracle_trigger: bool
+    retrain_skipped: bool
 
 
 @dataclass(frozen=True)
@@ -234,6 +235,7 @@ def _episode_from_payload(path: Path, arm: str, directory_seed: int) -> Episode:
     oracle_trigger = any(
         str(event.get("client_id", "")).casefold() == "oracle" for event in drift_events
     )
+    retrain_skipped = metrics.get("retrain_skipped_budget") is True
 
     return Episode(
         seed=seed_value,
@@ -258,6 +260,7 @@ def _episode_from_payload(path: Path, arm: str, directory_seed: int) -> Episode:
         decisions=decisions,
         retraining_periods=periods,
         oracle_trigger=oracle_trigger,
+        retrain_skipped=retrain_skipped,
     )
 
 
@@ -417,6 +420,17 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
     for pair, color in zip(pairs, colors):
         for decision in pair.agent.decisions:
             axis.axvline(decision, color=color, alpha=0.28, linewidth=0.9)
+            if pair.agent.retrain_skipped:
+                axis.plot(
+                    [decision],
+                    [1.005],
+                    transform=axis.get_xaxis_transform(),
+                    clip_on=False,
+                    color=color,
+                    marker="x",
+                    markersize=7,
+                    linewidth=0,
+                )
         for start_retrain, finish in pair.agent.retraining_periods:
             axis.axvspan(start_retrain, finish, color=color, alpha=0.08, linewidth=0)
 
@@ -467,7 +481,17 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
     )
 
     seed_handles = [
-        Line2D([0], [0], color=color, linewidth=2, label=f"Seed {pair.seed}")
+        Line2D(
+            [0],
+            [0],
+            color=color,
+            linewidth=2,
+            label=(
+                f"Seed {pair.seed} (no retrain)"
+                if pair.agent.retrain_skipped
+                else f"Seed {pair.seed}"
+            ),
+        )
         for pair, color in zip(pairs, colors)
     ]
     style_handles = [
@@ -514,6 +538,18 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
     elif sample.pre_drift_accuracy is not None:
         semantic_handles.append(
             Line2D([0], [0], color="#444444", marker="x", linewidth=0, label="Clean accuracy at onset")
+        )
+    if any(pair.agent.retrain_skipped for pair in pairs):
+        semantic_handles.append(
+            Line2D(
+                [0],
+                [0],
+                color="#444444",
+                marker="x",
+                markersize=7,
+                linewidth=0,
+                label="Decision without retraining (budget)",
+            )
         )
     first_legend = axis.legend(
         handles=[*seed_handles, *style_handles],

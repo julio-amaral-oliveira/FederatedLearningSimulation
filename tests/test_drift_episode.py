@@ -436,21 +436,29 @@ class TestDriftEpisode(unittest.TestCase):
         self.assertEqual(server.clients[0].reset_calls, 1)
         self.assertEqual(server.clients[1].reset_calls, 1)
 
-    def test_fixed_horizon_rejects_retraining_before_any_round_when_budget_cannot_fit(self):
+    def test_fixed_horizon_records_budget_skip_when_retraining_cannot_fit(self):
         server = _FakeServer(
             round_durations=(2.0, 10.0, 10.0, 10.0, 10.0, 10.0),
             timeout=10.0,
         )
 
-        with self.assertRaisesRegex(RuntimeError, "retraining budget"):
-            run_drift_episode(
-                _config(production_horizon_seconds=22.0),
-                server=server,
-                monitor=_ScriptedMonitor([True]),
-                corruption_fn=_identity,
-            )
+        result = run_drift_episode(
+            _config(production_horizon_seconds=22.0),
+            server=server,
+            monitor=_ScriptedMonitor([True]),
+            corruption_fn=_identity,
+        )
 
+        self.assertIs(result["metrics"]["retrain_skipped_budget"], True)
+        self.assertEqual(len(result["retrain_decisions"]), 1)
+        self.assertEqual(result["retrain_round_events"], [])
         self.assertEqual(server.run_one_round_calls, 1)
+        self.assertIsNone(result["metrics"]["retraining_duration_seconds"])
+        self.assertIsNone(result["metrics"]["time_to_recovery_seconds"])
+        self.assertEqual(
+            result["metadata"]["end_time_seconds"],
+            result["metadata"]["production_start_time"] + 22.0,
+        )
 
     def test_fixed_production_horizon_continues_after_retraining_and_reports_distinct_recovery_metrics(self):
         config = _config(production_horizon_seconds=100.0)

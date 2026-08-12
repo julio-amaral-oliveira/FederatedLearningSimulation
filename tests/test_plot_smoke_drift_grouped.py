@@ -179,6 +179,28 @@ class PlotSmokeDriftTests(unittest.TestCase):
             self.assertIn("Clean accuracy at onset", legend_labels)
             self.assertNotIn("Clean accuracy (training)", legend_labels)
 
+    def test_plot_marks_a_pair_whose_retraining_was_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _write_pair(root, "seed_42", 42)
+            agent_path = root / "seed_42" / "agent.json"
+            payload = json.loads(agent_path.read_text(encoding="utf-8"))
+            payload["retrain_round_events"] = []
+            payload["metrics"]["retrain_skipped_budget"] = True
+            agent_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            figure = build_figure(load_scenario(root))
+            seed_legend = figure.axes[0].artists[0]
+            self.assertIn(
+                "Seed 42 (no retrain)",
+                [text.get_text() for text in seed_legend.get_texts()],
+            )
+            trajectory_legend = figure.axes[0].get_legend()
+            self.assertIn(
+                "Decision without retraining (budget)",
+                [text.get_text() for text in trajectory_legend.get_texts()],
+            )
+
     def test_zero_downtime_uses_horizon_scale_and_keeps_both_bars_visible(
         self,
     ) -> None:

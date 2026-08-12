@@ -19,7 +19,6 @@ for _path in (str(_BASE), str(_BASE / "src")):
         sys.path.insert(0, _path)
 
 from experiments.e07_drift_agent.episode import (
-    DEFAULT_PRODUCTION_HORIZON_SECONDS,
     DriftEpisodeConfig,
 )
 from experiments.e07_drift_agent.run_matrix import run_matrix
@@ -31,6 +30,10 @@ DEFAULT_SCENARIOS: tuple[tuple[str, int], ...] = (
     ("motion_blur", 1),
     ("fog", 4),
 )
+
+# The E09 grid extends the E07 horizon from 400 s to 600 s so the 200 s ramp,
+# a late detection, the retrain and the post-retrain observation all fit.
+E09_PRODUCTION_HORIZON_SECONDS = 600.0
 
 
 def build_grid(
@@ -47,7 +50,7 @@ def build_grid(
             drift_ramp_ticks=ramp,
             seed=seed,
             retrain_rounds=1,
-            production_horizon_seconds=DEFAULT_PRODUCTION_HORIZON_SECONDS,
+            production_horizon_seconds=E09_PRODUCTION_HORIZON_SECONDS,
         )
         for (corruption, severity), seed, ramp in itertools.product(
             scenarios, seeds, ramp_ticks

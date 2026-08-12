@@ -607,9 +607,10 @@ def _finish_result(result: dict, server, clean_test, config: DriftEpisodeConfig)
         result["metrics"]["detection_delay_seconds"] = (
             decision_time - float(result["metadata"]["production_start_time"])
         )
-        result["metrics"]["retraining_duration_seconds"] = (
-            float(result["retrain_round_events"][-1]["completed_time"]) - decision_time
-        )
+        if result["retrain_round_events"]:
+            result["metrics"]["retraining_duration_seconds"] = (
+                float(result["retrain_round_events"][-1]["completed_time"]) - decision_time
+            )
         recovery_time = next(
             (
                 float(entry["time"])
@@ -796,27 +797,35 @@ def run_drift_episode(
         )
         tick += 1
         if outcome.should_retrain and not config.baseline and not retrained:
+            budget_fits = True
+            required_seconds = 0.0
+            remaining_seconds = 0.0
             if config.production_horizon_seconds is not None:
                 required_seconds = config.retrain_rounds * server.timeout
                 remaining_seconds = float(target_time) - float(server.virtual_time)
-                if remaining_seconds < required_seconds:
-                    raise RuntimeError(
-                        "retraining budget cannot fit within the fixed production horizon: "
-                        f"{remaining_seconds:g}s remaining, {required_seconds:g}s required"
-                    )
-            _run_retraining(
-                result,
-                server,
-                corrupted_client_datasets,
-                config.retrain_rounds,
-                config,
-                production_start,
-                current_test_fn=lambda: _current_evaluation_test(
-                    server, config, production_start, clean_test,
-                    corrupted_test, mixture_permutation,
-                ),
-                client_permutations=client_permutations,
-            )
+                budget_fits = remaining_seconds >= required_seconds
+            if not budget_fits:
+                result["metrics"]["retrain_skipped_budget"] = True
+                print(
+                    "WARNING: retraining skipped: the retraining budget cannot "
+                    "fit within the fixed production horizon "
+                    f"({remaining_seconds:g}s remaining, {required_seconds:g}s "
+                    "required); the decision is recorded without action"
+                )
+            else:
+                _run_retraining(
+                    result,
+                    server,
+                    corrupted_client_datasets,
+                    config.retrain_rounds,
+                    config,
+                    production_start,
+                    current_test_fn=lambda: _current_evaluation_test(
+                        server, config, production_start, clean_test,
+                        corrupted_test, mixture_permutation,
+                    ),
+                    client_permutations=client_permutations,
+                )
             retrained = True
             if target_time is None:
                 break

@@ -402,9 +402,19 @@ def _validate_v3_actions(
     if len(decisions) > 1:
         raise ValueError("schema v3 agent must have at most one retrain decision")
 
+    skipped = payload.get("metrics", {}).get("retrain_skipped_budget")
+    if skipped is not None and not isinstance(skipped, bool):
+        raise ValueError("schema v3 retrain_skipped_budget must be a bool")
+    if skipped is True and not decisions:
+        raise ValueError(
+            "schema v3 retrain_skipped_budget requires a retrain decision"
+        )
+
     expected_rounds = (
         payload["experiment_config"]["retrain_rounds"] if decisions else 0
     )
+    if skipped is True:
+        expected_rounds = 0
     if len(rounds) != expected_rounds:
         raise ValueError(
             "schema v3 retrain_round_events count mismatch: "
@@ -593,6 +603,8 @@ def _validate_v3_pair(agent: DriftResult, baseline: DriftResult) -> None:
 
     configured_rounds = int(agent.experiment_config["retrain_rounds"])
     expected_rounds = configured_rounds if agent_decision is not None else 0
+    if agent.get("metrics", {}).get("retrain_skipped_budget") is True:
+        expected_rounds = 0
     actual_rounds = len(agent.get("retrain_round_events", []))
     if actual_rounds != expected_rounds:
         raise ValueError(
