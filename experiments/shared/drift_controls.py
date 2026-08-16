@@ -81,3 +81,81 @@ class OracleMonitor:
             else:
                 self.counterfactual_triggers.append(decision)
         return TickOutcome(should_retrain, flagged_fraction, virtual_time)
+
+
+class ScheduledMonitor:
+    """Scheduled retraining monitor: a fixed timer over production ticks.
+
+    It implements the same narrow monitor protocol consumed by
+    :func:`experiments.e07_drift_agent.episode.run_drift_episode` as the
+    deterministic policy-sensitivity baseline arm: retraining happens exactly
+    once, on the first production tick whose virtual time is at least
+    ``trigger_after_seconds`` past the first production tick.  Set
+    ``trigger_after_seconds = k * monitor_tick_seconds`` to retrain on
+    production tick ``k``; with 0 the first production tick triggers, which
+    reproduces :class:`OracleMonitor`.  Warm-up ticks are recorded but never
+    trigger.
+    """
+
+    def __init__(self, trigger_after_seconds: float = 0.0) -> None:
+        if trigger_after_seconds < 0:
+            raise ValueError("trigger_after_seconds must be non-negative")
+        self.trigger_after_seconds = trigger_after_seconds
+        self._triggered = False
+        self._t0: float | None = None
+        self.drift_events: list[dict[str, float | str]] = []
+        self.retrain_decisions: list[dict[str, float]] = []
+        self.counterfactual_triggers: list[dict[str, float]] = []
+        self.tick_history: list[dict] = []
+
+    def observe_tick(
+        self,
+        batches_by_client: dict[str, torch.Tensor],
+        *,
+        virtual_time: float,
+        record_action: bool = True,
+        warmup: bool = False,
+    ) -> TickOutcome:
+        """Trigger exactly once when the production timer reaches the target."""
+        for batch in batches_by_client.values():
+            if not isinstance(batch, torch.Tensor):
+                raise TypeError("batches_by_client values must be torch.Tensor")
+
+        if warmup:
+            self.tick_history.append(
+                {
+                    "time": virtual_time,
+                    "warmup": True,
+                    "clients": {},
+                    "flagged_fraction": 0.0,
+                }
+            )
+            return TickOutcome(False, 0.0, virtual_time)
+
+        if self._t0 is None:
+            self._t0 = virtual_time
+
+        should_retrain = (
+            not self._triggered
+            and virtual_time - self._t0 >= self.trigger_after_seconds
+        )
+        flagged_fraction = 1.0 if should_retrain else 0.0
+        self.tick_history.append(
+            {
+                "time": virtual_time,
+                "warmup": False,
+                "clients": {},
+                "flagged_fraction": flagged_fraction,
+            }
+        )
+        if should_retrain:
+            self._triggered = True
+            self.drift_events.append(
+                {"time": virtual_time, "client_id": "scheduled", "score": 1.0}
+            )
+            decision = {"time": virtual_time, "flagged_fraction": 1.0}
+            if record_action:
+                self.retrain_decisions.append(decision)
+            else:
+                self.counterfactual_triggers.append(decision)
+        return TickOutcome(should_retrain, flagged_fraction, virtual_time)

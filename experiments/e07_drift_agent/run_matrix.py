@@ -37,6 +37,7 @@ def build_run_matrix(
     scenarios: Iterable[tuple[str, int]],
     quorums: Iterable[float] | None = None,
     retrain_rounds: Iterable[int] | None = None,
+    window_ticks: Iterable[int] | None = None,
     base_config: DriftEpisodeConfig | None = None,
 ) -> list[DriftEpisodeConfig]:
     """Materialize the requested Cartesian experiment product.
@@ -50,6 +51,9 @@ def build_run_matrix(
     requested_scenarios = tuple(scenarios)
     requested_quorums = tuple(quorums) if quorums is not None else (base.trigger_threshold,)
     requested_rounds = tuple(retrain_rounds) if retrain_rounds is not None else (base.retrain_rounds,)
+    requested_windows = (
+        tuple(window_ticks) if window_ticks is not None else (base.trigger_window_ticks,)
+    )
 
     return [
         replace(
@@ -59,11 +63,13 @@ def build_run_matrix(
             severity=severity,
             trigger_threshold=quorum,
             retrain_rounds=rounds,
+            trigger_window_ticks=window,
         )
         for corruption, severity in requested_scenarios
         for seed in requested_seeds
         for quorum in requested_quorums
         for rounds in requested_rounds
+        for window in requested_windows
     ]
 
 
@@ -309,6 +315,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--quorums", nargs="+", type=float)
     parser.add_argument("--retrain-rounds", nargs="+", type=int)
+    parser.add_argument("--window-ticks", nargs="+", type=int)
     parser.add_argument(
         "--client-speed-profile",
         "--speed-profile",
@@ -331,6 +338,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         scenarios=[_parse_scenario(value) for value in args.scenario],
         quorums=args.quorums,
         retrain_rounds=args.retrain_rounds,
+        window_ticks=args.window_ticks,
         base_config=DriftEpisodeConfig(
             dataset=args.dataset,
             output_dir=args.output_dir,
