@@ -39,7 +39,7 @@ transição do drift se alonga do regime abrupto ao gradual. Cada cliente monito
 fluxo de entrada não rotulado com um detector local
 baseado em incerteza (dropout de Monte Carlo, entropia de Shannon e um
 teste de janela adaptativa ADWIN); o servidor agrega os alarmes locais ao longo de uma
-curta janela de ticks e dispara no máximo uma única vez uma rodada de retreinamento sobre
+curta janela de passos de monitoramento e dispara no máximo uma única vez uma rodada de retreinamento sobre
 a mistura corrente de cada cliente. A métrica primária é a
 indisponibilidade (downtime) de serviço, o tempo virtual acumulado em que a
 acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
@@ -84,7 +84,7 @@ cresce lentamente ao longo de um intervalo de transição cuja duração é a la
 usada na literatura de detecção de drift
 \cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo como uma rampa linear
 da fração de dados corrompidos de zero a um ao longo de um número configurável
-de ticks de monitoramento \cite{cerqueira2026}. Nossa grade abrange rampas curtas
+de passos de monitoramento \cite{cerqueira2026}. Nossa grade abrange rampas curtas
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
 
@@ -96,7 +96,7 @@ incerteza (UDD) \cite{baier2023}: dropout de Monte Carlo (MC) \cite{gal2016}
 ao longo de $T$ passagens estocásticas, entropia média de Shannon e um teste de janela
 adaptativa ADWIN \cite{bifet2007} por cliente.
 O servidor coleta os alarmes por cliente ao longo de uma janela deslizante de dois
-ticks de monitoramento e dispara quando a fração de clientes distintos sinalizados
+passos de monitoramento e dispara quando a fração de clientes distintos sinalizados
 atinge um quórum. A ação disparada é uma única rodada global de retreinamento
 sobre a mistura que cada cliente serve no momento, em consonância com os orçamentos
 explícitos de retreinamento do DriftGuard \cite{han2026} e do ShiftEx
@@ -113,7 +113,7 @@ lacuna na Seção II-E.
 Nossas contribuições são: (i) uma \textbf{métrica de indisponibilidade de serviço} para FL sob
 drift, calculada como integral em escada sobre um horizonte fixo; (ii) uma
 \textbf{política coletiva por quórum} que agrega alarmes sem rótulos por cliente
-ao longo de uma curta janela de ticks, ausente na literatura revisada e
+ao longo de uma curta janela de passos, ausente na literatura revisada e
 mais próxima da barreira de participação do FL-MalDrift \cite{patel2026}, cuja
 relação entre latência e proteção contra alarmes falsos caracterizamos por meio de
 ablações de quórum e janela e sob drift dessincronizado;
@@ -211,18 +211,18 @@ distinta do nosso tempo de operação abaixo do limiar de qualidade.
 Consideramos FL síncrono com $C$ clientes e tempo virtual $v$, o
 relógio abstrato do nosso simulador. Um modelo é treinado em dados limpos durante $R$
 rodadas e entra em produção no instante $v_0$. Os dados de produção chegam em
-ticks de monitoramento de $\Delta t$ segundos: um lote sem rótulos por cliente, a cada
-tick.
+passos de monitoramento de $\Delta t$ segundos: um lote sem rótulos por cliente, a cada
+passo.
 
 \textbf{Modelo de drift gradual.} Uma corrupção aplicada às entradas $X$ (rótulos
 preservados) é injetada com uma fração de mistura $f(v)$ que cresce linearmente
-de zero a um ao longo de $N$ ticks:
+de zero a um ao longo de $N$ passos:
 \begin{equation}
 f(v) = \min\!\left(1,\ \frac{v-v_0}{N\,\Delta t}\right),
 \quad v\ge v_0 .
 \label{eq:ramp}
 \end{equation}
-A duração da rampa $N\Delta t$ é a largura do drift; sua inclinação $1/N$ por tick
+A duração da rampa $N\Delta t$ é a largura do drift; sua inclinação $1/N$ por passo
 é a variável independente. Aqui $N\in\{5,10,20\}$ ($50$,
 $100$, $200$\,s com $\Delta t=10$\,s).
 
@@ -238,7 +238,7 @@ D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$: a
 integral em escada usa a última qualidade conhecida, sem interpolação, e
 inclui o intervalo final até o horizonte. Os instantes de avaliação
-compreendem fronteiras de tick, o instante de conclusão do retreinamento e o
+compreendem fronteiras dos passos, o instante de conclusão do retreinamento e o
 horizonte.
 
 \textbf{Avaliação pareada.} A política reativa é comparada com uma linha de base
@@ -257,12 +257,12 @@ Cada cliente $c$ executa um detector local sobre o modelo global compartilhado:
 \cite{bifet2007,baier2023}.
 Nossa implementação do ADWIN testa janelas de ao menos 20 observações,
 porque alimentamos o ADWIN com a entropia média de cada lote, uma vez
-por tick em cada cliente, e não com um fluxo de instâncias. Cada detector recebe
-20 ticks de aquecimento (warm-up) em dados limpos antes do início da produção, calibrando-o sem alimentar a política coletiva.
+por passo em cada cliente, e não com um fluxo de instâncias. Cada detector recebe
+20 passos de aquecimento (warm-up) em dados limpos antes do início da produção, calibrando-o sem alimentar a política coletiva.
 
 \subsection{Política coletiva por quórum}
-A cada tick de produção, o servidor recebe as flags de alarme por cliente e
-mantém uma janela deslizante dos últimos dois ticks. A fração sinalizada é
+A cada passo de produção, o servidor recebe as flags de alarme por cliente e
+mantém uma janela deslizante dos últimos dois passos. A fração sinalizada é
 o número de clientes \emph{distintos} sinalizados na janela dividido pelo
 número total de clientes. Quando a fração atinge o quórum $\theta=0{,}30$
 (3 de 10 clientes), o servidor dispara. Dessa forma, um possível falso positivo local sob monitoramento contínuo
@@ -328,7 +328,7 @@ Névoa & 4 & 0,4875\\
 
 \subsection{Grade}
 A grade do estudo é o produto cartesiano das quatro corrupções calibradas,
-cinco sementes ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ ticks),
+cinco sementes ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
 totalizando 60 episódios pareados com horizonte de produção fixo de $H=600$\,s.
 A Tabela~\ref{tab:setup} lista a configuração fixa.
 
@@ -343,14 +343,14 @@ Parâmetro & Valor\\
 \midrule
 Conjunto de dados & CIFAR-10, IID, 10 clientes\\
 Rodadas iniciais (limpas) & 20\\
-Ticks de aquecimento (limpos) & 20\\
-Duração do tick & 10\,s\\
+Passos de aquecimento (limpos) & 20\\
+Duração do passo & 10\,s\\
 Tamanho de lote / épocas & 32 / 1\\
 Modelo & CNN 2,2M (4 conv, 2 fc)\\
 Otimizador & Adam, lr $10^{-3}$\\
 Velocidade / timeout & uniforme (p75; rodada $\approx$ 8\,s)\\
 Detector & ADWIN $\delta=0{,}002$; dropout MC $T=5$\\
-Quórum / janela & 0,30 / 2 ticks\\
+Quórum / janela & 0,30 / 2 passos\\
 Orçamento de retreinamento & 1 rodada\\
 Limiar de qualidade $\tau$ & 0,50\\
 Horizonte de produção & 600\,s\\
@@ -449,7 +449,7 @@ acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurác
 acima de $\tau$ (acurácia final sob corrupção de 0,71).
 
 \textbf{Comparação com gatilho de primeiro alarme.} Também executamos uma política
-de primeiro alarme (quórum 0,10, janela de um tick). Qualquer política de
+de primeiro alarme (quórum 0,10, janela de um passo). Qualquer política de
 retreinamento reduz a indisponibilidade média de 507,5\,s (linha de base) para no máximo
 62,2\,s (87,7--91,7\%), sem que nenhum grupo fique pior que a linha de base; o
 braço de quórum 0,30, porém, não domina o gatilho de primeiro alarme: o
@@ -479,14 +479,14 @@ nunca cai abaixo de $\tau$ (indisponibilidade zero).}
 \emph{Todos} os 10 clientes emitem alarme em cada episódio detectado (59 de 59):
 os detectores locais são individualmente sensíveis. O disparo
 ocorre no mínimo do quórum (0,30, três clientes distintos na
-janela de dois ticks) em 21 de 59 episódios; o ruído Gaussiano dispara no
+janela de dois passos) em 21 de 59 episódios; o ruído Gaussiano dispara no
 mínimo em todos os episódios detectados da rampa de 100\,s. A
 rampa longa espalha os alarmes: a fração sinalizada na decisão cai
 com a duração da rampa (névoa $0{,}88\rightarrow0{,}42$, vidro fosco
 $0{,}90\rightarrow0{,}56$, movimento $0{,}66\rightarrow0{,}54$).
 
 \textbf{Sensibilidade a quórum e janela.} O gatilho de primeiro alarme da
-Seção VI-B (quórum 0,10, janela de um tick) é o extremo sem quórum:
+Seção VI-B (quórum 0,10, janela de um passo) é o extremo sem quórum:
 dispara em 60 de 60 episódios e detecta 2--50\,s mais cedo que o padrão
 (121,3\,s vs.\ 135,1\,s de atraso médio), mas ao preço da proteção do quórum
 contra falsos positivos isolados (Seção IV-B), que não medimos
@@ -498,15 +498,15 @@ ruído Gaussiano (até +96\,s na rampa de 100\,s) e é de no máximo 10\,s
 nos demais casos. Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
 detectar a mesma semente de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
 diferente): nenhum nível de quórum
-introduz um novo modo de falha. No quórum padrão, uma janela de um tick dá
+introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
 resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de indisponibilidade),
-com o sinal da diferença variando por grupo; a união de dois ticks não mostra benefício
+com o sinal da diferença variando por grupo; a união de dois passos não mostra benefício
 sistemático aqui.
 
-\textbf{Drift dessincronizado.} Quando os clientes sofrem drift em ticks diferentes (cliente
-$i$ sofre drift no tick de produção $i$, sem rampa; 20 episódios), o gatilho
+\textbf{Drift dessincronizado.} Quando os clientes sofrem drift em passos diferentes (cliente
+$i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
-sinalizada 0,30--0,40), corroborando alarmes que uma janela de um tick
+sinalizada 0,30--0,40), corroborando alarmes que uma janela de um passo
 perderia. A política evita cerca de 81\% da indisponibilidade da linha de base (600\,s,
 drift permanente) em três das quatro corrupções e 70\% no ruído
 Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
@@ -520,7 +520,7 @@ Executamos 15 episódios de controle (cinco sementes vezes três cronogramas de 
 corrupção: cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
 O gatilho coletivo nunca dispara---nenhum dos 15 episódios registra uma
 decisão de retreinamento---e os detectores locais emitem zero alarmes nas
-9\,000 avaliações cliente-tick.
+9\,000 avaliações cliente-passo.
 Ocorrem oito picos isolados de entropia (valores acima de 1,0), mas o ADWIN não sinaliza
 nenhum, pois o teste é de mudança na distribuição, não de picos. O
 gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
@@ -572,13 +572,13 @@ horizonte; a linha de base segue degradando até cerca de 0,35.}
 \end{figure}
 
 \section{Discussão}
-O monitoramento não é gratuito: ao longo do episódio virtual de 80 ticks, o detector com $T=5$ custa cerca de 6,8\,TFLOPs
-(4\,000 passagens em lote de 32, 50 por tick nos dez clientes) contra
+O monitoramento não é gratuito: ao longo do episódio virtual de 80 passos, o detector com $T=5$ custa cerca de 6,8\,TFLOPs
+(4\,000 passagens em lote de 32, 50 por passo nos dez clientes) contra
 cerca de 8,0\,TFLOPs da rodada única de retreinamento. A razão é de
 0,85--0,96 conforme a contabilização, ou seja, o monitoramento responde por cerca de
 47\% da computação reativa.
-Nos dez clientes, o monitor por tick
-ocupa cerca de 0,13\,s, 1,3\% de cada tick de 10\,s; no dispositivo medido
+Nos dez clientes, o monitor por passo
+ocupa cerca de 0,13\,s, 1,3\% de cada passo de 10\,s; no dispositivo medido
 (Apple M5, PyTorch 2.12.1) uma atualização do detector leva cerca de 12,7\,ms por
 cliente. Se tivéssemos mantido a configuração publicada do UDD com
 $T=50$, o monitoramento excederia a rodada de retreinamento em cerca de $9\times$,
@@ -604,8 +604,8 @@ folga entre disparo e horizonte, cerca de 140\,s nesta grade.
 O ruído Gaussiano é o único cenário com detecção incompleta.
 Com rampa de 100\,s e semente 42,
 a política nunca dispara: só quatro dos dez clientes emitem alarme em
-todo o episódio, nunca três dentro da mesma janela de dois ticks (fração
-máxima sinalizada de 0,20 em ticks esparsos); as outras quatro sementes detectam em
+todo o episódio, nunca três dentro da mesma janela de dois passos (fração
+máxima sinalizada de 0,20 em passos esparsos); as outras quatro sementes detectam em
 120--210\,s. Como a janela e o
 quórum são idênticos entre sementes, a falha é mais bem explicada como perda
 (miss) do detector por cliente (uma interação que não conseguimos isolar). Sem decisão, o braço reativo equivale exatamente à
@@ -650,9 +650,9 @@ fixo. (iv) A fração no disparo só é informativa no
 regime de rampa longa. (v) O UDD publicado usa $T=50$ passagens; nosso $T=5$ é uma decisão de custo
 sem equivalência publicada, e $\delta=0{,}002$ é o valor padrão
 da implementação de referência, e não um valor calibrado
-\cite{baier2023,poenaru2022}. (vi) A indisponibilidade é amostrada na granularidade do tick
+\cite{baier2023,poenaru2022}. (vi) A indisponibilidade é amostrada na granularidade do passo
 mais o instante de conclusão da rodada; o cruzamento real de
-$\tau$ pode cair entre ticks. (vii) Os episódios rodaram em GPU CUDA
+$\tau$ pode cair entre passos. (vii) Os episódios rodaram em GPU CUDA
 (PyTorch 2.5.1, CUDA 12.1) com algoritmos não determinísticos; a reprodução bit a bit
 não foi confirmada, embora se verifique que cada par compartilha
 checkpoint, fluxo e horizonte idênticos. (viii) As
@@ -662,7 +662,7 @@ episódios, e as severidades não são revalidadas por semente. (ix) Os contrast
 calibradas; relatamos médias descritivas por grupo sobre 12 grupos sem
 correção para comparações múltiplas, e a robustez ordinal a
 $\tau \in \{0{,}40;\,0{,}55\}$ (Seção VI-B) não se estende à sua
-magnitude. (x) Comparado a um gatilho de primeiro alarme (quórum 0,10, janela de um tick),
+magnitude. (x) Comparado a um gatilho de primeiro alarme (quórum 0,10, janela de um passo),
 o braço de quórum 0,30 é mais lento e incorre em maior indisponibilidade, com o custo
 concentrado no ruído Gaussiano; a proteção contra falsos positivos que o
 quórum oferece não pôde
