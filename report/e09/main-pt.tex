@@ -264,23 +264,15 @@ por tick em cada cliente, e não com um fluxo de instâncias. Cada detector rece
 A cada tick de produção, o servidor recebe as flags de alarme por cliente e
 mantém uma janela deslizante dos últimos dois ticks. A fração sinalizada é
 o número de clientes \emph{distintos} sinalizados na janela dividido pelo
-número de clientes. Quando a fração atinge o quórum $\theta=0{,}30$
-(3 de 10 clientes), o servidor dispara, e uma trava impede qualquer decisão
-posterior no episódio. Um alarme isolado
-(um possível falso positivo local sob monitoramento contínuo
-\cite{poenaru2022}) não basta para disparar.
+número total de clientes. Quando a fração atinge o quórum $\theta=0{,}30$
+(3 de 10 clientes), o servidor dispara. Dessa forma, um possível falso positivo local sob monitoramento contínuo
+\cite{poenaru2022} não basta para iniciar o retreinamento.
 
 \subsection{Retreinamento reativo sobre a mistura corrente}
 Quando a política dispara no instante $t_d$, o conjunto de treinamento de cada cliente é
-substituído por uma mistura com fração corrompida $f(t_d)$, construída com uma
-permutação determinística por cliente, e uma única rodada síncrona de FL é
+substituído por uma mistura com fração corrompida $f(t_d)$ e uma única rodada síncrona de FL é
 executada com todos os clientes. Cada cliente detém 5\,000 imagens de treinamento (uma
-divisão IID do conjunto de treinamento de 50\,000 imagens) misturadas em $f(t_d)$. O retreinamento aprende a
-distribuição corrente, não o futuro da rampa. O
-orçamento é explícito (uma rodada); se o tempo
-virtual necessário exceder o horizonte restante, a decisão é registrada
-e a ação é omitida. Uma rodada de retreinamento
-consome cerca de 8\,s de tempo virtual (um timeout do servidor); em todo episódio
+divisão IID do conjunto de treinamento de 50\,000 imagens) misturadas em $f(t_d)$. Em todo episódio
 detectado a acurácia na conclusão da rodada já atinge $\tau$, de modo que o
 tempo até a recuperação equivale à duração do retreinamento.
 
