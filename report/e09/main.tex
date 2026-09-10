@@ -16,9 +16,9 @@
 \title{From Abrupt to Gradual Drift in Federated Learning: Label-Free Reactive Retraining and a Service-Downtime Metric}
 
 \author{
-\IEEEauthorblockN{Author Names}% TODO: fill authors
-\IEEEauthorblockA{Institute of Computing, University of Campinas (UNICAMP), Brazil\\
-TODO: emails}
+\IEEEauthorblockN{Julio Amaral, Hugo César, Miguel Elias M. Campista, Luiz Fernando Bittencourt}
+\IEEEauthorblockA{Institute of Computing, University of Campinas (UNICAMP), Brazil\\ j230537@dac.unicamp.br, hugocesar@gta.ufrj.br, miguel@gta.ufrj.br, bit@unicamp.br
+}
 }
 
 \maketitle
@@ -26,21 +26,21 @@ TODO: emails}
 \begin{abstract}
 Federated learning (FL) models deployed in production face concept drift:
 the data distribution shifts after deployment, and model quality degrades
-until a retraining action is taken. In real deployments the shift is often
-gradual: the fraction of corrupted inputs rises slowly over a transition
-interval whose duration is the drift width used in the drift-detection
-literature. We study reactive retraining in synchronous FL as the drift
+until a retraining action is taken; in real deployments the shift is often
+gradual, the fraction of corrupted inputs rising slowly over a transition
+interval whose duration is the drift width.
+We study reactive retraining in synchronous FL as the drift
 transition lengthens from abrupt to gradual. Each client monitors its
 unlabeled input stream with a local
 uncertainty-based detector (Monte Carlo dropout, Shannon entropy, and an
 ADWIN adaptive-window test); the server aggregates the local alarms over a
-short tick window and, at most once, triggers a single global retraining
-round executed on each client's current mixture. The primary metric is the
+short tick window and triggers at most once a single retraining round on
+each client's current mixture. The primary metric is the
 service downtime, the cumulative virtual time in which the served-model
 accuracy stays below a quality threshold. In 60 paired episodes (four
 calibrated corruptions, five seeds, three ramp durations of 50--200\,s)
-over a fixed 600\,s horizon, compared with a paired baseline that never
-retrains, detection succeeds in 59 of 60 episodes (14 of 15 in the
+over a fixed 600\,s horizon, against a paired never-retraining
+baseline, detection succeeds in 59 of 60 episodes (14 of 15 in the
 Gaussian-noise scenario); the detection delay grows with the ramp duration
 for the three visual corruptions (98--140\,s) and reaches 256\,s for
 Gaussian noise; the reactive policy reduces the mean downtime from
@@ -50,7 +50,12 @@ clean-set accuracy for the visual corruptions (1--2 points loss instead of
 9--21). Within the
 exercised regime (CIFAR-10, IID partition, ten clients, a single drift and
 at most one retraining round), a reactive label-free policy is effective
-and less destructive to previously learned knowledge.
+against a never-retraining baseline; detection latency is
+scenario-dependent, Gaussian noise being the hardest case; a no-quorum
+variant detects about 14\,s earlier with lower downtime, the measured
+price of the quorum's unquantified false-alarm protection; the collective
+trigger detects all staggered drift episodes with zero false alarms on
+drift-free streams.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -63,8 +68,8 @@ unsupervised detection, service downtime.
 remains distributed across clients \cite{mcmahan2017}. Once deployed, the
 model is served in an environment whose data distribution can change; such
 concept drift degrades the served model's quality until a retraining action
-is taken, and detecting it---usually without access to labels at inference
-time---is a prerequisite for triggering that action. A common simplification
+is taken, and detecting it---usually without labels at inference
+time---is a prerequisite for triggering it. A common simplification
 in the literature is to inject drift abruptly: the distribution switches at
 a single instant. In practice, however, the shift is often gradual: new
 data appears mixed with old data, and the proportion of shifted inputs
@@ -72,11 +77,9 @@ grows slowly over a transition interval whose duration is the drift width
 used in the drift-detection literature
 \cite{poenaru2022,cerqueira2026}. We model this continuum as a linear ramp
 of the corrupted-data fraction from zero to one over a configurable number
-of monitoring ticks \cite{cerqueira2026}; Casado et
-al.~\cite{casado2022} define gradual drift as the case in which the new
-concept appears mixed with the old one. Our grid spans short ramps
-(equivalent to the abrupt regime) and a long ramp in which the detector
-operates mid-transition, covering the boundary between the two regimes.
+of monitoring ticks \cite{cerqueira2026}. Our grid spans short ramps
+(the abrupt regime) and a long ramp in which the detector
+operates mid-transition.
 
 Our reactive policy follows the architecture that the FL drift literature
 converged to: \emph{local detection, central decision}
@@ -94,38 +97,28 @@ retraining budgets of DriftGuard \cite{han2026} and ShiftEx
 \cite{bhope2025} and Modyn's trigger/data-selection separation
 \cite{bother2025}.
 
-We evaluate the policy under an operational lens. The primary metric is the
-service \emph{downtime}: the cumulative virtual time in which the corrupted
-accuracy of the served model stays below a quality threshold $\tau$,
-computed as a stepwise integral without interpolation over a fixed horizon.
+The primary metric is the service \emph{downtime}: the cumulative virtual
+time in which the corrupted accuracy of the served model stays below a
+quality threshold $\tau$.
 To our knowledge, no work in the reviewed FL drift literature quantifies
 the time a served model stays below a quality threshold; we detail this
 gap in Section II-E.
 
 Our contributions are: (i) a \textbf{service-downtime metric} for FL under
 drift, computed as a stepwise integral over a fixed horizon; (ii) a
-\textbf{collective quorum policy} aggregating per-client label-free alarms
-over a short tick window, a mechanism absent from the reviewed literature,
-closest to the participation gate of FL-MalDrift \cite{patel2026}, assessed
-descriptively (ablations against alternative triggers are future work);
+\textbf{collective quorum policy} aggregating per-client label-free
+alarms over a short tick window, absent from the reviewed literature and
+closest to FL-MalDrift's participation gate \cite{patel2026}, whose
+latency versus false-alarm-protection trade-off we characterize over
+quorum and window ablations and under staggered drift;
 (iii) a \textbf{federated installation of UDD}, with one
 detector per client sharing the global model, extending the centralized
 detector of Baier et al.~\cite{baier2023}; (iv) an \textbf{auditable
-experimental infrastructure} that pairs the reactive arm with a
+experimental infrastructure} pairing the reactive arm with a
 no-retraining baseline from the same checkpoint, random state, stream, and
-horizon, and validates the pair before publication; and (v) an
+horizon, validated before publication; and (v) an
 \textbf{empirical characterization of gradual drift} over 60 paired
 episodes.
-
-Our main findings are: (i) detection succeeds in 59 of 60 episodes (14 of
-15 in the Gaussian-noise scenario); (ii)
-the detection delay grows with the ramp duration for the three visual
-corruptions, while Gaussian noise exhibits larger
-delays and dispersion; (iii) the reactive policy reduces the mean downtime
-from 408--562\,s in the baseline to 0--178\,s, reaching zero downtime in
-the longest-ramp fog scenario; and (iv) long ramps preserve clean-set
-accuracy for the visual corruptions, because the retraining set retains a
-substantial share of clean data.
 
 \section{Background and Related Work}
 \subsection{Concept drift in federated learning}
@@ -137,10 +130,10 @@ in which different clients drift at different times, are studied by
 Jothimurugesan et al.~\cite{jothimurugesan2023}. Gradual drift, the regime
 studied here, mixes the new concept with the old one with a growing
 proportion over time \cite{casado2022}; the transition duration is the
-drift width, the standard parameter controlling the speed of the change
+drift width
 \cite{poenaru2022,cerqueira2026}.
 
-Our scope is deliberately delimited to drifts accompanied by a change in
+Our scope is delimited to drifts accompanied by a change in
 $P(X)$ (covariate shift with preserved labels), the assumption under which
 label-free detection is structurally possible: label-free methods are
 deterministic functions of the inputs, so a change confined to $P(Y\mid X)$
@@ -148,44 +141,38 @@ produces no observable signal, a blind spot measured by Solozobov
 \cite{solozobov2026} and declared by Baier et al.~\cite{baier2023}.
 
 \subsection{Local detection, central decision}
-A recurring finding in FL drift research is that drift detection must be
+A recurring finding is that drift detection must be
 local. Jothimurugesan et al.~\cite{jothimurugesan2023} show that testing the
 aggregated error at the server fails during staggered transitions, because
-the errors of drifted clients and of clients that have not yet drifted
-cancel each other out. FLARE \cite{chow2023}, FLAME \cite{mavromatis2024},
+the errors of drifted and not-yet-drifted clients
+cancel out. FLARE \cite{chow2023}, FLAME \cite{mavromatis2024},
 FL-MalDrift \cite{patel2026}, DriftGuard \cite{han2026}, FedDAA
-\cite{fu2025}, FedPLC \cite{zhou2026}, the
-label-free virtual-drift detection of FELK/FL-HVD \cite{chen2026}, and
+\cite{fu2025}, FedPLC \cite{zhou2026},
+FELK/FL-HVD \cite{chen2026}, and
 Casado et al.~\cite{casado2022} follow local detection with central
 decision: nine of the twelve concept-drift FL works we reviewed do so.
-The three exceptions are informative: FLASH detects drift server-side
+The three exceptions: FLASH detects drift server-side
 from the magnitude of aggregated parameter updates \cite{panchal2023},
 Stallmann et al. use a global fuzzy-clustering detector
 \cite{stallmann2024}, and Adaptive-FedAVG forgoes detection altogether,
 adapting the server-side learning rate to raise the plasticity of the
-learning phase, a passive alternative to local detection
+learning phase
 \cite{canonaco2021}. Our design follows the consensus; the specific
 signal, however, is label-free uncertainty (Section IV-A).
 
 \subsection{Label-free drift detection}
 The uncertainty drift detector (UDD) of Baier et al.~\cite{baier2023} is the
-reference label-free method: for each input, the model performs $T$
-stochastic forwards with dropout enabled (MC dropout, \cite{gal2016}); the
-mean Shannon entropy feeds an ADWIN adaptive window test \cite{bifet2007}.
+reference label-free method; Section IV-A describes our installation.
 ADWIN is chosen over DDM/EDDM because these require binomial inputs,
-whereas the entropy signal is not restricted to a binomial distribution
+whereas the entropy signal is not restricted to one
 \cite{baier2023}. Lobo et al.~\cite{lobo2023} connect concept drift and
-model uncertainty, and uncertainty estimators are known to degrade under
-dataset shift---exactly the signal the detector exploits
-\cite{ovadia2019}. The published UDD uses
-$T=50$ forwards; our $T=5$ is a cost decision whose sensitivity is left as
-future work.
-D3M \cite{nguyen2025} is a complementary label-free method based on model
-disagreement, with false-positive guarantees under the covariate-shift
-assumption. PUDD \cite{lu2025} is complementary too: it tests the full
-distribution of a prediction-uncertainty index with a Pearson chi-square
-test whose significance level directly controls the false-positive rate,
-unlike UDD's mean-tracking ADWIN stage.
+model uncertainty, and uncertainty estimators are known to degrade under dataset shift
+\cite{ovadia2019}. D3M \cite{nguyen2025} is a complementary label-free
+method based on model disagreement, with false-positive guarantees under
+the covariate-shift assumption; so is PUDD \cite{lu2025}, a Pearson
+chi-square test on a prediction-uncertainty index whose significance
+level controls the false-positive rate, unlike UDD's mean-tracking ADWIN
+stage.
 
 \subsection{Retraining orchestration and budgets}
 DriftGuard \cite{han2026} formalizes the retraining decision as a tuple
@@ -196,10 +183,9 @@ reductions of 80--83\%. Modyn \cite{bother2025} separates trigger policies
 trigger uses MMD (with KS among candidate statistics) and an adaptive
 percentile threshold. In the reviewed
 FL works, only DriftGuard \cite{han2026} and ShiftEx \cite{bhope2025} make
-the retraining budget an explicit parameter (a named quantity controlling
-the number of post-trigger training rounds). We adopt an explicit budget of
-a single global round and retrain on the distribution each client currently
-serves.
+the retraining budget explicit (a named quantity controlling
+the number of post-trigger rounds); we adopt a budget of one round on the
+distribution each client currently serves.
 
 \subsection{Metrics gap}
 The drift-detection benchmark of Cerqueira et al.~\cite{cerqueira2026}
@@ -208,15 +194,13 @@ delay, alarm rate, acceptance windows), as do FL drift surveys
 \cite{mahdi2025}. Detection latency \cite{baier2023,chow2023},
 retraining duration, and cost per retraining \cite{han2026} are reported
 separately; none of the works we reviewed quantifies the time the served
-model stays below a quality threshold, the downtime metric we adopt, which
-mirrors the SLO practice of MLOps. Downtime language exists in adjacent
+model stays below a quality threshold, the downtime metric we adopt,
+mirroring the SLO practice of MLOps. Downtime language exists in adjacent
 ML-systems work---federated unlearning measures service downtime as the
 unavailability incurred while retraining to erase data
-\cite{zhang2025}---but that is an availability notion (the service is
-offline), whereas we measure time served online yet below a quality
-threshold. We report the detection delay in raw
-virtual seconds; the normalized delay (NDT) defined by the benchmark
-\cite{cerqueira2026} is left as future work.
+\cite{zhang2025}---an availability notion (the service is
+offline), unlike time served online yet below a quality
+threshold.
 
 \section{Problem Statement}
 We consider synchronous FL with $C$ clients and virtual time $v$, the
@@ -234,7 +218,7 @@ f(v) = \min\!\left(1,\ \frac{v-v_0}{N\,\Delta t}\right),
 \label{eq:ramp}
 \end{equation}
 The ramp duration $N\Delta t$ is the drift width; its slope $1/N$ per tick
-is the independent variable of our study. Here $N\in\{5,10,20\}$ ($50$,
+is the independent variable. Here $N\in\{5,10,20\}$ ($50$,
 $100$, $200$\,s at $\Delta t=10$\,s).
 
 \textbf{Quality threshold and downtime.} Let $a(v)$ be the accuracy of the
@@ -248,17 +232,15 @@ D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 \end{equation}
 where $v_1,\dots,v_m$ are the evaluation instants and $v_{m+1}=v_0+H$: the
 stepwise integral uses the last known quality, without interpolation, and
-includes the final interval up to the horizon (always an evaluation
-instant). The evaluation instants
+includes the final interval up to the horizon. The evaluation instants
 comprise tick boundaries, the retraining completion instant, and the
-horizon; the post-retraining grid is phase-shifted by the round duration.
+horizon.
 
 \textbf{Paired evaluation.} The reactive policy is compared with a baseline
 that observes the same stream from the same checkpoint and never retrains.
 Both arms share the same random state, production start, and horizon $H$;
 the baseline records the moment the policy \emph{would} have triggered as a
-counterfactual. The comparison attributes the downtime difference to the
-retraining action within this paired design.
+counterfactual.
 
 \section{Proposed Method}
 \subsection{Local uncertainty detection (UDD per client)}
@@ -269,12 +251,11 @@ Each client $c$ runs a local detector over the shared global model:
 computed;
 (4) the scalar feeds a per-client ADWIN with $\delta=0.002$
 \cite{bifet2007,baier2023}.
-Our ADWIN implementation only tests windows of at least 20 observations
-(the reference implementation \cite{bifet2007} uses a bucket structure
-with smaller minima), because we feed one batch-mean entropy per tick per
+Our ADWIN implementation tests windows of at least 20 observations,
+because we feed one batch-mean entropy per tick per
 client rather than a per-instance stream. Each detector therefore receives
-20 warm-up ticks on clean data before production starts. The warm-up
-calibrates the detectors but does not feed the collective policy.
+20 warm-up ticks on clean data before production starts, calibrating it
+without feeding the collective policy.
 The detector never mutates the model: training modes are restored
 after each update, and only the inputs $X$ are observed.
 
@@ -284,8 +265,7 @@ maintains a sliding window of the last two ticks. The flagged fraction is
 the number of \emph{distinct} clients flagged in the window divided by the
 number of clients. When the fraction reaches the quorum $\theta=0.30$
 (3 of 10 clients), the server triggers, and a latch prevents any further
-decision in the episode. In the baseline arm the same computation runs with
-\texttt{record\_action=false} and no retraining happens. A single isolated
+decision in the episode. A single isolated
 alarm (a possible local false positive under continuous monitoring
 \cite{poenaru2022}) is not enough to trigger.
 
@@ -294,12 +274,11 @@ When the policy triggers at time $t_d$, each client's training dataset is
 replaced by a mixture with corrupted fraction $f(t_d)$, built with a
 deterministic per-client permutation, and a single synchronous FL round is
 executed with all clients. Each client holds 5,000 training images (an IID
-split of the 50,000-image training set), so the retraining set is the
-client's 5,000-image set mixed at $f(t_d)$. The retraining learns the
-current distribution and does not predict the future of the ramp. The
+split of the 50,000-image training set) mixed at $f(t_d)$. Retraining learns the
+current distribution, not the future of the ramp. The
 budget is explicit (one round); if the required
 virtual time would exceed the remaining horizon, the decision is recorded
-and the action skipped (this did not occur in our grid). A retraining round
+and the action skipped. A retraining round
 consumes about 8\,s of virtual time (one server timeout); in every detected
 episode the accuracy at the round's completion already meets $\tau$, so the
 time-to-recovery equals the retraining duration.
@@ -318,8 +297,7 @@ are evaluated on the corrupted test set, and the smallest severity whose
 accuracy falls strictly inside $(0.25, 0.50)$ is selected. The lower bound
 keeps the model well above chance (0.10 for ten classes), so recovery is
 achievable with a small budget; the upper bound guarantees the
-corruption pushes the service below $\tau$ (so downtime exists to be
-avoided).
+corruption pushes the service below $\tau$.
 
 \section{Experimental Setup}
 \subsection{Dataset and corruptions}
@@ -333,9 +311,7 @@ project-specific: Gaussian noise adds perturbations with
 per-severity standard deviations of 0.08--0.24; frosted-glass blur permutes
 pixels within a $3\times3$ neighborhood and blends with a Gaussian blur
 (strength 0.2--1.0); motion blur convolves with a diagonal kernel of width
-5--15; fog blends the image with a four-octave fractal noise map. The
-complete parameterization accompanies the released code.
-
+5--15; fog blends the image with a four-octave fractal noise map.
 \subsection{Calibration result}
 The calibration, executed once from a clean checkpoint, selected the
 severities in Table~\ref{tab:calibration} (procedure in Section IV-E).
@@ -391,26 +367,20 @@ Seeds & 42--46\\
 \end{table}
 
 \section{Results}
-We report group means over the five seeds. We test two hypotheses: H1, the reactive policy reduces downtime relative
+We report group means over the five seeds and test two hypotheses: H1, the
+reactive policy reduces downtime relative
 to the no-retraining baseline; H2, the detection delay grows with the ramp
-duration. Given $n=5$ per
-group, inferential claims are limited to a pooled paired comparison; the
-per-group results are reported descriptively with dispersion. The primary
-measurements are the detection delay (production start to trigger), the
-mixture fraction at the trigger, and the downtime; secondary metrics are
-the clean retention (final clean accuracy minus pre-drift clean accuracy)
-and the final corrupted accuracy. Full per-seed values accompany the
-released artifacts.
+duration. Primary measurements are the detection delay (production
+start to trigger), the mixture fraction at the trigger, and the downtime;
+secondary are clean retention (final minus pre-drift clean accuracy) and
+final corrupted accuracy.
 
 \subsection{Detection: 59 of 60 episodes}
-Detection succeeded in 59 of the 60 episodes (14 of 15 for Gaussian noise).
-The only failure is Gaussian noise, 100\,s ramp, seed 42, analyzed in
-Section VII-A.
-Table~\ref{tab:delay} shows the detection delay per scenario and ramp. The
-delay grows with the ramp duration for the three visual corruptions,
-consistent with the ADWIN analysis of gradual change with constant slope
-\cite{bifet2007}; Gaussian noise does not follow this trend and shows much
-larger dispersion (per-seed std of 71--104\,s).
+Detection succeeded in 59 of 60 episodes (14 of 15 for Gaussian noise);
+the only failure is Gaussian noise, 100\,s ramp, seed 42.
+The delay grows with the ramp duration for the three visual corruptions,
+consistent with ADWIN's analysis of gradual change with constant slope
+\cite{bifet2007}; Gaussian noise does not follow the trend.
 
 \begin{table}[!t]
 \centering
@@ -437,13 +407,6 @@ corruptions; 71--104\,s for Gaussian noise. For the 50 and 100\,s ramps the
 fraction at the trigger is 1.00 by construction (post-ramp triggers).}
 \end{table}
 
-\textbf{Fraction at the trigger.} With ramps of 50 and 100\,s the trigger
-occurs \emph{after} the ramp completes (fraction 1.00) in every episode:
-the group-mean delay (98--164\,s) exceeds the ramp duration. Only the
-200\,s ramp produces an intra-ramp trigger, and only for the three visual
-corruptions (fractions 0.68--0.70); Gaussian noise triggers at 0.97, just
-after the ramp ends.
-
 \subsection{Downtime: reactive policy dominates the baseline}
 \begin{table}[!t]
 \centering
@@ -469,57 +432,101 @@ downtime std up to 184\,s, range 38--540\,s); visual corruptions have std
 $\le$6\,s (delay) and $\le$10\,s (downtime).}
 \end{table}
 
-Table~\ref{tab:downtime} reports the downtime of the reactive arm against
-the baseline: the reactive policy reduces the mean downtime in all 12
-groups, from 408--562\,s in the baseline to 0--178\,s in the reactive arm.
+The reactive policy reduces the mean downtime in all 12 groups, from
+408--562\,s to 0--178\,s.
 A one-sided paired Wilcoxon signed-rank test rejects
 equal downtime between the arms ($W^+=1770$ over the 59 nonzero
 differences, the single tied pair excluded, $p=1.2\times10^{-11}$); the
 pooled Hodges--Lehmann median downtime reduction is
 462\,s ($\approx$95\% CI [450, 476]) with a paired Cliff's delta of 0.98
-(large) and 59 wins in 60 episodes. Given the paired
-design fixes identical pre-trigger trajectories, we treat the test as a
-sanity check of the average direction, the per-group contrasts remaining
-descriptive at $n=5$: the Hodges--Lehmann reduction ranges
-372--492\,s per group; Cliff's delta is 1.00 (large) in 11 of 12 groups
-and 0.80 (large) for Gaussian noise at the 100\,s ramp (4 wins plus the
-single tie); and, since no exact 95\% interval exists at $n=5$ (smallest
-achievable tail mass 1/32), the exact intervals use the closest achievable
-coverage, 93.75\% (87.5\% for the tied Gaussian-noise group, where the
-tied pair is dropped, $m=4$). In every pair
-the reactive arm's downtime is at most the baseline's (equal only in the
-failed episode). The fog scenario
+(large) and 59 wins in 60 episodes; per-group
+contrasts remain descriptive at $n=5$: the Hodges--Lehmann reduction
+ranges 372--492\,s per group; Cliff's delta is 1.00 (large) in 11 of 12
+groups and 0.80 (large) for Gaussian noise at the 100\,s ramp (4 wins plus
+the single tie); and, since no exact 95\% interval exists at $n=5$, the
+exact intervals use the closest achievable coverage, 93.75\% (87.5\% for
+the tied Gaussian-noise group, $m=4$).
+The fog scenario
 with the 200\,s ramp reaches \textbf{zero downtime} at $\tau=0.5$
 (Fig.~\ref{fig:fog}): the trigger occurs at fraction 0.69 while the
 accuracy is still 0.568 (above $\tau$), and the single round keeps it
 above $\tau$ (final corrupted accuracy 0.71).
+
+\textbf{Comparison with a first-alarm trigger.} We also ran a first-alarm
+policy (quorum 0.10, one-tick window). Any retraining
+policy cuts mean downtime from 507.5\,s (no retraining) to at most
+62.2\,s (87.7--91.7\%), none worse than the baseline in any group; the
+quorum-0.30 arm, however, does not dominate the first-alarm trigger: the
+first-alarm
+reaches 42.1\,s against 62.2\,s for the reactive arm, improving downtime
+in all 12 groups; the quorum's cost is a mean detection-latency increase
+of about 13.8\,s, examined in Section VI-C. The
+reactive-arm-versus-baseline contrast is
+ordinally robust to the quality threshold: across
+$\tau \in \{0.40, 0.45, 0.50, 0.55\}$ the reactive arm never exceeds its
+paired baseline in any of the 48 cells, though magnitudes are
+$\tau$-specific (the mean contrast shrinks about 47\% at $\tau=0.40$; the
+reactive arm's worst case grows to 190\,s at $\tau=0.55$).
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_fog_ramp20.png}
 \caption{Fog, 200\,s ramp, five paired seeds. Top: corrupted accuracy over
 simulated time (solid: reactive, dashed: baseline; thick lines: means);
-$\tau=0.5$ dashed; shaded bands: the single retraining round. Bottom:
-final corrupted accuracy, downtime, and clean retention. The reactive arm
+$\tau=0.5$ dashed; shaded bands: the retraining round. Bottom:
+final corrupted accuracy, downtime, and clean retention; the reactive arm
 never falls below $\tau$ (zero downtime).}
 \label{fig:fog}
 \end{figure}
 
 \subsection{Collective-quorum analysis}
-Whenever a decision is taken, \emph{all} 10 clients raise an alarm at some
-point of the episode (59 of 59): the local detectors are individually
-sensitive to the gradual drift. The trigger fires exactly when
-the quorum is met at its minimum (0.30, three distinct clients in the
-two-tick window) in 21 of the 59 episodes; Gaussian noise is the extreme
-case, firing at the minimum in all detected episodes of the 100\,s ramp.
-The long ramp spreads the alarms in time: the flagged fraction at the
-decision drops with the ramp duration (fog 0.88$\rightarrow$0.42, frosted
-0.90$\rightarrow$0.56, motion 0.66$\rightarrow$0.54), because alarms arrive
-at more scattered ticks and co-occur later, at a smaller fraction of the
-ramp.
-These properties reflect the global, simultaneous drift of our scenario;
-staggered drifts, which motivate the quorum in \cite{jothimurugesan2023},
-are not exercised here.
+\emph{All} 10 clients raise an alarm in every detected episode (59 of 59):
+the local detectors are individually sensitive. The trigger
+fires at the quorum's minimum (0.30, three distinct clients in the
+two-tick window) in 21 of 59 episodes; Gaussian noise fires at the
+minimum in all detected episodes of the 100\,s ramp. The
+long ramp spreads the alarms: the flagged fraction at the decision drops
+with the ramp duration (fog 0.88$\rightarrow$0.42, frosted
+0.90$\rightarrow$0.56, motion 0.66$\rightarrow$0.54).
+
+\textbf{Quorum and window sensitivity.} The first-alarm trigger of
+Section VI-B (quorum 0.10, one-tick window) is the no-quorum extreme: it
+fires in 60 of 60 episodes and detects 2--50\,s earlier than the default
+(121.3\,s vs.\ 135.1\,s mean delay), at the price of the quorum's
+protection against isolated false alarms (Section IV-B), not measurable
+here. The detection delay increases
+monotonically with the quorum but in small increments: raising it from
+0.10 to 0.30 adds about 13.8\,s of delay and about 20\,s of downtime, and
+from 0.30 to 0.50 another 8.6\,s and 8\,s; the cost concentrates in
+Gaussian noise (up to +96\,s at the 100\,s ramp) and is at most 10\,s
+elsewhere. The 0.50 quorum fires in 59 of 60 episodes, missing the same
+Gaussian-noise seed as the 0.30 default (at a different ramp): no quorum
+level introduces a new failure mode. A one-tick window at the default
+quorum is a wash overall ($+3.7$\,s delay, $-3.9$\,s downtime), swapping
+sign per group; the two-tick union shows no systematic benefit here.
+
+\textbf{Staggered drift.} When clients drift at different ticks (client
+$i$ drifts at production tick $i$, no ramp; 20 episodes), the collective
+trigger fires in 20 of 20 episodes at the quorum boundary (flagged
+fraction 0.30--0.40), corroborating alarms a one-tick window would
+miss. The policy avoids about 81\% of the baseline downtime (600\,s,
+permanent drift) on three of the four corruptions and 70\% on Gaussian
+noise (116\,s and 180\,s of reactive-arm downtime, respectively);
+since the drift is instant and permanent, delay converts to downtime
+one-to-one (116 $\approx$ 108 + 8\,s). The quorum's value is thus
+suggestive in the staggered regime; under simultaneous drift it is
+cheap insurance whose false-positive protection is not measurable here.
+
+\subsection{False-positive rate on drift-free streams}
+We ran 15 control episodes (five seeds times three ramp schedules) with no
+corruption: each client monitors a clean stream for the full 600\,s
+horizon. The collective gate never fires---0 of 15 episodes record a
+retraining decision---and the local detectors raise zero alarms across the
+9{,}000 client-tick evaluations.
+Eight isolated entropy peaks (scores above 1.0) occur, but ADWIN flags
+none: it tests for a distributional change, not a spike. The
+gate is thus silent on drift-free streams and sensitive under drift (59 of
+60 episodes; measured false-positive rate 0.0\%).
 
 \subsection{Clean retention and recovery behavior}
 \begin{table}[!t]
@@ -542,16 +549,16 @@ Gaussian noise & $-0.084\pm0.013$ & $-0.066\pm0.034$ & $-0.072\pm0.016$\\
 \end{tabular}}
 \end{table}
 
-Two findings deserve emphasis. First, \emph{long ramps preserve
-the clean-set accuracy} (Table~\ref{tab:retention}): with the 200\,s ramp
+First, \emph{long ramps preserve the clean-set accuracy}
+(Table~\ref{tab:retention}): with the 200\,s ramp
 the retraining set keeps roughly 30\% of clean data and the clean-accuracy
 loss drops to 1--2 points (versus 9--21 on short ramps) for fog,
-frosted-glass, and motion blur; Gaussian noise does not benefit: its
-trigger occurs after the ramp (fraction 0.97). Second, \emph{the recovery
-is not temporary}: no episode shows the accuracy re-crossing $\tau$ within
-the fixed horizon; the retrained model generalizes to the fully corrupted
-regime. In 9 of the 20 episodes with the 200\,s ramp (all five fog runs,
-three frosted runs, one motion run) the accuracy never falls below $\tau$.
+frosted-glass, and motion blur; Gaussian noise does not benefit
+(fraction 0.97). Second, \emph{the recovery
+is not temporary}: no episode re-crosses $\tau$ within the horizon; the
+retrained model generalizes to the fully corrupted regime. In 9 of the 20
+episodes with the 200\,s ramp (all five fog runs, three frosted runs, one
+motion run) the accuracy never falls below $\tau$.
 Group-mean final corrupted accuracy
 ranges from 0.60 to 0.71 for the reactive arm (excluding the failed
 episode at 0.33) and 0.35--0.48 for the baseline
@@ -561,80 +568,73 @@ episode at 0.33) and 0.35--0.48 for the baseline
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
 \caption{Motion blur, 200\,s ramp, five paired seeds. The reactive arm
-recovers within one round and keeps the accuracy above $\tau$ for most of
+recovers within one round and stays above $\tau$ for most of
 the horizon; the baseline keeps degrading to about 0.35.}
 \label{fig:motion}
 \end{figure}
 
 \section{Discussion}
-Monitoring is not free, but it does not dominate the reactive budget:
-over an episode the $T=5$ detector costs about 6.8\,TFLOPs (4{,}000
-batch-32 forwards, 50 per tick across the ten clients) against about
-8.0\,TFLOPs for the single retraining round, a ratio of 0.85--0.96$\times$
-depending on the accounting---the same order of magnitude, and roughly 47\%
-of the reactive compute. On the measured device (Apple M5, PyTorch 2.12.1)
-one detector update takes about 12.7\,ms per client; the per-tick monitor
-across the ten clients occupies about 0.13\,s, 1.3\% of each 10\,s tick.
-The forward and FLOP counts refer to the virtual 80-tick episode; the
-12.7\,ms figure is measured wall-clock. Had we kept the published UDD
-setting $T=50$, monitoring would exceed the retraining round by roughly
-$9\times$, which is
-exactly why $T=5$ was chosen as a cost decision; the accuracy sensitivity
-to $T$ is left as future work.
+Monitoring is not free: over the virtual 80-tick episode the $T=5$ detector costs about 6.8\,TFLOPs
+(4{,}000 batch-32 forwards, 50 per tick across the ten clients) against
+about 8.0\,TFLOPs for the single retraining round, a 0.85--0.96$\times$
+ratio depending on the accounting, roughly 47\% of the reactive compute.
+Across the ten clients the per-tick monitor
+occupies about 0.13\,s, 1.3\% of each 10\,s tick; on the measured device
+(Apple M5, PyTorch 2.12.1) one detector update takes about 12.7\,ms per
+client. Had we kept the published UDD setting
+$T=50$, monitoring would exceed the retraining round by roughly $9\times$,
+which is why $T=5$ was chosen as a cost decision.
 
 The downtime conclusions are robust to a $10\times$ longer round:
 recomputing downtime post hoc from the recorded series---charging the
-pre-retrain accuracy over $[t_d,t_d+d]$, the first post-retrain record
+pre-retrain accuracy over $[t_d,t_d+d]$ and the first post-retrain record
 thereafter, with the controller's budget rule applied---an 80\,s
 communication-dominated round still cuts the mean
 downtime from 507.5\,s (baseline) to 122.2\,s (76\%); the per-group
-ranking, the zero-downtime fog case at the 200\,s ramp, and the
-detection-limited Gaussian behaviour are unchanged, the round's extra
-cost being exactly the pre-retrain interval it extends (zero when the
-detector fires early). At $d=800$\,s the round no longer fits the 600\,s
+ranking, the zero-downtime fog case, and the detection-limited Gaussian
+behaviour are unchanged, the extra cost being exactly the pre-retrain
+interval the round extends. At
+$d=800$\,s the round no longer fits the 600\,s
 production horizon and the budget rule would skip retraining in all 59
-triggered episodes, degenerating the agent to the baseline by policy
-rather than by training dynamics; the turning point is the smallest
+triggered episodes, degenerating the reactive policy to the baseline by
+policy rather than by training dynamics; the turning point is the smallest
 trigger-to-horizon slack, about 140\,s in this grid.
 
 \subsection{Gaussian noise is the limiting scenario}
-Gaussian noise is the only scenario with incomplete detection (14 of 15
-episodes). With the 100\,s ramp and seed 42,
-the policy never triggers: only four of the ten clients raise an alarm
-during the whole episode, never three within the same two-tick window
-(maximum flagged fraction 0.20, at sparse ticks), so the quorum is never
-met; the other four seeds of the group detect with delays of 120--210\,s.
-Because the window and the quorum are identical across seeds, the failure
-is best explained as a per-client detector miss on this seed; our design
-cannot isolate an interaction among the signal, the window, and the
-quorum. Without a decision, the reactive arm degenerates exactly to the
-baseline (both arms end with the same downtime, 540\,s). With the 200\,s
-ramp the
+Gaussian noise is the only scenario with incomplete detection.
+With the 100\,s ramp and seed 42,
+the policy never triggers: only four of the ten clients raise an alarm in
+the whole episode, never three within the same two-tick window (maximum
+flagged fraction 0.20 at sparse ticks); the other four seeds detect within
+120--210\,s. As the window and the
+quorum are identical across seeds, the failure is best explained as a
+per-client detector miss (an interaction we cannot isolate). Without a decision the reactive arm degenerates exactly to the
+baseline (downtime 540\,s). With the 200\,s ramp the
 delays spread between 180 and 460\,s (std 104\,s), yet the reactive arm
 still cuts the baseline downtime by 75\% (112 vs.\ 448\,s), consistent with the
-risk registered for ADWIN-style detectors under long, gentle drifts
-\cite{poenaru2022}. Fig.~\ref{fig:gaussian} shows the failed seed inside
-its group.
+risk ADWIN-style detectors carry under long, gentle drifts
+\cite{poenaru2022}. Gaussian noise is also the scenario with the highest reactive latency:
+the first-alarm trigger averages 77.3\,s against 140.1\,s for the
+quorum-0.30 arm---the seed-42 miss is the price of a trigger that depends
+on local detectability. Fig.~\ref{fig:gaussian} shows the failed seed.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_gaussian_ramp10.png}
 \caption{Gaussian noise, 100\,s ramp, five paired seeds. Seed 42 never
 triggers: its trajectory (solid blue) does not recover, while the other
-four seeds recover to about 0.68. The group mean is pulled down by the
-failed seed.}
+four seeds recover to about 0.68.}
 \label{fig:gaussian}
 \end{figure}
 
 \subsection{Why the long ramp behaves better}
-For the visual corruptions the 200\,s ramp concentrates three favorable
-effects. (i) The trigger occurs mid-ramp, at fractions 0.68--0.70, where
-the accuracy at the decision is 0.57 for fog (still above $\tau$, hence
-zero downtime), 0.51 for frosted-glass, and 0.48 for motion blur. (ii)
+For the visual corruptions the 200\,s ramp has three favorable effects. (i) The trigger occurs mid-ramp, at fractions 0.68--0.70, where
+the accuracy at the decision is 0.57 for fog (still above $\tau$), 0.51
+for frosted-glass, and 0.48 for motion blur. (ii)
 The retraining set mixes about 30\% clean data, reducing
 catastrophic forgetting. (iii) The model retrained at fraction
 $\approx$0.7 generalizes to the fully corrupted regime, so the recovery
-holds until the horizon. Short ramps behave like the abrupt regime:
+holds. Short ramps behave like the abrupt regime:
 detection completes after the ramp and the retraining set is almost fully
 corrupted. Gaussian noise triggers later (fraction 0.97) and does not
 enjoy effects (i) and (ii).
@@ -646,62 +646,66 @@ model is a small CNN of about 2.2 million parameters; absolute accuracies
 under corruption are modest, as expected for small architectures
 \cite{hendrycks2019}. (iii) The scenario assumes a single drift, one
 retraining round, an IID partition, uniform speed, and a fixed
-horizon; the paired comparison isolates the retraining action within these
-conditions. (iv) The fraction at the trigger is informative only in the
-long-ramp regime; the trigger occurs after the ramp completes for short
-ramps. (v) The published UDD uses $T=50$ forwards; our $T=5$ is a cost
+horizon. (iv) The fraction at the trigger is informative only in the
+long-ramp regime. (v) The published UDD uses $T=50$ forwards; our $T=5$ is a cost
 decision without published equivalence, and $\delta=0.002$ is the fallback
 of the reference implementation rather than a calibrated
 value \cite{baier2023,poenaru2022}. (vi) Downtime is sampled at tick
 granularity plus the round-completion instant; the true crossing of
 $\tau$ can fall between ticks. (vii) Episodes ran on a CUDA GPU
 (PyTorch 2.5.1, CUDA 12.1) with non-deterministic algorithms; bit-identical
-reproduction was not confirmed, although each pair is validated to share an
+reproduction was not confirmed, though each pair is validated to share an
 identical checkpoint, stream, and horizon. (viii) The
 severities were calibrated on a clean checkpoint from a separate training
 run; the calibration digest differs from the episode
-checkpoints, and severities are not re-validated per seed. (ix)
-The reported contrasts depend on $\tau=0.5$ and the calibrated
+checkpoints, and severities are not re-validated per seed. (ix) The reported contrasts depend on $\tau=0.5$ and the calibrated
 severities; we report descriptive group means over 12 groups without
-multiple-comparison correction. (x) The evaluation compares the
-reactive policy only with a no-retraining baseline; other comparators are
-future work, so our claims concern the value of retraining reactively
-rather than never, not the superiority of this detection mechanism over
-other triggers. (xi)
-No drift-free control episodes were run, so the detector's false-positive
-rate under continuous monitoring is unmeasured; sensitivity to $\tau$, the
-quorum, and the window is future work.
-
+multiple-comparison correction, and the ordinal robustness to
+$\tau \in \{0.40, 0.55\}$ (Section VI-B) does not extend to its
+magnitude. (x) Compared with a first-alarm trigger (quorum 0.10, one-tick window),
+the quorum-0.30 arm is slower and incurs more downtime, the cost
+concentrating in Gaussian noise; the false-positive protection the
+quorum buys could not
+be quantified (no drift-free runs at the low thresholds), so our claims
+are scoped to its viability, zero
+false-positive rate on drift-free streams, and scenario-dependent
+advantage; scheduled, oracle, and centralized-detector comparators
+remain future work; since drift onset coincides with production start
+in every episode, calendar-scheduled retraining would act as an oracle
+rather than a fair baseline. (xi) Drift-free control episodes (15)
+produced zero false triggers (0/15), so the detector's false-positive rate
+under continuous monitoring is 0\% within this setup.
 \section{Conclusion and Future Work}
-We studied reactive retraining in synchronous federated learning across the
-abrupt-to-gradual drift continuum, evaluating
-a reactive policy---per-client label-free UDD detection, a server-side
-quorum over a two-tick window, and a single retraining round on the current
-mixture---against a paired no-retraining baseline over 60 episodes with
-service downtime as the primary metric. Detection succeeded in 59 of 60
-episodes; the delay grew with the ramp duration for the visual corruptions;
-the reactive arm reduced the mean downtime from 408--562\,s to 0--178\,s,
-reaching zero at $\tau=0.5$ in the fog scenario; and long ramps preserved
-clean accuracy for the visual corruptions. Short ramps behaved like the
-abrupt regime. The single detection failure (Gaussian noise, one seed) is
-a per-client detector miss whose interaction with the window-quorum policy
-our design cannot isolate.
-
-Future work includes: scheduled-retraining, first-alarm, centralized-
-detector, and oracle baselines to isolate the contribution of the detection
-mechanism; drift-free control episodes to measure false positives; a
-sensitivity sweep over $\tau$ and the calibration bounds; a quorum
-ablation, including staggered drift; more seeds and a formal dispersion
-analysis; recurrent drift; non-IID partitions and heterogeneous client
-speeds; incremental drift; larger models; and publishing the protocol as a
-reusable benchmark for FL-under-drift evaluation
-\cite{cerqueira2026,mahdi2025}.
+We studied reactive retraining in synchronous federated learning across
+the abrupt-to-gradual drift continuum, evaluating our reactive policy
+against a paired no-retraining baseline over 60 episodes with service
+downtime as the primary metric. Detection succeeded in 59 of 60 episodes,
+the delay growing with the ramp duration for the visual corruptions; the
+reactive arm reduced the mean downtime from 408--562\,s to 0--178\,s
+(zero in the fog 200\,s-ramp case); and long ramps preserved clean
+accuracy for the visual corruptions. Against the first-alarm comparator,
+the quorum-0.30 arm trades about 13.8\,s of mean detection latency and
+about 20\,s of mean downtime for corroboration of a
+collective decision; the
+advantage is scenario-dependent---on Gaussian noise the first-alarm
+trigger is markedly more robust (77.3\,s vs.\ 140.1\,s), while the
+collective trigger fires in all 20 staggered episodes
+(70--81\% of the baseline downtime avoided) with a 0\% false-positive
+rate over 15 drift-free controls.
+Future work includes: centralized-detector, oracle, and schedule-aware
+(randomized-onset) baselines to isolate
+the contribution of the detection mechanism; more seeds and a formal
+dispersion analysis; recurrent drift; non-IID partitions and heterogeneous
+client speeds; incremental drift; larger models; sensitivity of the
+detector's $T$, $\delta$, and calibration bounds; the normalized
+detection delay (NDT) of the benchmark \cite{cerqueira2026}; and publishing
+the protocol as a reusable benchmark for FL-under-drift evaluation
+\cite{mahdi2025}.
 
 \section*{Availability}
-The implementation and all artifacts---60 paired episodes, the aggregated
-summary, per-seed tables, the calibration table, and plots---are available
-at [repository URL -- TODO].
-
+The implementation and all artifacts---the 60 paired episodes,
+comparator arms, aggregated summaries, and per-seed tables---are
+available at [https://github.com/julio-amaral-oliveira/FederatedLearningSimulation].
 \begin{thebibliography}{29}
 \bibitem{mcmahan2017} B.~McMahan, E.~Moore, D.~Ramage, S.~Hampson, and
 B.~Ag{\"u}era y Arcas, ``Communication-efficient learning of deep networks
