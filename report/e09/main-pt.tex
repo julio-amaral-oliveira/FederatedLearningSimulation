@@ -44,7 +44,7 @@ a mistura corrente de cada cliente. A métrica primária é a
 indisponibilidade (downtime) de serviço, o tempo virtual acumulado em que a
 acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
 episódios pareados (quatro
-corrupções calibradas, cinco sementes, três durações de rampa de 50--200\,s)
+corrupções calibradas, cinco seeds, três durações de rampa de 50--200\,s)
 sobre um horizonte fixo de 600\,s, contra uma linha de base pareada sem retreinamento.
 A detecção tem êxito em 59 de 60 episódios (14 de 15 no
 cenário de ruído Gaussiano); o atraso de detecção cresce com a duração da rampa
@@ -246,7 +246,7 @@ que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
 Ambos os braços compartilham o mesmo estado aleatório, início de produção e horizonte $H$;
 a linha de base registra, como contrafactual, o momento em que a política
 \emph{teria} disparado.
-
+% Inicio da revisao
 \section{Método Proposto}
 \subsection{Detecção local por incerteza (UDD por cliente)}
 Cada cliente $c$ executa um detector local sobre o modelo global compartilhado:
@@ -278,36 +278,33 @@ tempo até a recuperação equivale à duração do retreinamento.
 
 \subsection{Avaliação sobre a mistura corrente}
 A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) misturado
-na fração corrente $f(v)$: no início da produção o teste está limpo
-(fração zero), e só se torna totalmente corrompido quando a rampa
+na fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente corrompido quando a rampa
 termina; um teste totalmente corrompido superestimaria a degradação durante
 a rampa. A mistura usa uma permutação determinística semeada por episódio, de modo que
 ambos os braços são avaliados sobre o tensor idêntico em cada instante.
 
 \subsection{Calibração de severidade}
-Cada corrupção é calibrada em um checkpoint limpo: todas as severidades de $1$--$5$
+Todas as severidades de $1$--$5$
 são avaliadas no conjunto de teste corrompido, e a menor severidade cuja
 acurácia cai estritamente dentro de $(0{,}25;\,0{,}50)$ é selecionada. O limite inferior
 mantém o modelo bem acima do acaso (0,10 para dez classes), de modo que a recuperação é
-alcançável com um orçamento pequeno; o limite superior garante que a
+alcançável com pouco orçamento de retreino; o limite superior garante que a
 corrupção empurre o serviço para abaixo de $\tau$.
 
 \section{Configuração Experimental}
 \subsection{Conjunto de dados e corrupções}
 Usamos CIFAR-10 com partição IID entre 10 clientes e as 10
 classes completas em todas as fases. Quatro corrupções visuais são implementadas diretamente sobre
-tensores---ruído Gaussiano, borrão de vidro fosco (frosted-glass blur), borrão de movimento (motion blur) e névoa (fog)---com
-severidades inteiras de $1$--$5$, geradores por semente e formas e
+tensores---ruído Gaussiano, frosted-glass blur, motion blur e fog---com
+severidades inteiras de $1$--$5$, geradores por seed e formas e
 rótulos preservados. Elas são \emph{inspiradas} no benchmark
-CIFAR-10-C \cite{hendrycks2019}, mas não o reproduzem; seus parâmetros internos são
-específicos do projeto: o ruído Gaussiano adiciona perturbações com
+CIFAR-10-C \cite{hendrycks2019}; o ruído Gaussiano adiciona perturbações com
 desvios-padrão por severidade de 0,08--0,24; o borrão de vidro fosco permuta
 pixels em uma vizinhança $3\times3$ e combina-os com um borrão Gaussiano
 (força 0,2--1,0); o borrão de movimento faz convolução com um kernel diagonal de largura
 5--15; a névoa mistura a imagem com um mapa de ruído fractal de quatro oitavas.
 \subsection{Resultado da calibração}
 A calibração, executada uma vez a partir de um checkpoint limpo, selecionou as
-severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
 
 \begin{table}[!t]
 \centering
@@ -325,10 +322,11 @@ Névoa & 4 & 0,4875\\
 \bottomrule
 \end{tabular}
 \end{table}
+severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
 
 \subsection{Grade}
 A grade do estudo é o produto cartesiano das quatro corrupções calibradas,
-cinco sementes ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
+cinco seeds ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
 totalizando 60 episódios pareados com horizonte de produção fixo de $H=600$\,s.
 A Tabela~\ref{tab:setup} lista a configuração fixa.
 
@@ -354,13 +352,13 @@ Quórum / janela & 0,30 / 2 passos\\
 Orçamento de retreinamento & 1 rodada\\
 Limiar de qualidade $\tau$ & 0,50\\
 Horizonte de produção & 600\,s\\
-Sementes & 42--46\\
+seeds & 42--46\\
 \bottomrule
 \end{tabular}}
 \end{table}
-
+%TODO: Continua revisao daqui
 \section{Resultados}
-Relatamos médias por grupo sobre as cinco sementes e testamos duas hipóteses: H1, a
+Relatamos médias por grupo sobre as cinco seeds e testamos duas hipóteses: H1, a
 política reativa reduz a indisponibilidade em relação
 à linha de base sem retreinamento; H2, o atraso de detecção cresce com a duração da
 rampa. As medidas primárias são o atraso de detecção (do início da
@@ -371,7 +369,7 @@ antes do drift) e a acurácia final sob corrupção.
 \subsection{Detecção: 59 de 60 episódios}
 A detecção teve êxito em 59 de 60 episódios (14 de 15 no cenário de ruído
 Gaussiano); a única falha ocorreu no ruído Gaussiano, na rampa de 100\,s, com a
-semente 42.
+seed 42.
 O atraso cresce com a duração da rampa para as três corrupções visuais,
 em consonância com a análise do ADWIN para mudança gradual com inclinação constante
 \cite{bifet2007}; o ruído Gaussiano não segue a tendência.
@@ -379,7 +377,7 @@ em consonância com a análise do ADWIN para mudança gradual com inclinação c
 \begin{table}[!t]
 \centering
 \caption{Atraso de detecção (s) e fração de mistura no disparo (médias por
-grupo sobre 5 sementes; taxa de detecção por grupo; a semente Gaussiana que falhou em
+grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou em
 100\,s está excluída da média de atraso desse grupo).}
 \label{tab:delay}
 \small
@@ -397,7 +395,7 @@ Ruído Gaussiano & 164 & 158$^{*}$ & 256 & 0,97 & 4/5$^{*}$\\
 \bottomrule
 \end{tabular}}
 \vspace{2pt}
-{\footnotesize Desvio-padrão do atraso entre sementes: $\le$6\,s para as corrupções
+{\footnotesize Desvio-padrão do atraso entre seeds: $\le$6\,s para as corrupções
 visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s a
 fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \end{table}
@@ -406,7 +404,7 @@ fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \begin{table}[!t]
 \centering
 \caption{Indisponibilidade (s): braço reativo versus linha de base pareada sem retreinamento
-(médias por grupo sobre 5 sementes; formato: reativo / linha de base).}
+(médias por grupo sobre 5 seeds; formato: reativo / linha de base).}
 \label{tab:downtime}
 \small
 \resizebox{\columnwidth}{!}{%
@@ -467,7 +465,7 @@ pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_fog_ramp20.png}
-\caption{Névoa, rampa de 200\,s, cinco sementes pareadas. Acima: acurácia corrompida ao
+\caption{Névoa, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia corrompida ao
 longo do tempo simulado (sólida: reativo, tracejada: linha de base; linhas grossas: médias);
 $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo:
 acurácia final corrompida, indisponibilidade e retenção limpa; o braço reativo
@@ -496,7 +494,7 @@ monotonicamente com o quórum, mas em pequenos incrementos: elevar o quórum de
 e elevá-lo de 0,30 para 0,50 acrescenta outros 8,6\,s e 8\,s; o custo concentra-se no
 ruído Gaussiano (até +96\,s na rampa de 100\,s) e é de no máximo 10\,s
 nos demais casos. Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
-detectar a mesma semente de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
+detectar a mesma seed de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
 diferente): nenhum nível de quórum
 introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
 resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de indisponibilidade),
@@ -516,7 +514,7 @@ quórum dá indícios de vantagem; sob drift simultâneo, é
 um seguro barato cuja proteção contra falsos positivos não medimos aqui.
 
 \subsection{Taxa de falsos positivos em fluxos sem drift}
-Executamos 15 episódios de controle (cinco sementes vezes três cronogramas de rampa) sem
+Executamos 15 episódios de controle (cinco seeds vezes três cronogramas de rampa) sem
 corrupção: cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
 O gatilho coletivo nunca dispara---nenhum dos 15 episódios registra uma
 decisão de retreinamento---e os detectores locais emitem zero alarmes nas
@@ -530,7 +528,7 @@ gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
 \begin{table}[!t]
 \centering
 \caption{Retenção limpa $\Delta$ (braço reativo; média por grupo $\pm$ desvio-padrão sobre
-5 sementes).}
+5 seeds).}
 \label{tab:retention}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lccc}
@@ -565,7 +563,7 @@ com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a linha de base
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
-\caption{Borrão de movimento, rampa de 200\,s, cinco sementes pareadas. O braço reativo
+\caption{Borrão de movimento, rampa de 200\,s, cinco seeds pareadas. O braço reativo
 recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do
 horizonte; a linha de base segue degradando até cerca de 0,35.}
 \label{fig:motion}
@@ -602,12 +600,12 @@ folga entre disparo e horizonte, cerca de 140\,s nesta grade.
 
 \subsection{Ruído Gaussiano é o cenário limitante}
 O ruído Gaussiano é o único cenário com detecção incompleta.
-Com rampa de 100\,s e semente 42,
+Com rampa de 100\,s e seed 42,
 a política nunca dispara: só quatro dos dez clientes emitem alarme em
 todo o episódio, nunca três dentro da mesma janela de dois passos (fração
-máxima sinalizada de 0,20 em passos esparsos); as outras quatro sementes detectam em
+máxima sinalizada de 0,20 em passos esparsos); as outras quatro seeds detectam em
 120--210\,s. Como a janela e o
-quórum são idênticos entre sementes, a falha é mais bem explicada como perda
+quórum são idênticos entre seeds, a falha é mais bem explicada como perda
 (miss) do detector por cliente (uma interação que não conseguimos isolar). Sem decisão, o braço reativo equivale exatamente à
 linha de base (indisponibilidade de 540\,s). Com rampa de 200\,s os
 atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas o braço reativo
@@ -615,15 +613,15 @@ ainda corta a indisponibilidade da linha de base em 75\% (112 vs.\ 448\,s), em c
 risco que detectores do tipo ADWIN carregam sob drifts longos e suaves
 \cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa:
 o gatilho de primeiro alarme tem média de 77,3\,s contra 140,1\,s do
-braço de quórum 0,30---a perda da semente 42 é o preço de um gatilho que depende
-da detectabilidade local. A Fig.~\ref{fig:gaussian} mostra a semente que falhou.
+braço de quórum 0,30---a perda da seed 42 é o preço de um gatilho que depende
+da detectabilidade local. A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_gaussian_ramp10.png}
-\caption{Ruído Gaussiano, rampa de 100\,s, cinco sementes pareadas. A semente 42 nunca
+\caption{Ruído Gaussiano, rampa de 100\,s, cinco seeds pareadas. A seed 42 nunca
 dispara: sua trajetória (azul sólida) não se recupera, enquanto as outras
-quatro sementes se recuperam para cerca de 0,68.}
+quatro seeds se recuperam para cerca de 0,68.}
 \label{fig:gaussian}
 \end{figure}
 
@@ -641,7 +639,7 @@ usufrui dos efeitos (i) e (ii).
 
 \subsection{Limitações}
 Nossos resultados são limitados pelas seguintes restrições declaradas. (i) Cinco
-sementes por grupo limitam a precisão da estimativa de dispersão. (ii) O
+seeds por grupo limitam a precisão da estimativa de dispersão. (ii) O
 modelo é uma CNN pequena de cerca de 2,2 milhões de parâmetros; as acurácias absolutas
 sob corrupção são modestas, como esperado para arquiteturas pequenas
 \cite{hendrycks2019}. (iii) O cenário pressupõe um único drift, uma
@@ -658,7 +656,7 @@ não foi confirmada, embora se verifique que cada par compartilha
 checkpoint, fluxo e horizonte idênticos. (viii) As
 severidades foram calibradas em um checkpoint limpo de uma execução de treinamento
 separada; o digest da calibração difere dos checkpoints dos
-episódios, e as severidades não são revalidadas por semente. (ix) Os contrastes relatados dependem de $\tau=0{,}5$ e das severidades
+episódios, e as severidades não são revalidadas por seed. (ix) Os contrastes relatados dependem de $\tau=0{,}5$ e das severidades
 calibradas; relatamos médias descritivas por grupo sobre 12 grupos sem
 correção para comparações múltiplas, e a robustez ordinal a
 $\tau \in \{0{,}40;\,0{,}55\}$ (Seção VI-B) não se estende à sua
@@ -694,7 +692,7 @@ gatilho coletivo dispara nos 20 episódios dessincronizados
 0\% em 15 controles sem drift.
 Trabalhos futuros incluem linhas de base com detector centralizado, do tipo oráculo e
 cientes do agendamento (com início aleatorizado) para isolar
-a contribuição do mecanismo de detecção; mais sementes e análise formal de
+a contribuição do mecanismo de detecção; mais seeds e análise formal de
 dispersão; drift recorrente; partições não IID e velocidades heterogêneas
 de clientes; drift incremental; modelos maiores; sensibilidade aos parâmetros $T$, $\delta$ e
 limites de calibração do detector; o atraso normalizado de
@@ -704,7 +702,7 @@ protocolo como benchmark reutilizável para avaliação de FL sob drift
 
 \section*{Disponibilidade}
 A implementação e todos os artefatos---os 60 episódios pareados,
-braços comparadores, resumos agregados e tabelas por semente---estão
+braços comparadores, resumos agregados e tabelas por seed---estão
 disponíveis em \url{https://github.com/julio-amaral-oliveira/FederatedLearningSimulation}.
 \begin{thebibliography}{29}
 \bibitem{mcmahan2017} B.~McMahan, E.~Moore, D.~Ramage, S.~Hampson, and
