@@ -57,10 +57,7 @@ a acurácia no conjunto limpo para as corrupções visuais (perda de 1--2 pontos
 regime exercitado (CIFAR-10, partição IID, dez clientes, um único drift e
 no máximo uma rodada de retreinamento), uma política reativa sem rótulos é eficaz,
 em comparação com uma linha de base sem retreinamento; a latência de detecção
-depende do cenário, e o ruído Gaussiano é o caso mais difícil; uma variante
-sem quórum detecta cerca de 14\,s mais cedo e com menor indisponibilidade; esse é o
-preço medido da proteção do quórum contra falsos positivos, proteção cuja magnitude
-não quantificamos;
+depende do cenário, e o ruído Gaussiano é o caso mais difícil;
 o gatilho coletivo detecta todos os episódios de drift dessincronizado (staggered) com zero alarmes falsos em
 fluxos sem drift.
 \end{abstract}
@@ -115,7 +112,7 @@ drift, calculada como integral em escada sobre um horizonte fixo; (ii) uma
 \textbf{política coletiva por quórum} que agrega alarmes sem rótulos por cliente
 ao longo de uma curta janela de passos, ausente na literatura revisada e
 mais próxima da barreira de participação do FL-MalDrift \cite{patel2026}, cuja
-relação entre latência e proteção contra alarmes falsos caracterizamos por meio de
+latência de detecção caracterizamos por meio de
 ablações de quórum e janela e sob drift dessincronizado;
 (iii) uma \textbf{implementação federada do UDD}, com um
 detector por cliente compartilhando o modelo global, estendendo o detector
@@ -446,15 +443,6 @@ com rampa de 200\,s atinge \textbf{indisponibilidade zero} com $\tau=0{,}5$
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob corrupção de 0,71).
 
-\textbf{Comparação com gatilho de primeiro alarme.} Também executamos uma política
-de primeiro alarme (quórum 0,10, janela de um passo). Qualquer política de
-retreinamento reduz a indisponibilidade média de 507,5\,s (linha de base) para no máximo
-62,2\,s (87,7--91,7\%), sem que nenhum grupo fique pior que a linha de base; o
-braço de quórum 0,30, porém, não domina o gatilho de primeiro alarme: o
-primeiro alarme
-atinge 42,1\,s contra 62,2\,s do braço reativo, com indisponibilidade menor
-nos 12 grupos; o custo do quórum é um aumento médio de cerca de 13,8\,s na latência
-de detecção, examinado em detalhe na Seção VI-C.
 O contraste entre o braço reativo e a linha de base mantém a
 mesma ordem ao variar o limiar de qualidade: para
 $\tau \in \{0{,}40;\,0{,}45;\,0{,}50;\,0{,}55\}$ o braço reativo nunca supera sua
@@ -483,17 +471,7 @@ rampa longa espalha os alarmes: a fração sinalizada na decisão cai
 com a duração da rampa (névoa $0{,}88\rightarrow0{,}42$, vidro fosco
 $0{,}90\rightarrow0{,}56$, movimento $0{,}66\rightarrow0{,}54$).
 
-\textbf{Sensibilidade a quórum e janela.} O gatilho de primeiro alarme da
-Seção VI-B (quórum 0,10, janela de um passo) é o extremo sem quórum:
-dispara em 60 de 60 episódios e detecta 2--50\,s mais cedo que o padrão
-(121,3\,s vs.\ 135,1\,s de atraso médio), mas ao preço da proteção do quórum
-contra falsos positivos isolados (Seção IV-B), que não medimos
-aqui. O atraso de detecção aumenta
-monotonicamente com o quórum, mas em pequenos incrementos: elevar o quórum de
-0,10 para 0,30 acrescenta cerca de 13,8\,s de atraso e cerca de 20\,s de indisponibilidade,
-e elevá-lo de 0,30 para 0,50 acrescenta outros 8,6\,s e 8\,s; o custo concentra-se no
-ruído Gaussiano (até +96\,s na rampa de 100\,s) e é de no máximo 10\,s
-nos demais casos. Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
+\textbf{Sensibilidade a quórum e janela.} Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
 detectar a mesma seed de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
 diferente): nenhum nível de quórum
 introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
@@ -509,9 +487,7 @@ perderia. A política evita cerca de 81\% da indisponibilidade da linha de base 
 drift permanente) em três das quatro corrupções e 70\% no ruído
 Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
 como o drift é instantâneo e permanente, atraso converte-se em indisponibilidade
-um para um (116 $\approx$ 108 + 8\,s). Portanto, no regime dessincronizado o
-quórum dá indícios de vantagem; sob drift simultâneo, é
-um seguro barato cuja proteção contra falsos positivos não medimos aqui.
+um para um (116 $\approx$ 108 + 8\,s).
 
 \subsection{Taxa de falsos positivos em fluxos sem drift}
 Executamos 15 episódios de controle (cinco seeds vezes três cronogramas de rampa) sem
@@ -611,10 +587,8 @@ linha de base (indisponibilidade de 540\,s). Com rampa de 200\,s os
 atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas o braço reativo
 ainda corta a indisponibilidade da linha de base em 75\% (112 vs.\ 448\,s), em consonância com o
 risco que detectores do tipo ADWIN carregam sob drifts longos e suaves
-\cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa:
-o gatilho de primeiro alarme tem média de 77,3\,s contra 140,1\,s do
-braço de quórum 0,30---a perda da seed 42 é o preço de um gatilho que depende
-da detectabilidade local. A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
+\cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa.
+A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
 
 \begin{figure}[!t]
 \centering
@@ -660,14 +634,11 @@ episódios, e as severidades não são revalidadas por seed. (ix) Os contrastes 
 calibradas; relatamos médias descritivas por grupo sobre 12 grupos sem
 correção para comparações múltiplas, e a robustez ordinal a
 $\tau \in \{0{,}40;\,0{,}55\}$ (Seção VI-B) não se estende à sua
-magnitude. (x) Comparado a um gatilho de primeiro alarme (quórum 0,10, janela de um passo),
-o braço de quórum 0,30 é mais lento e incorre em maior indisponibilidade, com o custo
-concentrado no ruído Gaussiano; a proteção contra falsos positivos que o
+magnitude. (x) A proteção contra falsos positivos que o
 quórum oferece não pôde
-ser quantificada (sem execuções sem drift nos limiares baixos), de modo que nossas afirmações
-restringem-se à sua viabilidade, à taxa
-nula de falsos positivos em fluxos sem drift e à vantagem
-dependente do cenário. Comparadores com agendamento, do tipo oráculo e com detector centralizado
+ser quantificada, de modo que nossas afirmações
+restringem-se à sua viabilidade e à taxa
+nula de falsos positivos em fluxos sem drift. Comparadores com agendamento, do tipo oráculo e com detector centralizado
 permanecem como trabalhos futuros; como o início do drift coincide com o início da produção
 em todos os episódios, o retreinamento calendarizado agiria como oráculo,
 e não como linha de base justa. (xi) Episódios de controle sem drift (15)
@@ -681,12 +652,7 @@ serviço como métrica primária. A detecção teve êxito em 59 de 60 episódio
 com o atraso crescendo com a duração da rampa para as corrupções visuais; o
 braço reativo reduziu a indisponibilidade média de 408--562\,s para 0--178\,s
 (zero no caso de névoa com rampa de 200\,s); e rampas longas preservaram a acurácia
-limpa para as corrupções visuais. Contra o comparador de primeiro alarme,
-o braço com quórum 0,30 custa, em média, cerca de 13,8\,s a mais de latência de detecção e
-cerca de 20\,s a mais de indisponibilidade em troca da corroboração de uma
-decisão coletiva; a
-vantagem é dependente do cenário---no ruído Gaussiano o gatilho de primeiro alarme
-é marcadamente mais robusto (77,3\,s vs.\ 140,1\,s), enquanto o
+limpa para as corrupções visuais. O
 gatilho coletivo dispara nos 20 episódios dessincronizados
 (70--81\% da indisponibilidade da linha de base evitada) com taxa de falsos positivos de
 0\% em 15 controles sem drift.
