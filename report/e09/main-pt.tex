@@ -361,7 +361,7 @@ seeds & 42--46\\
 Relatamos médias por grupo sobre as cinco seeds e testamos duas hipóteses: H1, a
 política reativa reduz o downtime em relação
 à baseline sem retreinamento; H2, o atraso de detecção cresce com a duração da
-rampa. As medidas primárias são o atraso de detecção, a fração degradada no disparo e o downtime;
+rampa. As medidas primárias são o atraso de detecção, o progresso do drift no disparo e o downtime;
 as secundárias são a clean retention (acurácia limpa final menos a acurácia limpa
 antes do drift) e a acurácia final sob degradação.
 
@@ -375,7 +375,7 @@ em consonância com a análise do ADWIN para mudança gradual com inclinação c
 
 \begin{table}[!t]
 \centering
-\caption{Atraso de detecção (s) e fração degradada no disparo (médias por
+\caption{Atraso de detecção (s) e progresso do drift no disparo (médias por
 grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou em
 100\,s está excluída da média de atraso desse grupo).}
 \label{tab:delay}
@@ -383,7 +383,7 @@ grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou e
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lccccl}
 \toprule
- & \multicolumn{3}{c}{Atraso (s)} & \multicolumn{1}{c}{Fração no disparo} & \multicolumn{1}{c}{Taxa de det.}\\
+ & \multicolumn{3}{c}{Atraso (s)} & \multicolumn{1}{c}{Progresso do drift no disparo} & \multicolumn{1}{c}{Taxa de det.}\\
 \cmidrule(lr){2-4}\cmidrule(lr){5-5}\cmidrule(lr){6-6}
 Degradação & 50\,s & 100\,s & 200\,s & 200\,s & (de 5)\\
 \midrule
@@ -395,8 +395,9 @@ Ruído Gaussiano & 164 & 158$^{*}$ & 256 & 0,97 & 4/5$^{*}$\\
 \end{tabular}}
 \vspace{2pt}
 {\footnotesize Desvio-padrão do atraso entre seeds: $\le$6\,s para as degradações
-visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s a
-fração no disparo é 1,00 por construção (disparos pós-rampa).}
+visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s o
+disparo ocorre após o fim da rampa, de modo que o progresso do drift no
+disparo é 1,00 por construção.}
 \end{table}
 
 \subsection{Downtime: política reativa domina a baseline}
@@ -428,7 +429,7 @@ A política reativa reduz o downtime médio nos 12 grupos, de
 408--562\,s para 0--178\,s, com 59 vitórias nos 60 episódios pareados.
 O cenário de fog
 com rampa de 200\,s atinge \textbf{downtime zero} com $\tau=0{,}5$
-(Fig.~\ref{fig:fog}): o disparo ocorre na fração 0,69, quando a
+(Fig.~\ref{fig:fog}): o disparo ocorre com o progresso do drift em 0,69, quando a
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob degradação de 0,71).
 
@@ -513,7 +514,7 @@ Primeiro, \emph{rampas longas preservam a acurácia no conjunto limpo}
 o conjunto de retreinamento mantém cerca de 30\% de dados limpos e a perda de acurácia
 limpa cai para 1--2 pontos (contra 9--21 em rampas curtas) para fog,
 frosted-glass e motion blur; o ruído Gaussiano não se beneficia
-(fração 0,97). Segundo, \emph{a recuperação
+(progresso do drift de 0,97 no disparo). Segundo, \emph{a recuperação
 não é temporária}: nenhum episódio volta a cruzar $\tau$ dentro do horizonte; o
 modelo retreinado generaliza para o regime totalmente degradado. Em 9 dos 20
 episódios com rampa de 200\,s (todas as cinco execuções de fog, três de frosted-glass e uma
@@ -549,7 +550,7 @@ As conclusões sobre o downtime são robustas a uma rodada $10\times$ mais longa
 ao recalcular-se o downtime \emph{a posteriori} a partir das séries registradas---atribuindo a
 acurácia pré-retreinamento ao intervalo $[t_d,t_d+d]$, usando o primeiro registro
 pós-retreinamento em diante e aplicando a regra de orçamento---, verifica-se que
-uma rodada de 80\,s, dominada pela comunicação, ainda corta o downtime médio
+uma rodada de 80\,s ainda corta o downtime médio
 de 507,5\,s (baseline) para 122,2\,s (76\%). A ordenação por grupo,
 o caso de downtime zero no fog e o comportamento limitado pela detecção no ruído
 Gaussiano permanecem inalterados; o custo extra é exatamente o intervalo pré-retreinamento
@@ -586,15 +587,15 @@ quatro seeds se recuperam para cerca de 0,68.}
 \end{figure}
 
 \subsection{Por que a rampa longa se comporta melhor}
-Para as degradações visuais, a rampa de 200\,s tem três efeitos favoráveis. (i) O disparo ocorre no meio da rampa, nas frações 0,68--0,70, em que
+Para as degradações visuais, a rampa de 200\,s tem três efeitos favoráveis. (i) O disparo ocorre no meio da rampa, com progresso do drift de 0,68--0,70, em que
 a acurácia na decisão é 0,57 para fog (ainda acima de $\tau$), 0,51
 para frosted-glass e 0,48 para motion blur. (ii)
 O conjunto de retreinamento contém cerca de 30\% de dados limpos, reduzindo
-o esquecimento catastrófico. (iii) O modelo retreinado na fração
+o esquecimento catastrófico. (iii) O modelo retreinado com progresso do drift de
 $\approx$0,7 generaliza para o regime totalmente degradado, de modo que a recuperação
 se sustenta. Rampas curtas comportam-se como o regime abrupto:
 a detecção termina após a rampa e o conjunto de retreinamento fica quase totalmente
-degradado. O ruído Gaussiano dispara mais tarde (fração 0,97) e não
+degradado. O ruído Gaussiano dispara mais tarde (progresso 0,97) e não
 usufrui dos efeitos (i) e (ii).
 
 \subsection{Limitações}
@@ -604,30 +605,19 @@ modelo é uma CNN pequena de cerca de 2,2 milhões de parâmetros; as acurácias
 sob degradação são modestas, como esperado para arquiteturas pequenas
 \cite{hendrycks2019}. (iii) O cenário pressupõe um único drift, uma
 rodada de retreinamento, partição IID, velocidade uniforme e horizonte
-fixo. (iv) A fração no disparo só é informativa no
-regime de rampa longa. (v) O UDD publicado usa $T=50$ forward passes; nosso $T=5$ é uma decisão de custo
-sem equivalência publicada, e $\delta=0{,}002$ é o valor padrão
+fixo. (iv) O progresso do drift no disparo só é informativo na
+rampa de 200\,s. (v) O UDD publicado usa $T=50$ forward passes; o nosso $T=5$ reduz o orçamento de
+monitoramento por uma questão de custo, e a comparação direta entre as duas
+configurações não foi investigada aqui, permanecendo como trabalho futuro;
+$\delta=0{,}002$ é o valor padrão
 da implementação de referência, e não um valor calibrado
 \cite{baier2023,poenaru2022}. (vi) O downtime é amostrado na granularidade do passo
-mais o instante de conclusão da rodada; o cruzamento real de
-$\tau$ pode cair entre passos. (vii) Os episódios rodaram em GPU CUDA
-(PyTorch 2.5.1, CUDA 12.1) com algoritmos não determinísticos; a reprodução bit a bit
-não foi confirmada, embora se verifique que cada par compartilha
-checkpoint, fluxo e horizonte idênticos. (viii) As
-severidades foram calibradas em um checkpoint limpo de uma execução de treinamento
-separada; o digest da calibração difere dos checkpoints dos
-episódios, e as severidades não são revalidadas por seed. (ix) Os contrastes relatados dependem de $\tau=0{,}5$ e das severidades
-calibradas; relatamos médias descritivas por grupo sobre 12 grupos sem
-correção para comparações múltiplas, e a robustez ordinal a
-$\tau \in \{0{,}40;\,0{,}55\}$ (Seção VI-B) não se estende à sua
-magnitude. (x) A proteção contra falsos positivos que o
+mais o instante de conclusão da rodada. (vii) A proteção contra falsos positivos que o
 quórum oferece não pôde
 ser quantificada, de modo que nossas afirmações
 restringem-se à sua viabilidade e à taxa
 nula de falsos positivos em fluxos sem drift. Comparadores com agendamento, do tipo oráculo e com detector centralizado
-permanecem como trabalhos futuros; como o início do drift coincide com o início da produção
-em todos os episódios, o retreinamento calendarizado agiria como oráculo,
-e não como baseline justa. (xi) Episódios de controle sem drift (15)
+permanecem como trabalhos futuros. (viii) Episódios de controle sem drift (15)
 não produziram nenhum disparo falso (0/15), de modo que a taxa de falsos positivos do
 detector sob monitoramento contínuo é de 0\% nesta configuração.
 \section{Conclusão e Trabalhos Futuros}
@@ -643,14 +633,9 @@ gatilho coletivo dispara nos 20 episódios de staggered drift
 (70--81\% do downtime da baseline evitado) com taxa de falsos positivos de
 0\% em 15 controles sem drift.
 Trabalhos futuros incluem baselines com detector centralizado, do tipo oráculo e
-cientes do agendamento (com início aleatorizado) para isolar
-a contribuição do mecanismo de detecção; mais seeds e análise formal de
-dispersão; drift recorrente; partições não IID e velocidades heterogêneas
-de clientes; drift incremental; modelos maiores; sensibilidade aos parâmetros $T$, $\delta$ e
-limites de calibração do detector; o atraso normalizado de
-detecção (NDT) do benchmark \cite{cerqueira2026}; e a publicação do
-protocolo como benchmark reutilizável para avaliação de FL sob drift
-\cite{mahdi2025}.
+cientes do agendamento; mais seeds e análise formal de
+dispersão; drift recorrente; partições não IID; drift incremental; modelos maiores; sensibilidade aos parâmetros $T$, $\delta$ e
+limites de calibração do detector.
 
 \section*{Disponibilidade}
 A implementação e todos os artefatos---os 60 episódios pareados,

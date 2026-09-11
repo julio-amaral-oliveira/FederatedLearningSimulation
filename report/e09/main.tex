@@ -376,7 +376,7 @@ We report group means over the five seeds and test two hypotheses: H1, the
 reactive policy reduces downtime relative
 to the no-retraining baseline; H2, the detection delay grows with the ramp
 duration. Primary measurements are the detection delay (production
-start to trigger), the mixture fraction at the trigger, and the downtime;
+start to trigger), the drift progress at the trigger, and the downtime;
 secondary are clean retention (final minus pre-drift clean accuracy) and
 final corrupted accuracy.
 
@@ -389,14 +389,14 @@ consistent with ADWIN's analysis of gradual change with constant slope
 
 \begin{table}[!t]
 \centering
-\caption{Detection delay (s) and mixture fraction at the trigger (group
+\caption{Detection delay (s) and drift progress at the trigger (group
 means over 5 seeds; detection rate per group; the failed Gaussian seed at
 100\,s is excluded from its delay mean).}
 \label{tab:delay}
 \small
 \begin{tabular}{lccccl}
 \toprule
- & \multicolumn{3}{c}{Delay (s)} & \multicolumn{2}{c}{Frac.\ at trigger}\\
+ & \multicolumn{3}{c}{Delay (s)} & \multicolumn{2}{c}{Drift progress}\\
 \cmidrule(lr){2-4}\cmidrule(lr){5-6}
 Corruption & 50\,s & 100\,s & 200\,s & 200\,s & det.\\
 \midrule
@@ -409,7 +409,8 @@ Gaussian noise & 164 & 158$^{*}$ & 256 & 0.97 & 4/5$^{*}$\\
 \vspace{2pt}
 {\footnotesize Delay std across seeds: $\le$6\,s for the visual
 corruptions; 71--104\,s for Gaussian noise. For the 50 and 100\,s ramps the
-fraction at the trigger is 1.00 by construction (post-ramp triggers).}
+trigger occurs after the ramp ends, so the drift progress at the trigger is
+1.00 by construction.}
 \end{table}
 
 \subsection{Downtime: reactive policy dominates the baseline}
@@ -441,7 +442,7 @@ The reactive policy reduces the mean downtime in all 12 groups, from
 408--562\,s to 0--178\,s, with 59 wins in the 60 paired episodes.
 The fog scenario
 with the 200\,s ramp reaches \textbf{zero downtime} at $\tau=0.5$
-(Fig.~\ref{fig:fog}): the trigger occurs at fraction 0.69 while the
+(Fig.~\ref{fig:fog}): the trigger occurs at a drift progress of 0.69 while the
 accuracy is still 0.568 (above $\tau$), and the single round keeps it
 above $\tau$ (final corrupted accuracy 0.71).
 
@@ -547,7 +548,7 @@ First, \emph{long ramps preserve the clean-set accuracy}
 the retraining set keeps roughly 30\% of clean data and the clean-accuracy
 loss drops to 1--2 points (versus 9--21 on short ramps) for fog,
 frosted-glass, and motion blur; Gaussian noise does not benefit
-(fraction 0.97). Second, \emph{the recovery
+(trigger at drift progress 0.97). Second, \emph{the recovery
 is not temporary}: no episode re-crosses $\tau$ within the horizon; the
 retrained model generalizes to the fully corrupted regime. In 9 of the 20
 episodes with the 200\,s ramp (all five fog runs, three frosted runs, one
@@ -621,15 +622,15 @@ four seeds recover to about 0.68.}
 \end{figure}
 
 \subsection{Why the long ramp behaves better}
-For the visual corruptions the 200\,s ramp has three favorable effects. (i) The trigger occurs mid-ramp, at fractions 0.68--0.70, where
+For the visual corruptions the 200\,s ramp has three favorable effects. (i) The trigger occurs mid-ramp, at a drift progress of 0.68--0.70, where
 the accuracy at the decision is 0.57 for fog (still above $\tau$), 0.51
 for frosted-glass, and 0.48 for motion blur. (ii)
 The retraining set mixes about 30\% clean data, reducing
-catastrophic forgetting. (iii) The model retrained at fraction
+catastrophic forgetting. (iii) The model retrained at a drift progress of
 $\approx$0.7 generalizes to the fully corrupted regime, so the recovery
 holds. Short ramps behave like the abrupt regime:
 detection completes after the ramp and the retraining set is almost fully
-corrupted. Gaussian noise triggers later (fraction 0.97) and does not
+corrupted. Gaussian noise triggers later (drift progress 0.97) and does not
 enjoy effects (i) and (ii).
 
 \subsection{Limitations}
@@ -639,10 +640,12 @@ model is a small CNN of about 2.2 million parameters; absolute accuracies
 under corruption are modest, as expected for small architectures
 \cite{hendrycks2019}. (iii) The scenario assumes a single drift, one
 retraining round, an IID partition, uniform speed, and a fixed
-horizon. (iv) The fraction at the trigger is informative only in the
-long-ramp regime. (v) The published UDD uses $T=50$ forwards; our $T=5$ is a cost
-decision without published equivalence, and $\delta=0.002$ is the fallback
-of the reference implementation rather than a calibrated
+horizon. (iv) The drift progress at the trigger is informative only for the
+200\,s ramp; on the 50 and 100\,s ramps the trigger occurs after the ramp ends,
+so the value is 1.00 by construction. (v) The published UDD uses $T=50$ forwards; our $T=5$ reduces the monitoring
+budget as a cost trade-off, and the direct comparison between the two
+settings is not investigated here and remains future work; $\delta=0.002$ is
+the fallback of the reference implementation rather than a calibrated
 value \cite{baier2023,poenaru2022}. (vi) Downtime is sampled at tick
 granularity plus the round-completion instant; the true crossing of
 $\tau$ can fall between ticks. (vii) Episodes ran on a CUDA GPU
