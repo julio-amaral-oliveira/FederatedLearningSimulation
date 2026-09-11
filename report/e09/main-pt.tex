@@ -18,7 +18,7 @@
 
 \begin{document}
 
-\title{Do Drift Abrupto ao Gradual em Aprendizado Federado: Retreinamento Reativo sem Rótulos e uma Métrica de Indisponibilidade de Serviço}
+\title{Do Drift Abrupto ao Gradual em Aprendizado Federado: Retreinamento Reativo sem Rótulos e uma Métrica de Downtime de Serviço}
 
 \author{
 \IEEEauthorblockN{Julio Amaral, Hugo César, Miguel Elias M. Campista, Luiz Fernando Bittencourt}
@@ -29,7 +29,7 @@
 \maketitle
 
 \begin{abstract}
-Modelos de aprendizado federado (FL) implantados em produção enfrentam drift de conceito:
+Modelos de aprendizado federado (FL) implantados em produção enfrentam concept drift:
 a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
 até que uma ação de retreinamento seja adotada; em implantações reais a mudança é com
 frequência gradual, com a fração de entradas degradadas crescendo lentamente ao longo de um intervalo
@@ -37,11 +37,11 @@ de transição cuja duração é a largura do drift.
 Estudamos o retreinamento reativo em FL síncrono à medida que a
 transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
 fluxo de entrada não rotulado com um detector local
-baseado em incerteza (dropout de Monte Carlo, entropia de Shannon e um
+baseado em incerteza (Monte Carlo dropout, entropia de Shannon e um
 teste de janela adaptativa ADWIN); o servidor agrega os alarmes locais ao longo de uma
 curta janela de passos de monitoramento e dispara no máximo uma única vez uma rodada de retreinamento sobre
-os dados correntes de cada cliente. A métrica primária é a
-indisponibilidade (downtime) de serviço, o tempo virtual acumulado em que a
+os dados correntes de cada cliente. A métrica primária é o
+downtime de serviço, o tempo virtual acumulado em que a
 acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
 episódios pareados (quatro
 degradações calibradas, cinco seeds, três durações de rampa de 50--200\,s)
@@ -49,29 +49,29 @@ sobre um horizonte fixo de 600\,s, contra uma baseline pareada sem retreinamento
 A detecção tem êxito em 59 de 60 episódios (14 de 15 no
 cenário de ruído Gaussiano); o atraso de detecção cresce com a duração da rampa
 para as três degradações visuais (98--140\,s) e chega a 256\,s para
-o ruído Gaussiano; a política reativa reduz a indisponibilidade média de
-408--562\,s na baseline para 0--178\,s, alcançando indisponibilidade zero em
-$\tau=0{,}5$ no cenário de névoa (fog) com rampa mais longa; e rampas longas preservam
+o ruído Gaussiano; a política reativa reduz o downtime médio de
+408--562\,s na baseline para 0--178\,s, alcançando downtime zero em
+$\tau=0{,}5$ no cenário de fog com rampa mais longa; e rampas longas preservam
 a acurácia no conjunto limpo para as degradações visuais (perda de 1--2 pontos em vez de
 9--21). No
 regime exercitado (CIFAR-10, partição IID, dez clientes, um único drift e
 no máximo uma rodada de retreinamento), uma política reativa sem rótulos é eficaz,
 em comparação com uma baseline sem retreinamento; a latência de detecção
 depende do cenário, e o ruído Gaussiano é o caso mais difícil;
-o gatilho coletivo detecta todos os episódios de drift dessincronizado (staggered) com zero alarmes falsos em
+o gatilho coletivo detecta todos os episódios de staggered drift com zero alarmes falsos em
 fluxos sem drift.
 \end{abstract}
 
 \begin{IEEEkeywords}
-aprendizado federado, drift de conceito, detecção de drift, retreinamento reativo,
-detecção não supervisionada, indisponibilidade de serviço.
+aprendizado federado, concept drift, detecção de drift, retreinamento reativo,
+detecção não supervisionada, downtime de serviço.
 \end{IEEEkeywords}
 
 \section{Introdução}
 \IEEEPARstart{A}{prendizado} federado (FL) treina um modelo compartilhado a partir de dados que
 permanecem distribuídos entre os clientes \cite{mcmahan2017}. Uma vez implantado, o
 modelo é servido em um ambiente cuja distribuição de dados pode mudar; tal
-drift de conceito compromete a qualidade do modelo em serviço até que uma ação de
+concept drift compromete a qualidade do modelo em serviço até que uma ação de
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
 inferência---é um pré-requisito para dispará-la. Uma simplificação comum
 na literatura é injetar o drift de forma abrupta: a distribuição muda em um
@@ -89,8 +89,8 @@ Nossa política reativa segue a arquitetura para a qual a literatura de drift em
 convergiu: \emph{detecção local, decisão central}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
 zhou2026,casado2022,panchal2023,chen2026}. Cada cliente executa um detector de drift por
-incerteza (UDD) \cite{baier2023}: dropout de Monte Carlo (MC) \cite{gal2016}
-ao longo de $T$ passagens estocásticas, entropia média de Shannon e um teste de janela
+incerteza (UDD) \cite{baier2023}: Monte Carlo (MC) dropout \cite{gal2016}
+ao longo de $T$ forward passes estocásticos, entropia média de Shannon e um teste de janela
 adaptativa ADWIN \cite{bifet2007} por cliente.
 O servidor coleta os alarmes por cliente ao longo de uma janela deslizante de dois
 passos de monitoramento e dispara quando a fração de clientes distintos sinalizados
@@ -100,20 +100,20 @@ explícitos de retreinamento do DriftGuard \cite{han2026} e do ShiftEx
 \cite{bhope2025} e com a separação entre gatilho e seleção de dados do Modyn
 \cite{bother2025}.
 
-A métrica primária é a \emph{indisponibilidade} (downtime) de serviço: o tempo virtual
+A métrica primária é o \emph{downtime} de serviço: o tempo virtual
 acumulado em que a acurácia do modelo em serviço sob degradação permanece abaixo de um
 limiar de qualidade $\tau$.
 Até onde sabemos, nenhum trabalho na literatura revisada de drift em FL quantifica
 o tempo em que um modelo em serviço permanece abaixo de um limiar de qualidade; detalhamos essa
 lacuna na Seção II-E.
 
-Nossas contribuições são: (i) uma \textbf{métrica de indisponibilidade de serviço} para FL sob
+Nossas contribuições são: (i) uma \textbf{métrica de downtime de serviço} para FL sob
 drift, calculada como integral em escada sobre um horizonte fixo; (ii) uma
 \textbf{política coletiva por quórum} que agrega alarmes sem rótulos por cliente
 ao longo de uma curta janela de passos, ausente na literatura revisada e
 mais próxima da barreira de participação do FL-MalDrift \cite{patel2026}, cuja
 latência de detecção caracterizamos por meio de
-ablações de janela e sob drift dessincronizado;
+ablações de janela e sob staggered drift;
 (iii) uma \textbf{implementação federada do UDD}, com um
 detector por cliente compartilhando o modelo global, estendendo o detector
 centralizado de Baier et al.~\cite{baier2023}; (iv) uma \textbf{infraestrutura experimental
@@ -124,11 +124,11 @@ horizonte, validada antes da publicação; e (v) uma
 pareados.
 
 \section{Contextualização e Trabalhos Relacionados}
-\subsection{Drift de conceito em aprendizado federado}
-Drift de conceito é a mudança na distribuição dos dados ao longo do tempo
+\subsection{Concept drift em aprendizado federado}
+Concept drift é a mudança na distribuição dos dados ao longo do tempo
 \cite{criado2022,mahdi2025}; a taxonomia distingue drift virtual (só
 $P(X)$ muda) de drift real (a condicional $P(Y\mid X)$ muda), bem como
-drifts abruptos, graduais e recorrentes \cite{mahdi2025}. Drifts dessincronizados,
+drifts abruptos, graduais e recorrentes \cite{mahdi2025}. Staggered drifts,
 nos quais clientes diferentes sofrem drift em momentos diferentes, são estudados por
 Jothimurugesan et al.~\cite{jothimurugesan2023}. O drift gradual, regime
 estudado aqui, combina o conceito novo com o antigo em proporção crescente
@@ -137,7 +137,7 @@ largura do drift
 \cite{poenaru2022,cerqueira2026}.
 
 Nosso escopo limita-se a drifts acompanhados de mudança em
-$P(X)$ (deslocamento de covariáveis com rótulos preservados). É o pressuposto sob o qual
+$P(X)$ (covariate shift, com rótulos preservados). É o pressuposto sob o qual
 a detecção sem rótulos é estruturalmente possível: métodos sem rótulos são
 funções determinísticas das entradas, de modo que uma mudança restrita a $P(Y\mid X)$
 não produz sinal observável --- um ponto cego medido por Solozobov
@@ -146,14 +146,14 @@ não produz sinal observável --- um ponto cego medido por Solozobov
 \subsection{Detecção local, decisão central}
 Um achado recorrente é que a detecção de drift precisa ser
 local. Jothimurugesan et al.~\cite{jothimurugesan2023} mostram que testar o
-erro agregado no servidor falha durante transições dessincronizadas, porque
+erro agregado no servidor falha durante transições staggered, porque
 os erros de clientes que já sofreram drift e dos que ainda não sofreram
 se cancelam. FLARE \cite{chow2023}, FLAME \cite{mavromatis2024},
 FL-MalDrift \cite{patel2026}, DriftGuard \cite{han2026}, FedDAA
 \cite{fu2025}, FedPLC \cite{zhou2026},
 FELK/FL-HVD \cite{chen2026} e
 Casado et al.~\cite{casado2022} seguem detecção local com decisão
-central: nove dos doze trabalhos de FL com drift de conceito que revisamos o fazem.
+central: nove dos doze trabalhos de FL com concept drift que revisamos o fazem.
 As três exceções: o FLASH detecta drift no servidor
 a partir da magnitude das atualizações agregadas de parâmetros \cite{panchal2023};
 Stallmann et al.\ usam um detector global por agrupamento fuzzy
@@ -168,11 +168,11 @@ O detector de drift por incerteza (UDD) de Baier et al.~\cite{baier2023} é o
 método de referência sem rótulos; a Seção IV-A descreve nossa implementação.
 O ADWIN é preferido a DDM/EDDM porque estes exigem entradas binomiais,
 enquanto o sinal de entropia não se restringe a esse tipo
-\cite{baier2023}. Lobo et al.~\cite{lobo2023} conectam drift de conceito e
-incerteza do modelo, e sabe-se que estimadores de incerteza perdem confiabilidade sob deslocamento de dados
+\cite{baier2023}. Lobo et al.~\cite{lobo2023} conectam concept drift e
+incerteza do modelo, e sabe-se que estimadores de incerteza perdem confiabilidade sob dataset shift
 \cite{ovadia2019}. O D3M \cite{nguyen2025} é um método complementar sem rótulos,
 baseado em discordância entre modelos, com garantias quanto a falsos positivos sob o
-pressuposto de deslocamento de covariáveis. O PUDD \cite{lu2025} é igualmente
+pressuposto de covariate shift. O PUDD \cite{lu2025} é igualmente
 complementar: aplica um teste qui-quadrado de Pearson a um índice de incerteza de
 predição, cujo nível de significância controla a taxa de falsos positivos --- ao
 contrário da etapa ADWIN do UDD, que acompanha a média.
@@ -197,10 +197,10 @@ detecção, taxa de alarmes, janelas de aceitação), o que também registram le
 \cite{mahdi2025}. Latência de detecção \cite{baier2023,chow2023},
 duração do retreinamento e custo por retreinamento \cite{han2026} são relatados
 separadamente; nenhum dos trabalhos que revisamos quantifica, em uma métrica de
-indisponibilidade, o tempo em que o modelo em serviço permanece abaixo de um limiar de
-qualidade, à semelhança da prática de SLO em MLOps. A linguagem de indisponibilidade existe em
-trabalhos adjacentes de sistemas de ML---o desaprendizado (unlearning) federado mede a
-indisponibilidade de serviço como o tempo de inatividade incorrido ao retreinar para apagar
+downtime, o tempo em que o modelo em serviço permanece abaixo de um limiar de
+qualidade, à semelhança da prática de SLO em MLOps. A linguagem de downtime existe em
+trabalhos adjacentes de sistemas de ML---o desaprendizado (unlearning) federado mede o
+downtime de serviço como o tempo de inatividade incorrido ao retreinar para apagar
 dados \cite{zhang2025}---uma noção de disponibilidade (o serviço está fora de operação),
 distinta do nosso tempo de operação abaixo do limiar de qualidade.
 
@@ -223,10 +223,10 @@ A duração da rampa $N\Delta t$ é a largura do drift; sua inclinação $1/N$ p
 é a variável independente. Aqui $N\in\{5,10,20\}$ ($50$,
 $100$, $200$\,s com $\Delta t=10$\,s).
 
-\textbf{Limiar de qualidade e indisponibilidade.} Seja $a(v)$ a acurácia do
+\textbf{Limiar de qualidade e downtime.} Seja $a(v)$ a acurácia do
 modelo em serviço em um conjunto de teste com a fração corrente $f(v)$. O limiar de
 qualidade $\tau$ define o estado do serviço: o modelo está indisponível quando
-$a(v)<\tau$. A indisponibilidade ao longo de um horizonte fixo $[v_0,v_0+H]$ é
+$a(v)<\tau$. O downtime ao longo de um horizonte fixo $[v_0,v_0+H]$ é
 \begin{equation}
 D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 \mathbf{1}\big[a(v_i)<\tau\big] ,
@@ -248,14 +248,14 @@ a baseline registra, como contrafactual, o momento em que a política
 \subsection{Detecção local por incerteza (UDD por cliente)}
 Cada cliente $c$ executa um detector local sobre o modelo global compartilhado:
 (1) o modelo é posto em modo de avaliação com as camadas de dropout reativadas;
-(2) $T=5$ passagens estocásticas produzem probabilidades por classe;
+(2) $T=5$ forward passes estocásticos produzem probabilidades por classe;
 (3) calcula-se a entropia média de Shannon $H=-\sum_k p_k\log p_k$ sobre o lote;
 (4) o escalar alimenta um ADWIN por cliente com $\delta=0{,}002$
 \cite{bifet2007,baier2023}.
 Nossa implementação do ADWIN testa janelas de ao menos 20 observações,
 porque alimentamos o ADWIN com a entropia média de cada lote, uma vez
 por passo em cada cliente, e não com um fluxo de instâncias. Cada detector recebe
-20 passos de aquecimento (warm-up) em dados limpos antes do início da produção, calibrando-o sem alimentar a política coletiva.
+20 passos de warm-up em dados limpos antes do início da produção, calibrando-o sem alimentar a política coletiva.
 
 \subsection{Política coletiva por quórum}
 A cada passo de produção, o servidor recebe as flags de alarme por cliente e
@@ -276,7 +276,7 @@ tempo até a recuperação equivale à duração do retreinamento.
 \subsection{Avaliação sobre os dados correntes}
 A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente degradado quando a rampa
 termina; um teste totalmente degradado superestimaria a queda de acurácia durante
-a rampa. A composição usa uma permutação determinística semeada por episódio, de modo que
+a rampa. A composição usa uma permutação determinística com seed por episódio, de modo que
 ambos os braços são avaliados sobre o tensor idêntico em cada instante.
 
 \subsection{Calibração de severidade}
@@ -295,10 +295,10 @@ tensores---ruído Gaussiano, frosted-glass blur, motion blur e fog---com
 severidades inteiras de $1$--$5$, geradores por seed e formas e
 rótulos preservados. Elas são \emph{inspiradas} no benchmark
 CIFAR-10-C \cite{hendrycks2019}; o ruído Gaussiano adiciona perturbações com
-desvios-padrão por severidade de 0,08--0,24; o borrão de vidro fosco permuta
+desvios-padrão por severidade de 0,08--0,24; o frosted-glass blur permuta
 pixels em uma vizinhança $3\times3$ e combina-os com um borrão Gaussiano
-(força 0,2--1,0); o borrão de movimento faz convolução com um kernel diagonal de largura
-5--15; a névoa combina a imagem com um mapa de ruído fractal de quatro oitavas.
+(força 0,2--1,0); o motion blur faz convolução com um kernel diagonal de largura
+5--15; o fog combina a imagem com um mapa de ruído fractal de quatro oitavas.
 \subsection{Resultado da calibração}
 A calibração, executada uma vez a partir de um checkpoint limpo, selecionou as
 
@@ -312,9 +312,9 @@ $(0{,}25;\,0{,}50)$).}
 Degradação & Severidade & Acurácia\\
 \midrule
 Ruído Gaussiano & 3 & 0,3783\\
-Borrão de vidro fosco & 4 & 0,4022\\
-Borrão de movimento & 1 & 0,3493\\
-Névoa & 4 & 0,4875\\
+Frosted-glass blur & 4 & 0,4022\\
+Motion blur & 1 & 0,3493\\
+Fog & 4 & 0,4875\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -337,13 +337,13 @@ Parâmetro & Valor\\
 \midrule
 Conjunto de dados & CIFAR-10, IID, 10 clientes\\
 Rodadas iniciais (limpas) & 20\\
-Passos de aquecimento (limpos) & 20\\
+Passos de warm-up (limpos) & 20\\
 Duração do passo & 10\,s\\
 Tamanho de lote / épocas & 32 / 1\\
 Modelo & CNN 2,2M (4 conv, 2 fc)\\
 Otimizador & Adam, lr $10^{-3}$\\
 Velocidade / timeout & uniforme (p75; rodada $\approx$ 8\,s)\\
-Detector & ADWIN $\delta=0{,}002$; dropout MC $T=5$\\
+Detector & ADWIN $\delta=0{,}002$; MC dropout $T=5$\\
 Quórum / janela & 0,30 / 2 passos\\
 Orçamento de retreinamento & 1 rodada\\
 Limiar de qualidade $\tau$ & 0,50\\
@@ -354,9 +354,9 @@ seeds & 42--46\\
 \end{table}
 \section{Resultados}
 Relatamos médias por grupo sobre as cinco seeds e testamos duas hipóteses: H1, a
-política reativa reduz a indisponibilidade em relação
+política reativa reduz o downtime em relação
 à baseline sem retreinamento; H2, o atraso de detecção cresce com a duração da
-rampa. As medidas primárias são o atraso de detecção, a fração degradada no disparo e a indisponibilidade;
+rampa. As medidas primárias são o atraso de detecção, a fração degradada no disparo e o downtime;
 as secundárias são a clean retention (acurácia limpa final menos a acurácia limpa
 antes do drift) e a acurácia final sob degradação.
 
@@ -382,9 +382,9 @@ grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou e
 \cmidrule(lr){2-4}\cmidrule(lr){5-5}\cmidrule(lr){6-6}
 Degradação & 50\,s & 100\,s & 200\,s & 200\,s & (de 5)\\
 \midrule
-Névoa & 100 & 112 & 138 & 0,69 & 5/5\\
-Vidro fosco & 100 & 108 & 136 & 0,68 & 5/5\\
-Borrão de movimento & 98 & 112 & 140 & 0,70 & 5/5\\
+Fog & 100 & 112 & 138 & 0,69 & 5/5\\
+Frosted-glass & 100 & 108 & 136 & 0,68 & 5/5\\
+Motion blur & 98 & 112 & 140 & 0,70 & 5/5\\
 Ruído Gaussiano & 164 & 158$^{*}$ & 256 & 0,97 & 4/5$^{*}$\\
 \bottomrule
 \end{tabular}}
@@ -394,10 +394,10 @@ visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s a
 fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \end{table}
 
-\subsection{Indisponibilidade: política reativa domina a baseline}
+\subsection{Downtime: política reativa domina a baseline}
 \begin{table}[!t]
 \centering
-\caption{Indisponibilidade (s): braço reativo versus baseline pareada sem retreinamento
+\caption{Downtime (s): braço reativo versus baseline pareada sem retreinamento
 (médias por grupo sobre 5 seeds; formato: reativo / baseline).}
 \label{tab:downtime}
 \small
@@ -408,24 +408,24 @@ fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \cmidrule(lr){2-4}
 Degradação & 50\,s & 100\,s & 200\,s\\
 \midrule
-Névoa & 58 / 550 & 24 / 504 & \textbf{0} / 408\\
-Vidro fosco & 68 / 560 & 40 / 524 & 3 / 454\\
-Borrão de movimento & 68 / 562 & 50 / 530 & 14 / 466\\
+Fog & 58 / 550 & 24 / 504 & \textbf{0} / 408\\
+Frosted-glass & 68 / 560 & 40 / 524 & 3 / 454\\
+Motion blur & 68 / 562 & 50 / 530 & 14 / 466\\
 Ruído Gaussiano & 130 / 558 & 178 / 526 & 112 / 448\\
 \bottomrule
 \end{tabular}}
 \vspace{2pt}
 {\footnotesize A dispersão do ruído Gaussiano é grande (desvio-padrão do atraso de até 104\,s;
-desvio-padrão da indisponibilidade de até 184\,s, intervalo 38--540\,s); degradações visuais têm desvio-padrão
-$\le$6\,s (atraso) e $\le$10\,s (indisponibilidade).}
+desvio-padrão do downtime de até 184\,s, intervalo 38--540\,s); degradações visuais têm desvio-padrão
+$\le$6\,s (atraso) e $\le$10\,s (downtime).}
 \end{table}
-
-A política reativa reduz a indisponibilidade média nos 12 grupos, de
+%TODO: Continuar daqui
+A política reativa reduz o downtime médio nos 12 grupos, de
 408--562\,s para 0--178\,s.
 Um teste dos postos com sinais de Wilcoxon, pareado e unilateral, rejeita
-a igualdade de indisponibilidade entre os braços ($W^+=1770$ sobre as 59 diferenças
+a igualdade de downtime entre os braços ($W^+=1770$ sobre as 59 diferenças
 não nulas, o único par empatado excluído, $p=1{,}2\times10^{-11}$); a
-mediana agrupada da redução de indisponibilidade estimada por Hodges--Lehmann é de
+mediana agrupada da redução de downtime estimada por Hodges--Lehmann é de
 462\,s ($\approx$IC 95\% [450; 476]), o delta de Cliff pareado é 0,98
 (grande) e a política vence em 59 dos 60 episódios. Com $n=5$, os contrastes por
 grupo permanecem descritivos: a redução de Hodges--Lehmann
@@ -434,8 +434,8 @@ grupos e 0,80 (grande) para ruído Gaussiano na rampa de 100\,s (4 vitórias mai
 o único empate); e, como não existe intervalo exato de 95\% com $n=5$, os
 intervalos exatos usam a cobertura alcançável mais próxima, 93,75\% (87,5\% para
 o grupo de ruído Gaussiano com empate, $m=4$).
-O cenário de névoa
-com rampa de 200\,s atinge \textbf{indisponibilidade zero} com $\tau=0{,}5$
+O cenário de fog
+com rampa de 200\,s atinge \textbf{downtime zero} com $\tau=0{,}5$
 (Fig.~\ref{fig:fog}): o disparo ocorre na fração 0,69, quando a
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob degradação de 0,71).
@@ -450,11 +450,11 @@ pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_fog_ramp20.png}
-\caption{Névoa, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia sob degradação ao
+\caption{Fog, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia sob degradação ao
 longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias);
 $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo:
-acurácia final sob degradação, indisponibilidade e clean retention; o braço reativo
-nunca cai abaixo de $\tau$ (indisponibilidade zero).}
+acurácia final sob degradação, downtime e clean retention; o braço reativo
+nunca cai abaixo de $\tau$ (downtime zero).}
 \label{fig:fog}
 \end{figure}
 
@@ -465,24 +465,24 @@ ocorre no mínimo do quórum (0,30, três clientes distintos na
 janela de dois passos) em 21 de 59 episódios; o ruído Gaussiano dispara no
 mínimo em todos os episódios detectados da rampa de 100\,s. A
 rampa longa espalha os alarmes: a fração sinalizada na decisão cai
-com a duração da rampa (névoa $0{,}88\rightarrow0{,}42$, vidro fosco
-$0{,}90\rightarrow0{,}56$, movimento $0{,}66\rightarrow0{,}54$).
+com a duração da rampa (fog $0{,}88\rightarrow0{,}42$, frosted-glass
+$0{,}90\rightarrow0{,}56$, motion blur $0{,}66\rightarrow0{,}54$).
 
 \textbf{Sensibilidade a quórum e janela.} Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
 detectar a mesma seed de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
 diferente): o nível mais alto não
 introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
-resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de indisponibilidade),
+resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de downtime),
 com o sinal da diferença variando por grupo; a união de dois passos não mostra benefício
 sistemático.
 
-\textbf{Drift dessincronizado.} Quando os clientes sofrem drift em passos diferentes (cliente
+\textbf{Staggered drift.} Quando os clientes sofrem drift em passos diferentes (cliente
 $i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
-sinalizada 0,30--0,40). A política evita cerca de 81\% da indisponibilidade da baseline (600\,s,
+sinalizada 0,30--0,40). A política evita cerca de 81\% do downtime da baseline (600\,s,
 drift permanente) em três das quatro degradações e 70\% no ruído
-Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
-como o drift é instantâneo e permanente, atraso converte-se em indisponibilidade
+Gaussiano (116\,s e 180\,s de downtime no braço reativo, respectivamente);
+como o drift é instantâneo e permanente, atraso converte-se em downtime
 um para um (116 $\approx$ 108 + 8\,s).
 
 \subsection{Taxa de falsos positivos em fluxos sem drift}
@@ -509,9 +509,9 @@ gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
 \cmidrule(lr){2-4}
 Degradação & 50\,s & 100\,s & 200\,s\\
 \midrule
-Névoa & $-0{,}096\pm0{,}012$ & $-0{,}094\pm0{,}014$ & $-0{,}014\pm0{,}005$\\
-Vidro fosco & $-0{,}152\pm0{,}008$ & $-0{,}156\pm0{,}014$ & $-0{,}022\pm0{,}005$\\
-Borrão de movimento & $-0{,}199\pm0{,}017$ & $-0{,}208\pm0{,}020$ & $-0{,}016\pm0{,}002$\\
+Fog & $-0{,}096\pm0{,}012$ & $-0{,}094\pm0{,}014$ & $-0{,}014\pm0{,}005$\\
+Frosted-glass & $-0{,}152\pm0{,}008$ & $-0{,}156\pm0{,}014$ & $-0{,}022\pm0{,}005$\\
+Motion blur & $-0{,}199\pm0{,}017$ & $-0{,}208\pm0{,}020$ & $-0{,}016\pm0{,}002$\\
 Ruído Gaussiano & $-0{,}084\pm0{,}013$ & $-0{,}066\pm0{,}034$ & $-0{,}072\pm0{,}016$\\
 \bottomrule
 \end{tabular}}
@@ -520,13 +520,13 @@ Ruído Gaussiano & $-0{,}084\pm0{,}013$ & $-0{,}066\pm0{,}034$ & $-0{,}072\pm0{,
 Primeiro, \emph{rampas longas preservam a acurácia no conjunto limpo}
 (Tabela~\ref{tab:retention}): com rampa de 200\,s
 o conjunto de retreinamento mantém cerca de 30\% de dados limpos e a perda de acurácia
-limpa cai para 1--2 pontos (contra 9--21 em rampas curtas) para névoa,
-vidro fosco e borrão de movimento; o ruído Gaussiano não se beneficia
+limpa cai para 1--2 pontos (contra 9--21 em rampas curtas) para fog,
+frosted-glass e motion blur; o ruído Gaussiano não se beneficia
 (fração 0,97). Segundo, \emph{a recuperação
 não é temporária}: nenhum episódio volta a cruzar $\tau$ dentro do horizonte; o
 modelo retreinado generaliza para o regime totalmente degradado. Em 9 dos 20
-episódios com rampa de 200\,s (todas as cinco execuções de névoa, três de vidro fosco e uma
-de borrão de movimento), a acurácia nunca cai abaixo de $\tau$.
+episódios com rampa de 200\,s (todas as cinco execuções de fog, três de frosted-glass e uma
+de motion blur), a acurácia nunca cai abaixo de $\tau$.
 A acurácia final média por grupo, no regime totalmente degradado,
 varia de 0,60 a 0,71 para o braço reativo (exceto no episódio
 com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
@@ -535,7 +535,7 @@ com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
-\caption{Borrão de movimento, rampa de 200\,s, cinco seeds pareadas. O braço reativo
+\caption{Motion blur, rampa de 200\,s, cinco seeds pareadas. O braço reativo
 recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do
 horizonte; a baseline segue caindo até cerca de 0,35.}
 \label{fig:motion}
@@ -543,7 +543,7 @@ horizonte; a baseline segue caindo até cerca de 0,35.}
 
 \section{Discussão}
 O monitoramento não é gratuito: ao longo do episódio virtual de 80 passos, o detector com $T=5$ custa cerca de 6,8\,TFLOPs
-(4\,000 passagens em lote de 32, 50 por passo nos dez clientes) contra
+(4\,000 forward passes em lote de 32, 50 por passo nos dez clientes) contra
 cerca de 8,0\,TFLOPs da rodada única de retreinamento. A razão é de
 0,85--0,96 conforme a contabilização, ou seja, o monitoramento responde por cerca de
 47\% da computação reativa.
@@ -554,13 +554,13 @@ cliente. Se tivéssemos mantido a configuração publicada do UDD com
 $T=50$, o monitoramento excederia a rodada de retreinamento em cerca de $9\times$,
 razão pela qual a adoção de $T=5$ foi uma decisão de custo.
 
-As conclusões sobre indisponibilidade são robustas a uma rodada $10\times$ mais longa:
-ao recalcular-se a indisponibilidade \emph{a posteriori} a partir das séries registradas---atribuindo a
+As conclusões sobre o downtime são robustas a uma rodada $10\times$ mais longa:
+ao recalcular-se o downtime \emph{a posteriori} a partir das séries registradas---atribuindo a
 acurácia pré-retreinamento ao intervalo $[t_d,t_d+d]$, usando o primeiro registro
 pós-retreinamento em diante e aplicando a regra de orçamento---, verifica-se que
-uma rodada de 80\,s, dominada pela comunicação, ainda corta a indisponibilidade média
+uma rodada de 80\,s, dominada pela comunicação, ainda corta o downtime médio
 de 507,5\,s (baseline) para 122,2\,s (76\%). A ordenação por grupo,
-o caso de indisponibilidade zero na névoa e o comportamento limitado pela detecção no ruído
+o caso de downtime zero no fog e o comportamento limitado pela detecção no ruído
 Gaussiano permanecem inalterados; o custo extra é exatamente o intervalo pré-retreinamento
 que a rodada alonga. Com
 $d=800$\,s, a rodada já não cabe no horizonte de produção de 600\,s
@@ -579,9 +579,9 @@ máxima sinalizada de 0,20 em passos esparsos); as outras quatro seeds detectam 
 120--210\,s. Como a janela e o
 quórum são idênticos entre seeds, a falha é mais bem explicada como perda
 (miss) do detector por cliente (uma interação que não conseguimos isolar). Sem decisão, o braço reativo equivale exatamente à
-baseline (indisponibilidade de 540\,s). Com rampa de 200\,s os
+baseline (downtime de 540\,s). Com rampa de 200\,s os
 atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas o braço reativo
-ainda corta a indisponibilidade da baseline em 75\% (112 vs.\ 448\,s), em consonância com o
+ainda corta o downtime da baseline em 75\% (112 vs.\ 448\,s), em consonância com o
 risco que detectores do tipo ADWIN carregam sob drifts longos e suaves
 \cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa.
 A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
@@ -597,8 +597,8 @@ quatro seeds se recuperam para cerca de 0,68.}
 
 \subsection{Por que a rampa longa se comporta melhor}
 Para as degradações visuais, a rampa de 200\,s tem três efeitos favoráveis. (i) O disparo ocorre no meio da rampa, nas frações 0,68--0,70, em que
-a acurácia na decisão é 0,57 para névoa (ainda acima de $\tau$), 0,51
-para vidro fosco e 0,48 para borrão de movimento. (ii)
+a acurácia na decisão é 0,57 para fog (ainda acima de $\tau$), 0,51
+para frosted-glass e 0,48 para motion blur. (ii)
 O conjunto de retreinamento contém cerca de 30\% de dados limpos, reduzindo
 o esquecimento catastrófico. (iii) O modelo retreinado na fração
 $\approx$0,7 generaliza para o regime totalmente degradado, de modo que a recuperação
@@ -615,10 +615,10 @@ sob degradação são modestas, como esperado para arquiteturas pequenas
 \cite{hendrycks2019}. (iii) O cenário pressupõe um único drift, uma
 rodada de retreinamento, partição IID, velocidade uniforme e horizonte
 fixo. (iv) A fração no disparo só é informativa no
-regime de rampa longa. (v) O UDD publicado usa $T=50$ passagens; nosso $T=5$ é uma decisão de custo
+regime de rampa longa. (v) O UDD publicado usa $T=50$ forward passes; nosso $T=5$ é uma decisão de custo
 sem equivalência publicada, e $\delta=0{,}002$ é o valor padrão
 da implementação de referência, e não um valor calibrado
-\cite{baier2023,poenaru2022}. (vi) A indisponibilidade é amostrada na granularidade do passo
+\cite{baier2023,poenaru2022}. (vi) O downtime é amostrado na granularidade do passo
 mais o instante de conclusão da rodada; o cruzamento real de
 $\tau$ pode cair entre passos. (vii) Os episódios rodaram em GPU CUDA
 (PyTorch 2.5.1, CUDA 12.1) com algoritmos não determinísticos; a reprodução bit a bit
@@ -643,16 +643,16 @@ detector sob monitoramento contínuo é de 0\% nesta configuração.
 \section{Conclusão e Trabalhos Futuros}
 Estudamos o retreinamento reativo em aprendizado federado síncrono ao longo
 do espectro do drift abrupto ao gradual, avaliando nossa política reativa
-contra uma baseline pareada sem retreinamento em 60 episódios, com indisponibilidade de
+contra uma baseline pareada sem retreinamento em 60 episódios, com downtime de
 serviço como métrica primária. A detecção teve êxito em 59 de 60 episódios,
 com o atraso crescendo com a duração da rampa para as degradações visuais; o
-braço reativo reduziu a indisponibilidade média de 408--562\,s para 0--178\,s
-(zero no caso de névoa com rampa de 200\,s); e rampas longas preservaram a acurácia
+braço reativo reduziu o downtime médio de 408--562\,s para 0--178\,s
+(zero no caso de fog com rampa de 200\,s); e rampas longas preservaram a acurácia
 limpa para as degradações visuais. O
-gatilho coletivo dispara nos 20 episódios dessincronizados
-(70--81\% da indisponibilidade da baseline evitada) com taxa de falsos positivos de
+gatilho coletivo dispara nos 20 episódios de staggered drift
+(70--81\% do downtime da baseline evitado) com taxa de falsos positivos de
 0\% em 15 controles sem drift.
-Trabalhos futuros incluem linhas de base com detector centralizado, do tipo oráculo e
+Trabalhos futuros incluem baselines com detector centralizado, do tipo oráculo e
 cientes do agendamento (com início aleatorizado) para isolar
 a contribuição do mecanismo de detecção; mais seeds e análise formal de
 dispersão; drift recorrente; partições não IID e velocidades heterogêneas
