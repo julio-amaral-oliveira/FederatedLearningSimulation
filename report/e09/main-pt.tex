@@ -34,7 +34,7 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \maketitle
 
 \begin{abstract}
-Modelos de aprendizado federado (FL) implantados em produção enfrentam concept drift:
+Modelos de aprendizado federado (FL) implantados em ambientes reais enfrentam concept drift:
 a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
 até que uma ação de retreinamento seja adotada; em implantações reais a mudança é com
 frequência gradual, com a fração de entradas degradadas crescendo lentamente ao longo de um intervalo
@@ -212,7 +212,7 @@ distinta do nosso tempo de operação abaixo do limiar de qualidade.
 \section{Definição do Problema}
 Consideramos FL síncrono com $C$ clientes e tempo $v$, o
 relógio abstrato do nosso simulador. Um modelo é treinado em dados limpos durante $R$
-rodadas e entra em produção no instante $v_0$. Os dados de produção chegam em
+rodadas e entra em operação no instante $v_0$. Os dados de inferência chegam em
 passos de monitoramento de $\Delta t$ segundos: um lote sem rótulos por cliente, a cada
 passo.
 
@@ -245,7 +245,7 @@ horizonte.
 
 \textbf{Avaliação pareada.} A política reativa é comparada com uma baseline
 que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
-Ambas as variantes compartilham o mesmo estado aleatório, início de produção e horizonte $H$;
+Ambas as variantes compartilham o mesmo estado aleatório, início da operação e horizonte $H$;
 a baseline registra, como contrafactual, o momento em que a política
 \emph{teria} disparado.
 % Inicio da revisao
@@ -260,10 +260,10 @@ Cada cliente $c$ executa um detector local sobre o modelo global compartilhado:
 Nossa implementação do ADWIN testa janelas de ao menos 20 observações,
 porque alimentamos o ADWIN com a entropia média de cada lote, uma vez
 por passo em cada cliente, e não com um fluxo de instâncias. Cada detector recebe
-20 passos de warm-up em dados limpos antes do início da produção, calibrando-o sem alimentar a política coletiva.
+20 passos de warm-up em dados limpos antes do início da operação, calibrando-o sem alimentar a política coletiva.
 
 \subsection{Política coletiva por quórum}
-A cada passo de produção, o servidor recebe as flags de alarme por cliente e
+A cada passo de operação, o servidor recebe as flags de alarme por cliente e
 mantém uma janela deslizante dos últimos dois passos. A fração sinalizada é
 o número de clientes \emph{distintos} sinalizados na janela dividido pelo
 número total de clientes. Quando a fração atinge o quórum $\theta=0{,}30$
@@ -279,7 +279,7 @@ detectado a acurácia na conclusão da rodada já atinge $\tau$, de modo que o
 tempo até a recuperação equivale à duração do retreinamento.
 
 \subsection{Avaliação sobre os dados correntes}
-A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente degradado quando a rampa
+A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da operação o teste tem fração zero, e só se torna totalmente degradado quando a rampa
 termina; um teste totalmente degradado superestimaria a queda de acurácia durante
 a rampa. A composição usa uma permutação determinística com seed por episódio, de modo que
 ambas as variantes são avaliadas sobre o tensor idêntico em cada instante.
@@ -328,7 +328,7 @@ severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
 \subsection{Grade}
 A grade do estudo é o produto cartesiano das quatro degradações calibradas,
 cinco seeds ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
-totalizando 60 episódios pareados com horizonte de produção fixo de $H=600$\,s.
+totalizando 60 episódios pareados com horizonte de operação fixo de $H=600$\,s.
 A Tabela~\ref{tab:setup} lista a configuração fixa.
 
 \begin{table}[!t]
@@ -352,7 +352,7 @@ Detector & ADWIN $\delta=0{,}002$; MC dropout $T=5$\\
 Quórum / janela & 0,30 / 2 passos\\
 Orçamento de retreinamento & 1 rodada\\
 Limiar de qualidade $\tau$ & 0,50\\
-Horizonte de produção & 600\,s\\
+Horizonte de operação & 600\,s\\
 seeds & 42--46\\
 \bottomrule
 \end{tabular}}
@@ -469,7 +469,7 @@ com o sinal da diferença variando por grupo; a união de dois passos não mostr
 sistemático.
 
 \textbf{Staggered drift.} Quando os clientes sofrem drift em passos diferentes (cliente
-$i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
+$i$ sofre drift no passo de operação $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
 sinalizada 0,30--0,40). A política evita cerca de 81\% do downtime da baseline (600\,s,
 drift permanente) em três das quatro degradações e 70\% no ruído
@@ -555,7 +555,7 @@ de 507,5\,s (baseline) para 122,2\,s (76\%). A ordenação por grupo,
 o caso de downtime zero no fog e o comportamento limitado pela detecção no ruído
 Gaussiano permanecem inalterados; o custo extra é exatamente o intervalo pré-retreinamento
 que a rodada alonga. Com
-$d=800$\,s, a rodada já não cabe no horizonte de produção de 600\,s
+$d=800$\,s, a rodada já não cabe no horizonte de operação de 600\,s
 e a regra de orçamento pularia o retreinamento em todos os 59
 episódios em que houve disparo, de modo que a política reativa passaria a
 equivaler à baseline por força da regra de orçamento, e não por dinâmica de
