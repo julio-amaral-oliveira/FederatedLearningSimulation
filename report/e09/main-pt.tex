@@ -30,9 +30,9 @@
 
 \begin{abstract}
 Modelos de aprendizado federado (FL) implantados em produção enfrentam drift de conceito:
-a distribuição dos dados muda após a implantação, e a qualidade do modelo se degrada
+a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
 até que uma ação de retreinamento seja adotada; em implantações reais a mudança é com
-frequência gradual, com a fração de entradas corrompidas crescendo lentamente ao longo de um intervalo
+frequência gradual, com a fração de entradas degradadas crescendo lentamente ao longo de um intervalo
 de transição cuja duração é a largura do drift.
 Estudamos o retreinamento reativo em FL síncrono à medida que a
 transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
@@ -40,19 +40,19 @@ fluxo de entrada não rotulado com um detector local
 baseado em incerteza (dropout de Monte Carlo, entropia de Shannon e um
 teste de janela adaptativa ADWIN); o servidor agrega os alarmes locais ao longo de uma
 curta janela de passos de monitoramento e dispara no máximo uma única vez uma rodada de retreinamento sobre
-a mistura corrente de cada cliente. A métrica primária é a
+os dados correntes de cada cliente. A métrica primária é a
 indisponibilidade (downtime) de serviço, o tempo virtual acumulado em que a
 acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
 episódios pareados (quatro
-corrupções calibradas, cinco seeds, três durações de rampa de 50--200\,s)
+degradações calibradas, cinco seeds, três durações de rampa de 50--200\,s)
 sobre um horizonte fixo de 600\,s, contra uma baseline pareada sem retreinamento.
 A detecção tem êxito em 59 de 60 episódios (14 de 15 no
 cenário de ruído Gaussiano); o atraso de detecção cresce com a duração da rampa
-para as três corrupções visuais (98--140\,s) e chega a 256\,s para
+para as três degradações visuais (98--140\,s) e chega a 256\,s para
 o ruído Gaussiano; a política reativa reduz a indisponibilidade média de
 408--562\,s na baseline para 0--178\,s, alcançando indisponibilidade zero em
 $\tau=0{,}5$ no cenário de névoa (fog) com rampa mais longa; e rampas longas preservam
-a acurácia no conjunto limpo para as corrupções visuais (perda de 1--2 pontos em vez de
+a acurácia no conjunto limpo para as degradações visuais (perda de 1--2 pontos em vez de
 9--21). No
 regime exercitado (CIFAR-10, partição IID, dez clientes, um único drift e
 no máximo uma rodada de retreinamento), uma política reativa sem rótulos é eficaz,
@@ -71,16 +71,16 @@ detecção não supervisionada, indisponibilidade de serviço.
 \IEEEPARstart{A}{prendizado} federado (FL) treina um modelo compartilhado a partir de dados que
 permanecem distribuídos entre os clientes \cite{mcmahan2017}. Uma vez implantado, o
 modelo é servido em um ambiente cuja distribuição de dados pode mudar; tal
-drift de conceito degrada a qualidade do modelo em serviço até que uma ação de
+drift de conceito compromete a qualidade do modelo em serviço até que uma ação de
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
 inferência---é um pré-requisito para dispará-la. Uma simplificação comum
 na literatura é injetar o drift de forma abrupta: a distribuição muda em um
 único instante. Na prática, contudo, a mudança é com frequência gradual: dados novos
-aparecem misturados aos dados antigos, e a proporção de entradas deslocadas
+passam a coexistir com os antigos, e a proporção de entradas deslocadas
 cresce lentamente ao longo de um intervalo de transição cuja duração é a largura do drift
 usada na literatura de detecção de drift
 \cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo como uma rampa linear
-da fração de dados corrompidos de zero a um ao longo de um número configurável
+da fração de dados degradados de zero a um ao longo de um número configurável
 de passos de monitoramento \cite{cerqueira2026}. Nossa grade abrange rampas curtas
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
@@ -95,13 +95,13 @@ adaptativa ADWIN \cite{bifet2007} por cliente.
 O servidor coleta os alarmes por cliente ao longo de uma janela deslizante de dois
 passos de monitoramento e dispara quando a fração de clientes distintos sinalizados
 atinge um quórum. A ação disparada é uma única rodada global de retreinamento
-sobre a mistura que cada cliente serve no momento, em consonância com os orçamentos
+sobre os dados que cada cliente serve no momento, em consonância com os orçamentos
 explícitos de retreinamento do DriftGuard \cite{han2026} e do ShiftEx
 \cite{bhope2025} e com a separação entre gatilho e seleção de dados do Modyn
 \cite{bother2025}.
 
 A métrica primária é a \emph{indisponibilidade} (downtime) de serviço: o tempo virtual
-acumulado em que a acurácia corrompida do modelo em serviço permanece abaixo de um
+acumulado em que a acurácia do modelo em serviço sob degradação permanece abaixo de um
 limiar de qualidade $\tau$.
 Até onde sabemos, nenhum trabalho na literatura revisada de drift em FL quantifica
 o tempo em que um modelo em serviço permanece abaixo de um limiar de qualidade; detalhamos essa
@@ -131,7 +131,7 @@ $P(X)$ muda) de drift real (a condicional $P(Y\mid X)$ muda), bem como
 drifts abruptos, graduais e recorrentes \cite{mahdi2025}. Drifts dessincronizados,
 nos quais clientes diferentes sofrem drift em momentos diferentes, são estudados por
 Jothimurugesan et al.~\cite{jothimurugesan2023}. O drift gradual, regime
-estudado aqui, mistura o conceito novo com o antigo em proporção crescente
+estudado aqui, combina o conceito novo com o antigo em proporção crescente
 ao longo do tempo \cite{casado2022}; a duração da transição é a
 largura do drift
 \cite{poenaru2022,cerqueira2026}.
@@ -169,7 +169,7 @@ método de referência sem rótulos; a Seção IV-A descreve nossa implementaç�
 O ADWIN é preferido a DDM/EDDM porque estes exigem entradas binomiais,
 enquanto o sinal de entropia não se restringe a esse tipo
 \cite{baier2023}. Lobo et al.~\cite{lobo2023} conectam drift de conceito e
-incerteza do modelo, e sabe-se que estimadores de incerteza se degradam sob deslocamento de dados
+incerteza do modelo, e sabe-se que estimadores de incerteza perdem confiabilidade sob deslocamento de dados
 \cite{ovadia2019}. O D3M \cite{nguyen2025} é um método complementar sem rótulos,
 baseado em discordância entre modelos, com garantias quanto a falsos positivos sob o
 pressuposto de deslocamento de covariáveis. O PUDD \cite{lu2025} é igualmente
@@ -211,8 +211,8 @@ rodadas e entra em produção no instante $v_0$. Os dados de produção chegam e
 passos de monitoramento de $\Delta t$ segundos: um lote sem rótulos por cliente, a cada
 passo.
 
-\textbf{Modelo de drift gradual.} Uma corrupção aplicada às entradas $X$ (rótulos
-preservados) é injetada com uma fração de mistura $f(v)$ que cresce linearmente
+\textbf{Modelo de drift gradual.} Uma degradação aplicada às entradas $X$ (rótulos
+preservados) é injetada com uma fração degradada $f(v)$ que cresce linearmente
 de zero a um ao longo de $N$ passos:
 \begin{equation}
 f(v) = \min\!\left(1,\ \frac{v-v_0}{N\,\Delta t}\right),
@@ -224,7 +224,7 @@ A duração da rampa $N\Delta t$ é a largura do drift; sua inclinação $1/N$ p
 $100$, $200$\,s com $\Delta t=10$\,s).
 
 \textbf{Limiar de qualidade e indisponibilidade.} Seja $a(v)$ a acurácia do
-modelo em serviço em um conjunto de teste misturado na fração corrente $f(v)$. O limiar de
+modelo em serviço em um conjunto de teste com a fração corrente $f(v)$. O limiar de
 qualidade $\tau$ define o estado do serviço: o modelo está indisponível quando
 $a(v)<\tau$. A indisponibilidade ao longo de um horizonte fixo $[v_0,v_0+H]$ é
 \begin{equation}
@@ -265,33 +265,32 @@ número total de clientes. Quando a fração atinge o quórum $\theta=0{,}30$
 (3 de 10 clientes), o servidor dispara. Dessa forma, um possível falso positivo local sob monitoramento contínuo
 \cite{poenaru2022} não basta para iniciar o retreinamento.
 
-\subsection{Retreinamento reativo sobre a mistura corrente}
+\subsection{Retreinamento reativo sobre os dados correntes}
 Quando a política dispara no instante $t_d$, o conjunto de treinamento de cada cliente é
-substituído por uma mistura com fração corrompida $f(t_d)$ e uma única rodada síncrona de FL é
+substituído por um conjunto com fração degradada $f(t_d)$ e uma única rodada síncrona de FL é
 executada com todos os clientes. Cada cliente detém 5\,000 imagens de treinamento (uma
-divisão IID do conjunto de treinamento de 50\,000 imagens) misturadas em $f(t_d)$. Em todo episódio
+divisão IID do conjunto de treinamento de 50\,000 imagens) com fração degradada $f(t_d)$. Em todo episódio
 detectado a acurácia na conclusão da rodada já atinge $\tau$, de modo que o
 tempo até a recuperação equivale à duração do retreinamento.
 
-\subsection{Avaliação sobre a mistura corrente}
-A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) misturado
-na fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente corrompido quando a rampa
-termina; um teste totalmente corrompido superestimaria a degradação durante
-a rampa. A mistura usa uma permutação determinística semeada por episódio, de modo que
+\subsection{Avaliação sobre os dados correntes}
+A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente degradado quando a rampa
+termina; um teste totalmente degradado superestimaria a queda de acurácia durante
+a rampa. A composição usa uma permutação determinística semeada por episódio, de modo que
 ambos os braços são avaliados sobre o tensor idêntico em cada instante.
 
 \subsection{Calibração de severidade}
 Todas as severidades de $1$--$5$
-são avaliadas no conjunto de teste corrompido, e a menor severidade cuja
+são avaliadas no conjunto de teste degradado, e a menor severidade cuja
 acurácia cai estritamente dentro de $(0{,}25;\,0{,}50)$ é selecionada. O limite inferior
 mantém o modelo bem acima do acaso (0,10 para dez classes), de modo que a recuperação é
 alcançável com pouco orçamento de retreino; o limite superior garante que a
-corrupção empurre o serviço para abaixo de $\tau$.
+degradação empurre o serviço para abaixo de $\tau$.
 
 \section{Configuração Experimental}
-\subsection{Conjunto de dados e corrupções}
+\subsection{Conjunto de dados e degradações}
 Usamos CIFAR-10 com partição IID entre 10 clientes e as 10
-classes completas em todas as fases. Quatro corrupções visuais são implementadas diretamente sobre
+classes completas em todas as fases. Quatro degradações visuais são implementadas diretamente sobre
 tensores---ruído Gaussiano, frosted-glass blur, motion blur e fog---com
 severidades inteiras de $1$--$5$, geradores por seed e formas e
 rótulos preservados. Elas são \emph{inspiradas} no benchmark
@@ -299,7 +298,7 @@ CIFAR-10-C \cite{hendrycks2019}; o ruído Gaussiano adiciona perturbações com
 desvios-padrão por severidade de 0,08--0,24; o borrão de vidro fosco permuta
 pixels em uma vizinhança $3\times3$ e combina-os com um borrão Gaussiano
 (força 0,2--1,0); o borrão de movimento faz convolução com um kernel diagonal de largura
-5--15; a névoa mistura a imagem com um mapa de ruído fractal de quatro oitavas.
+5--15; a névoa combina a imagem com um mapa de ruído fractal de quatro oitavas.
 \subsection{Resultado da calibração}
 A calibração, executada uma vez a partir de um checkpoint limpo, selecionou as
 
@@ -310,7 +309,7 @@ $(0{,}25;\,0{,}50)$).}
 \label{tab:calibration}
 \begin{tabular}{lcc}
 \toprule
-Corrupção & Severidade & Acurácia\\
+Degradação & Severidade & Acurácia\\
 \midrule
 Ruído Gaussiano & 3 & 0,3783\\
 Borrão de vidro fosco & 4 & 0,4022\\
@@ -322,7 +321,7 @@ Névoa & 4 & 0,4875\\
 severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
 
 \subsection{Grade}
-A grade do estudo é o produto cartesiano das quatro corrupções calibradas,
+A grade do estudo é o produto cartesiano das quatro degradações calibradas,
 cinco seeds ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
 totalizando 60 episódios pareados com horizonte de produção fixo de $H=600$\,s.
 A Tabela~\ref{tab:setup} lista a configuração fixa.
@@ -357,22 +356,21 @@ seeds & 42--46\\
 Relatamos médias por grupo sobre as cinco seeds e testamos duas hipóteses: H1, a
 política reativa reduz a indisponibilidade em relação
 à baseline sem retreinamento; H2, o atraso de detecção cresce com a duração da
-rampa. As medidas primárias são o atraso de detecção (do início da
-produção ao disparo), a fração de mistura no disparo e a indisponibilidade;
-as secundárias são a retenção limpa (acurácia limpa final menos a acurácia limpa
-antes do drift) e a acurácia final sob corrupção.
+rampa. As medidas primárias são o atraso de detecção, a fração degradada no disparo e a indisponibilidade;
+as secundárias são a clean retention (acurácia limpa final menos a acurácia limpa
+antes do drift) e a acurácia final sob degradação.
 
 \subsection{Detecção: 59 de 60 episódios}
 A detecção teve êxito em 59 de 60 episódios (14 de 15 no cenário de ruído
 Gaussiano); a única falha ocorreu no ruído Gaussiano, na rampa de 100\,s, com a
 seed 42.
-O atraso cresce com a duração da rampa para as três corrupções visuais,
+O atraso cresce com a duração da rampa para as três degradações visuais,
 em consonância com a análise do ADWIN para mudança gradual com inclinação constante
 \cite{bifet2007}; o ruído Gaussiano não segue a tendência.
 
 \begin{table}[!t]
 \centering
-\caption{Atraso de detecção (s) e fração de mistura no disparo (médias por
+\caption{Atraso de detecção (s) e fração degradada no disparo (médias por
 grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou em
 100\,s está excluída da média de atraso desse grupo).}
 \label{tab:delay}
@@ -382,7 +380,7 @@ grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou e
 \toprule
  & \multicolumn{3}{c}{Atraso (s)} & \multicolumn{1}{c}{Fração no disparo} & \multicolumn{1}{c}{Taxa de det.}\\
 \cmidrule(lr){2-4}\cmidrule(lr){5-5}\cmidrule(lr){6-6}
-Corrupção & 50\,s & 100\,s & 200\,s & 200\,s & (de 5)\\
+Degradação & 50\,s & 100\,s & 200\,s & 200\,s & (de 5)\\
 \midrule
 Névoa & 100 & 112 & 138 & 0,69 & 5/5\\
 Vidro fosco & 100 & 108 & 136 & 0,68 & 5/5\\
@@ -391,7 +389,7 @@ Ruído Gaussiano & 164 & 158$^{*}$ & 256 & 0,97 & 4/5$^{*}$\\
 \bottomrule
 \end{tabular}}
 \vspace{2pt}
-{\footnotesize Desvio-padrão do atraso entre seeds: $\le$6\,s para as corrupções
+{\footnotesize Desvio-padrão do atraso entre seeds: $\le$6\,s para as degradações
 visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s a
 fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \end{table}
@@ -408,7 +406,7 @@ fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \toprule
  & \multicolumn{3}{c}{Duração da rampa}\\
 \cmidrule(lr){2-4}
-Corrupção & 50\,s & 100\,s & 200\,s\\
+Degradação & 50\,s & 100\,s & 200\,s\\
 \midrule
 Névoa & 58 / 550 & 24 / 504 & \textbf{0} / 408\\
 Vidro fosco & 68 / 560 & 40 / 524 & 3 / 454\\
@@ -418,7 +416,7 @@ Ruído Gaussiano & 130 / 558 & 178 / 526 & 112 / 448\\
 \end{tabular}}
 \vspace{2pt}
 {\footnotesize A dispersão do ruído Gaussiano é grande (desvio-padrão do atraso de até 104\,s;
-desvio-padrão da indisponibilidade de até 184\,s, intervalo 38--540\,s); corrupções visuais têm desvio-padrão
+desvio-padrão da indisponibilidade de até 184\,s, intervalo 38--540\,s); degradações visuais têm desvio-padrão
 $\le$6\,s (atraso) e $\le$10\,s (indisponibilidade).}
 \end{table}
 
@@ -440,7 +438,7 @@ O cenário de névoa
 com rampa de 200\,s atinge \textbf{indisponibilidade zero} com $\tau=0{,}5$
 (Fig.~\ref{fig:fog}): o disparo ocorre na fração 0,69, quando a
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
-acima de $\tau$ (acurácia final sob corrupção de 0,71).
+acima de $\tau$ (acurácia final sob degradação de 0,71).
 
 O contraste entre o braço reativo e a baseline mantém a
 mesma ordem ao variar o limiar de qualidade: para
@@ -452,10 +450,10 @@ pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_fog_ramp20.png}
-\caption{Névoa, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia corrompida ao
+\caption{Névoa, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia sob degradação ao
 longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias);
 $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo:
-acurácia final corrompida, indisponibilidade e retenção limpa; o braço reativo
+acurácia final sob degradação, indisponibilidade e clean retention; o braço reativo
 nunca cai abaixo de $\tau$ (indisponibilidade zero).}
 \label{fig:fog}
 \end{figure}
@@ -482,14 +480,14 @@ sistemático.
 $i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
 sinalizada 0,30--0,40). A política evita cerca de 81\% da indisponibilidade da baseline (600\,s,
-drift permanente) em três das quatro corrupções e 70\% no ruído
+drift permanente) em três das quatro degradações e 70\% no ruído
 Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
 como o drift é instantâneo e permanente, atraso converte-se em indisponibilidade
 um para um (116 $\approx$ 108 + 8\,s).
 
 \subsection{Taxa de falsos positivos em fluxos sem drift}
 Executamos 15 episódios de controle (cinco seeds vezes três cronogramas de rampa) sem
-corrupção: cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
+degradação: cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
 O gatilho coletivo nunca dispara---nenhum dos 15 episódios registra uma
 decisão de retreinamento---e os detectores locais emitem zero alarmes nas
 9\,000 avaliações cliente-passo.
@@ -498,10 +496,10 @@ nenhum, pois o teste é de mudança na distribuição, não de picos. O
 gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
 60 episódios; taxa de falsos positivos medida de 0,0\%).
 
-\subsection{Retenção limpa e comportamento de recuperação}
+\subsection{Clean retention e comportamento de recuperação}
 \begin{table}[!t]
 \centering
-\caption{Retenção limpa $\Delta$ (braço reativo; média por grupo $\pm$ desvio-padrão sobre
+\caption{Clean retention $\Delta$ (braço reativo; média por grupo $\pm$ desvio-padrão sobre
 5 seeds).}
 \label{tab:retention}
 \resizebox{\columnwidth}{!}{%
@@ -509,7 +507,7 @@ gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
 \toprule
  & \multicolumn{3}{c}{Duração da rampa}\\
 \cmidrule(lr){2-4}
-Corrupção & 50\,s & 100\,s & 200\,s\\
+Degradação & 50\,s & 100\,s & 200\,s\\
 \midrule
 Névoa & $-0{,}096\pm0{,}012$ & $-0{,}094\pm0{,}014$ & $-0{,}014\pm0{,}005$\\
 Vidro fosco & $-0{,}152\pm0{,}008$ & $-0{,}156\pm0{,}014$ & $-0{,}022\pm0{,}005$\\
@@ -526,10 +524,10 @@ limpa cai para 1--2 pontos (contra 9--21 em rampas curtas) para névoa,
 vidro fosco e borrão de movimento; o ruído Gaussiano não se beneficia
 (fração 0,97). Segundo, \emph{a recuperação
 não é temporária}: nenhum episódio volta a cruzar $\tau$ dentro do horizonte; o
-modelo retreinado generaliza para o regime totalmente corrompido. Em 9 dos 20
+modelo retreinado generaliza para o regime totalmente degradado. Em 9 dos 20
 episódios com rampa de 200\,s (todas as cinco execuções de névoa, três de vidro fosco e uma
 de borrão de movimento), a acurácia nunca cai abaixo de $\tau$.
-A acurácia final média por grupo, no regime totalmente corrompido,
+A acurácia final média por grupo, no regime totalmente degradado,
 varia de 0,60 a 0,71 para o braço reativo (exceto no episódio
 com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
 (Fig.~\ref{fig:motion}).
@@ -539,7 +537,7 @@ com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
 \caption{Borrão de movimento, rampa de 200\,s, cinco seeds pareadas. O braço reativo
 recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do
-horizonte; a baseline segue degradando até cerca de 0,35.}
+horizonte; a baseline segue caindo até cerca de 0,35.}
 \label{fig:motion}
 \end{figure}
 
@@ -598,22 +596,22 @@ quatro seeds se recuperam para cerca de 0,68.}
 \end{figure}
 
 \subsection{Por que a rampa longa se comporta melhor}
-Para as corrupções visuais, a rampa de 200\,s tem três efeitos favoráveis. (i) O disparo ocorre no meio da rampa, nas frações 0,68--0,70, em que
+Para as degradações visuais, a rampa de 200\,s tem três efeitos favoráveis. (i) O disparo ocorre no meio da rampa, nas frações 0,68--0,70, em que
 a acurácia na decisão é 0,57 para névoa (ainda acima de $\tau$), 0,51
 para vidro fosco e 0,48 para borrão de movimento. (ii)
-O conjunto de retreinamento mistura cerca de 30\% de dados limpos, reduzindo
+O conjunto de retreinamento contém cerca de 30\% de dados limpos, reduzindo
 o esquecimento catastrófico. (iii) O modelo retreinado na fração
-$\approx$0,7 generaliza para o regime totalmente corrompido, de modo que a recuperação
+$\approx$0,7 generaliza para o regime totalmente degradado, de modo que a recuperação
 se sustenta. Rampas curtas comportam-se como o regime abrupto:
 a detecção termina após a rampa e o conjunto de retreinamento fica quase totalmente
-corrompido. O ruído Gaussiano dispara mais tarde (fração 0,97) e não
+degradado. O ruído Gaussiano dispara mais tarde (fração 0,97) e não
 usufrui dos efeitos (i) e (ii).
 
 \subsection{Limitações}
 Nossos resultados são limitados pelas seguintes restrições declaradas. (i) Cinco
 seeds por grupo limitam a precisão da estimativa de dispersão. (ii) O
 modelo é uma CNN pequena de cerca de 2,2 milhões de parâmetros; as acurácias absolutas
-sob corrupção são modestas, como esperado para arquiteturas pequenas
+sob degradação são modestas, como esperado para arquiteturas pequenas
 \cite{hendrycks2019}. (iii) O cenário pressupõe um único drift, uma
 rodada de retreinamento, partição IID, velocidade uniforme e horizonte
 fixo. (iv) A fração no disparo só é informativa no
@@ -647,10 +645,10 @@ Estudamos o retreinamento reativo em aprendizado federado síncrono ao longo
 do espectro do drift abrupto ao gradual, avaliando nossa política reativa
 contra uma baseline pareada sem retreinamento em 60 episódios, com indisponibilidade de
 serviço como métrica primária. A detecção teve êxito em 59 de 60 episódios,
-com o atraso crescendo com a duração da rampa para as corrupções visuais; o
+com o atraso crescendo com a duração da rampa para as degradações visuais; o
 braço reativo reduziu a indisponibilidade média de 408--562\,s para 0--178\,s
 (zero no caso de névoa com rampa de 200\,s); e rampas longas preservaram a acurácia
-limpa para as corrupções visuais. O
+limpa para as degradações visuais. O
 gatilho coletivo dispara nos 20 episódios dessincronizados
 (70--81\% da indisponibilidade da baseline evitada) com taxa de falsos positivos de
 0\% em 15 controles sem drift.
