@@ -45,18 +45,18 @@ indisponibilidade (downtime) de serviço, o tempo virtual acumulado em que a
 acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
 episódios pareados (quatro
 corrupções calibradas, cinco seeds, três durações de rampa de 50--200\,s)
-sobre um horizonte fixo de 600\,s, contra uma linha de base pareada sem retreinamento.
+sobre um horizonte fixo de 600\,s, contra uma baseline pareada sem retreinamento.
 A detecção tem êxito em 59 de 60 episódios (14 de 15 no
 cenário de ruído Gaussiano); o atraso de detecção cresce com a duração da rampa
 para as três corrupções visuais (98--140\,s) e chega a 256\,s para
 o ruído Gaussiano; a política reativa reduz a indisponibilidade média de
-408--562\,s na linha de base para 0--178\,s, alcançando indisponibilidade zero em
+408--562\,s na baseline para 0--178\,s, alcançando indisponibilidade zero em
 $\tau=0{,}5$ no cenário de névoa (fog) com rampa mais longa; e rampas longas preservam
 a acurácia no conjunto limpo para as corrupções visuais (perda de 1--2 pontos em vez de
 9--21). No
 regime exercitado (CIFAR-10, partição IID, dez clientes, um único drift e
 no máximo uma rodada de retreinamento), uma política reativa sem rótulos é eficaz,
-em comparação com uma linha de base sem retreinamento; a latência de detecção
+em comparação com uma baseline sem retreinamento; a latência de detecção
 depende do cenário, e o ruído Gaussiano é o caso mais difícil;
 o gatilho coletivo detecta todos os episódios de drift dessincronizado (staggered) com zero alarmes falsos em
 fluxos sem drift.
@@ -117,7 +117,7 @@ ablações de janela e sob drift dessincronizado;
 (iii) uma \textbf{implementação federada do UDD}, com um
 detector por cliente compartilhando o modelo global, estendendo o detector
 centralizado de Baier et al.~\cite{baier2023}; (iv) uma \textbf{infraestrutura experimental
-auditável} que pareia o braço reativo com uma linha de base
+auditável} que pareia o braço reativo com uma baseline
 sem retreinamento a partir do mesmo checkpoint, estado aleatório, fluxo e
 horizonte, validada antes da publicação; e (v) uma
 \textbf{caracterização empírica do drift gradual} ao longo de 60 episódios
@@ -238,10 +238,10 @@ inclui o intervalo final até o horizonte. Os instantes de avaliação
 compreendem fronteiras dos passos, o instante de conclusão do retreinamento e o
 horizonte.
 
-\textbf{Avaliação pareada.} A política reativa é comparada com uma linha de base
+\textbf{Avaliação pareada.} A política reativa é comparada com uma baseline
 que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
 Ambos os braços compartilham o mesmo estado aleatório, início de produção e horizonte $H$;
-a linha de base registra, como contrafactual, o momento em que a política
+a baseline registra, como contrafactual, o momento em que a política
 \emph{teria} disparado.
 % Inicio da revisao
 \section{Método Proposto}
@@ -353,11 +353,10 @@ seeds & 42--46\\
 \bottomrule
 \end{tabular}}
 \end{table}
-%TODO: Continua revisao daqui
 \section{Resultados}
 Relatamos médias por grupo sobre as cinco seeds e testamos duas hipóteses: H1, a
 política reativa reduz a indisponibilidade em relação
-à linha de base sem retreinamento; H2, o atraso de detecção cresce com a duração da
+à baseline sem retreinamento; H2, o atraso de detecção cresce com a duração da
 rampa. As medidas primárias são o atraso de detecção (do início da
 produção ao disparo), a fração de mistura no disparo e a indisponibilidade;
 as secundárias são a retenção limpa (acurácia limpa final menos a acurácia limpa
@@ -397,11 +396,11 @@ visuais; 71--104\,s para o ruído Gaussiano. Para as rampas de 50 e 100\,s a
 fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \end{table}
 
-\subsection{Indisponibilidade: política reativa domina a linha de base}
+\subsection{Indisponibilidade: política reativa domina a baseline}
 \begin{table}[!t]
 \centering
-\caption{Indisponibilidade (s): braço reativo versus linha de base pareada sem retreinamento
-(médias por grupo sobre 5 seeds; formato: reativo / linha de base).}
+\caption{Indisponibilidade (s): braço reativo versus baseline pareada sem retreinamento
+(médias por grupo sobre 5 seeds; formato: reativo / baseline).}
 \label{tab:downtime}
 \small
 \resizebox{\columnwidth}{!}{%
@@ -443,10 +442,10 @@ com rampa de 200\,s atinge \textbf{indisponibilidade zero} com $\tau=0{,}5$
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob corrupção de 0,71).
 
-O contraste entre o braço reativo e a linha de base mantém a
+O contraste entre o braço reativo e a baseline mantém a
 mesma ordem ao variar o limiar de qualidade: para
 $\tau \in \{0{,}40;\,0{,}45;\,0{,}50;\,0{,}55\}$ o braço reativo nunca supera sua
-linha de base pareada em nenhuma das 48 células, embora as magnitudes sejam
+baseline pareada em nenhuma das 48 células, embora as magnitudes sejam
 específicas de $\tau$ (o contraste médio encolhe cerca de 47\% com $\tau=0{,}40$; o
 pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 
@@ -454,7 +453,7 @@ pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_fog_ramp20.png}
 \caption{Névoa, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia corrompida ao
-longo do tempo simulado (sólida: reativo, tracejada: linha de base; linhas grossas: médias);
+longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias);
 $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo:
 acurácia final corrompida, indisponibilidade e retenção limpa; o braço reativo
 nunca cai abaixo de $\tau$ (indisponibilidade zero).}
@@ -482,7 +481,7 @@ sistemático.
 \textbf{Drift dessincronizado.} Quando os clientes sofrem drift em passos diferentes (cliente
 $i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
-sinalizada 0,30--0,40). A política evita cerca de 81\% da indisponibilidade da linha de base (600\,s,
+sinalizada 0,30--0,40). A política evita cerca de 81\% da indisponibilidade da baseline (600\,s,
 drift permanente) em três das quatro corrupções e 70\% no ruído
 Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
 como o drift é instantâneo e permanente, atraso converte-se em indisponibilidade
@@ -532,7 +531,7 @@ episódios com rampa de 200\,s (todas as cinco execuções de névoa, três de v
 de borrão de movimento), a acurácia nunca cai abaixo de $\tau$.
 A acurácia final média por grupo, no regime totalmente corrompido,
 varia de 0,60 a 0,71 para o braço reativo (exceto no episódio
-com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a linha de base
+com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
 (Fig.~\ref{fig:motion}).
 
 \begin{figure}[!t]
@@ -540,7 +539,7 @@ com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a linha de base
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
 \caption{Borrão de movimento, rampa de 200\,s, cinco seeds pareadas. O braço reativo
 recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do
-horizonte; a linha de base segue degradando até cerca de 0,35.}
+horizonte; a baseline segue degradando até cerca de 0,35.}
 \label{fig:motion}
 \end{figure}
 
@@ -562,14 +561,14 @@ ao recalcular-se a indisponibilidade \emph{a posteriori} a partir das séries re
 acurácia pré-retreinamento ao intervalo $[t_d,t_d+d]$, usando o primeiro registro
 pós-retreinamento em diante e aplicando a regra de orçamento---, verifica-se que
 uma rodada de 80\,s, dominada pela comunicação, ainda corta a indisponibilidade média
-de 507,5\,s (linha de base) para 122,2\,s (76\%). A ordenação por grupo,
+de 507,5\,s (baseline) para 122,2\,s (76\%). A ordenação por grupo,
 o caso de indisponibilidade zero na névoa e o comportamento limitado pela detecção no ruído
 Gaussiano permanecem inalterados; o custo extra é exatamente o intervalo pré-retreinamento
 que a rodada alonga. Com
 $d=800$\,s, a rodada já não cabe no horizonte de produção de 600\,s
 e a regra de orçamento pularia o retreinamento em todos os 59
 episódios em que houve disparo, de modo que a política reativa passaria a
-equivaler à linha de base por força da regra de orçamento, e não por dinâmica de
+equivaler à baseline por força da regra de orçamento, e não por dinâmica de
 treinamento; o ponto de virada é a menor
 folga entre disparo e horizonte, cerca de 140\,s nesta grade.
 
@@ -582,9 +581,9 @@ máxima sinalizada de 0,20 em passos esparsos); as outras quatro seeds detectam 
 120--210\,s. Como a janela e o
 quórum são idênticos entre seeds, a falha é mais bem explicada como perda
 (miss) do detector por cliente (uma interação que não conseguimos isolar). Sem decisão, o braço reativo equivale exatamente à
-linha de base (indisponibilidade de 540\,s). Com rampa de 200\,s os
+baseline (indisponibilidade de 540\,s). Com rampa de 200\,s os
 atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas o braço reativo
-ainda corta a indisponibilidade da linha de base em 75\% (112 vs.\ 448\,s), em consonância com o
+ainda corta a indisponibilidade da baseline em 75\% (112 vs.\ 448\,s), em consonância com o
 risco que detectores do tipo ADWIN carregam sob drifts longos e suaves
 \cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa.
 A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
@@ -640,20 +639,20 @@ restringem-se à sua viabilidade e à taxa
 nula de falsos positivos em fluxos sem drift. Comparadores com agendamento, do tipo oráculo e com detector centralizado
 permanecem como trabalhos futuros; como o início do drift coincide com o início da produção
 em todos os episódios, o retreinamento calendarizado agiria como oráculo,
-e não como linha de base justa. (xi) Episódios de controle sem drift (15)
+e não como baseline justa. (xi) Episódios de controle sem drift (15)
 não produziram nenhum disparo falso (0/15), de modo que a taxa de falsos positivos do
 detector sob monitoramento contínuo é de 0\% nesta configuração.
 \section{Conclusão e Trabalhos Futuros}
 Estudamos o retreinamento reativo em aprendizado federado síncrono ao longo
 do espectro do drift abrupto ao gradual, avaliando nossa política reativa
-contra uma linha de base pareada sem retreinamento em 60 episódios, com indisponibilidade de
+contra uma baseline pareada sem retreinamento em 60 episódios, com indisponibilidade de
 serviço como métrica primária. A detecção teve êxito em 59 de 60 episódios,
 com o atraso crescendo com a duração da rampa para as corrupções visuais; o
 braço reativo reduziu a indisponibilidade média de 408--562\,s para 0--178\,s
 (zero no caso de névoa com rampa de 200\,s); e rampas longas preservaram a acurácia
 limpa para as corrupções visuais. O
 gatilho coletivo dispara nos 20 episódios dessincronizados
-(70--81\% da indisponibilidade da linha de base evitada) com taxa de falsos positivos de
+(70--81\% da indisponibilidade da baseline evitada) com taxa de falsos positivos de
 0\% em 15 controles sem drift.
 Trabalhos futuros incluem linhas de base com detector centralizado, do tipo oráculo e
 cientes do agendamento (com início aleatorizado) para isolar
