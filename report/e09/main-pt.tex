@@ -21,9 +21,14 @@
 \title{Do Drift Abrupto ao Gradual em Aprendizado Federado: Retreinamento Reativo sem Rótulos e uma Métrica de Downtime de Serviço}
 
 \author{
-\IEEEauthorblockN{Julio Amaral, Hugo César, Miguel Elias M. Campista, Luiz Fernando Bittencourt}
-\IEEEauthorblockA{Instituto de Computação, Universidade Estadual de Campinas (UNICAMP), Brasil\\ j230537@dac.unicamp.br, hugocesar@gta.ufrj.br, miguel@gta.ufrj.br, bit@unicamp.br
-}
+\IEEEauthorblockN{Julio Amaral\IEEEauthorrefmark{1},
+Hugo César\IEEEauthorrefmark{2},
+Miguel Elias M. Campista\IEEEauthorrefmark{2},
+Luiz Fernando Bittencourt\IEEEauthorrefmark{1}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Instituto de Computação, Universidade Estadual de Campinas (UNICAMP), Brasil\\
+j230537@dac.unicamp.br, bit@unicamp.br}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}Universidade Federal do Rio de Janeiro (UFRJ), Brasil\\
+hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 }
 
 \maketitle
@@ -117,7 +122,7 @@ ablações de janela e sob staggered drift;
 (iii) uma \textbf{implementação federada do UDD}, com um
 detector por cliente compartilhando o modelo global, estendendo o detector
 centralizado de Baier et al.~\cite{baier2023}; (iv) uma \textbf{infraestrutura experimental
-auditável} que pareia o braço reativo com uma baseline
+auditável} que pareia a variante reativa com uma baseline
 sem retreinamento a partir do mesmo checkpoint, estado aleatório, fluxo e
 horizonte, validada antes da publicação; e (v) uma
 \textbf{caracterização empírica do drift gradual} ao longo de 60 episódios
@@ -240,7 +245,7 @@ horizonte.
 
 \textbf{Avaliação pareada.} A política reativa é comparada com uma baseline
 que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
-Ambos os braços compartilham o mesmo estado aleatório, início de produção e horizonte $H$;
+Ambas as variantes compartilham o mesmo estado aleatório, início de produção e horizonte $H$;
 a baseline registra, como contrafactual, o momento em que a política
 \emph{teria} disparado.
 % Inicio da revisao
@@ -277,7 +282,7 @@ tempo até a recuperação equivale à duração do retreinamento.
 A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da produção o teste tem fração zero, e só se torna totalmente degradado quando a rampa
 termina; um teste totalmente degradado superestimaria a queda de acurácia durante
 a rampa. A composição usa uma permutação determinística com seed por episódio, de modo que
-ambos os braços são avaliados sobre o tensor idêntico em cada instante.
+ambas as variantes são avaliadas sobre o tensor idêntico em cada instante.
 
 \subsection{Calibração de severidade}
 Todas as severidades de $1$--$5$
@@ -397,7 +402,7 @@ fração no disparo é 1,00 por construção (disparos pós-rampa).}
 \subsection{Downtime: política reativa domina a baseline}
 \begin{table}[!t]
 \centering
-\caption{Downtime (s): braço reativo versus baseline pareada sem retreinamento
+\caption{Downtime (s): variante reativa versus baseline pareada sem retreinamento
 (médias por grupo sobre 5 seeds; formato: reativo / baseline).}
 \label{tab:downtime}
 \small
@@ -427,12 +432,12 @@ com rampa de 200\,s atinge \textbf{downtime zero} com $\tau=0{,}5$
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob degradação de 0,71).
 
-O contraste entre o braço reativo e a baseline mantém a
+O contraste entre a variante reativa e a baseline mantém a
 mesma ordem ao variar o limiar de qualidade: para
-$\tau \in \{0{,}40;\,0{,}45;\,0{,}50;\,0{,}55\}$ o braço reativo nunca supera sua
+$\tau \in \{0{,}40;\,0{,}45;\,0{,}50;\,0{,}55\}$ a variante reativa nunca supera sua
 baseline pareada em nenhuma das 48 células, embora as magnitudes sejam
 específicas de $\tau$ (o contraste médio encolhe cerca de 47\% com $\tau=0{,}40$; o
-pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
+pior caso da variante reativa cresce para 190\,s com $\tau=0{,}55$).
 
 \begin{figure}[!t]
 \centering
@@ -440,14 +445,14 @@ pior caso do braço reativo cresce para 190\,s com $\tau=0{,}55$).
 \caption{Fog, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia sob degradação ao
 longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias);
 $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo:
-acurácia final sob degradação, downtime e clean retention; o braço reativo
+acurácia final sob degradação, downtime e clean retention; a variante reativa
 nunca cai abaixo de $\tau$ (downtime zero).}
 \label{fig:fog}
 \end{figure}
 
 \subsection{Análise do quórum coletivo}
 \emph{Todos} os 10 clientes emitem alarme em cada episódio detectado (59 de 59):
-os detectores locais são individualmente sensíveis. O disparo
+os detectores locais são independentes. O disparo
 ocorre no mínimo do quórum (0,30, três clientes distintos na
 janela de dois passos) em 21 de 59 episódios; o ruído Gaussiano dispara no
 mínimo em todos os episódios detectados da rampa de 100\,s. A
@@ -457,8 +462,7 @@ $0{,}90\rightarrow0{,}56$, motion blur $0{,}66\rightarrow0{,}54$).
 
 \textbf{Sensibilidade a quórum e janela.} Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
 detectar a mesma seed de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
-diferente): o nível mais alto não
-introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
+diferente). No quórum padrão, uma janela de um passo dá
 resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de downtime),
 com o sinal da diferença variando por grupo; a união de dois passos não mostra benefício
 sistemático.
@@ -468,7 +472,7 @@ $i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
 sinalizada 0,30--0,40). A política evita cerca de 81\% do downtime da baseline (600\,s,
 drift permanente) em três das quatro degradações e 70\% no ruído
-Gaussiano (116\,s e 180\,s de downtime no braço reativo, respectivamente);
+Gaussiano (116\,s e 180\,s de downtime na variante reativa, respectivamente);
 como o drift é instantâneo e permanente, atraso converte-se em downtime
 um para um (116 $\approx$ 108 + 8\,s).
 
@@ -486,7 +490,7 @@ gatilho é, assim, silencioso em fluxos sem drift e sensível sob drift (59 de
 \subsection{Clean retention e comportamento de recuperação}
 \begin{table}[!t]
 \centering
-\caption{Clean retention $\Delta$ (braço reativo; média por grupo $\pm$ desvio-padrão sobre
+\caption{Clean retention $\Delta$ (variante reativa; média por grupo $\pm$ desvio-padrão sobre
 5 seeds).}
 \label{tab:retention}
 \resizebox{\columnwidth}{!}{%
@@ -515,14 +519,14 @@ modelo retreinado generaliza para o regime totalmente degradado. Em 9 dos 20
 episódios com rampa de 200\,s (todas as cinco execuções de fog, três de frosted-glass e uma
 de motion blur), a acurácia nunca cai abaixo de $\tau$.
 A acurácia final média por grupo, no regime totalmente degradado,
-varia de 0,60 a 0,71 para o braço reativo (exceto no episódio
+varia de 0,60 a 0,71 para a variante reativa (exceto no episódio
 com falha, cuja acurácia final é 0,33) e de 0,35 a 0,48 para a baseline
 (Fig.~\ref{fig:motion}).
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_motion_ramp20.png}
-\caption{Motion blur, rampa de 200\,s, cinco seeds pareadas. O braço reativo
+\caption{Motion blur, rampa de 200\,s, cinco seeds pareadas. A variante reativa
 recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do
 horizonte; a baseline segue caindo até cerca de 0,35.}
 \label{fig:motion}
@@ -536,7 +540,7 @@ cerca de 8,0\,TFLOPs da rodada única de retreinamento. A razão é de
 47\% da computação reativa.
 Nos dez clientes, o monitor por passo
 ocupa cerca de 0,13\,s, 1,3\% de cada passo de 10\,s; no dispositivo medido
-(Apple M5, PyTorch 2.12.1) uma atualização do detector leva cerca de 12,7\,ms por
+ uma atualização do detector leva cerca de 12,7\,ms por
 cliente. Se tivéssemos mantido a configuração publicada do UDD com
 $T=50$, o monitoramento excederia a rodada de retreinamento em cerca de $9\times$,
 razão pela qual a adoção de $T=5$ foi uma decisão de custo.
@@ -564,10 +568,9 @@ a política nunca dispara: só quatro dos dez clientes emitem alarme em
 todo o episódio, nunca três dentro da mesma janela de dois passos (fração
 máxima sinalizada de 0,20 em passos esparsos); as outras quatro seeds detectam em
 120--210\,s. Como a janela e o
-quórum são idênticos entre seeds, a falha é mais bem explicada como perda
-(miss) do detector por cliente (uma interação que não conseguimos isolar). Sem decisão, o braço reativo equivale exatamente à
+quórum são idênticos entre seeds, a falha é mais bem explicada como perda do detector por cliente. Sem decisão, a variante reativa equivale exatamente à
 baseline (downtime de 540\,s). Com rampa de 200\,s os
-atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas o braço reativo
+atrasos variam entre 180 e 460\,s (desvio-padrão de 104\,s), mas a variante reativa
 ainda corta o downtime da baseline em 75\% (112 vs.\ 448\,s), em consonância com o
 risco que detectores do tipo ADWIN carregam sob drifts longos e suaves
 \cite{poenaru2022}. O ruído Gaussiano é também o cenário de maior latência reativa.
@@ -632,8 +635,8 @@ Estudamos o retreinamento reativo em aprendizado federado síncrono ao longo
 do espectro do drift abrupto ao gradual, avaliando nossa política reativa
 contra uma baseline pareada sem retreinamento em 60 episódios, com downtime de
 serviço como métrica primária. A detecção teve êxito em 59 de 60 episódios,
-com o atraso crescendo com a duração da rampa para as degradações visuais; o
-braço reativo reduziu o downtime médio de 408--562\,s para 0--178\,s
+com o atraso crescendo com a duração da rampa para as degradações visuais; a
+variante reativa reduziu o downtime médio de 408--562\,s para 0--178\,s
 (zero no caso de fog com rampa de 200\,s); e rampas longas preservaram a acurácia
 limpa para as degradações visuais. O
 gatilho coletivo dispara nos 20 episódios de staggered drift
@@ -651,7 +654,7 @@ protocolo como benchmark reutilizável para avaliação de FL sob drift
 
 \section*{Disponibilidade}
 A implementação e todos os artefatos---os 60 episódios pareados,
-braços comparadores, resumos agregados e tabelas por seed---estão
+variantes comparadoras, resumos agregados e tabelas por seed---estão
 disponíveis em \url{https://github.com/julio-amaral-oliveira/FederatedLearningSimulation}.
 \begin{thebibliography}{29}
 \bibitem{mcmahan2017} B.~McMahan, E.~Moore, D.~Ramage, S.~Hampson, and
