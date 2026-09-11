@@ -113,7 +113,7 @@ drift, calculada como integral em escada sobre um horizonte fixo; (ii) uma
 ao longo de uma curta janela de passos, ausente na literatura revisada e
 mais próxima da barreira de participação do FL-MalDrift \cite{patel2026}, cuja
 latência de detecção caracterizamos por meio de
-ablações de quórum e janela e sob drift dessincronizado;
+ablações de janela e sob drift dessincronizado;
 (iii) uma \textbf{implementação federada do UDD}, com um
 detector por cliente compartilhando o modelo global, estendendo o detector
 centralizado de Baier et al.~\cite{baier2023}; (iv) uma \textbf{infraestrutura experimental
@@ -381,9 +381,9 @@ grupo sobre 5 seeds; taxa de detecção por grupo; a seed Gaussiana que falhou e
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lccccl}
 \toprule
- & \multicolumn{3}{c}{Atraso (s)} & \multicolumn{2}{c}{Fração no disparo}\\
-\cmidrule(lr){2-4}\cmidrule(lr){5-6}
-Corrupção & 50\,s & 100\,s & 200\,s & 200\,s & det.\\
+ & \multicolumn{3}{c}{Atraso (s)} & \multicolumn{1}{c}{Fração no disparo} & \multicolumn{1}{c}{Taxa de det.}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-5}\cmidrule(lr){6-6}
+Corrupção & 50\,s & 100\,s & 200\,s & 200\,s & (de 5)\\
 \midrule
 Névoa & 100 & 112 & 138 & 0,69 & 5/5\\
 Vidro fosco & 100 & 108 & 136 & 0,68 & 5/5\\
@@ -473,17 +473,16 @@ $0{,}90\rightarrow0{,}56$, movimento $0{,}66\rightarrow0{,}54$).
 
 \textbf{Sensibilidade a quórum e janela.} Com quórum 0,50, a política dispara em 59 de 60 episódios, deixando de
 detectar a mesma seed de ruído Gaussiano que com o quórum padrão 0,30 (em rampa
-diferente): nenhum nível de quórum
+diferente): o nível mais alto não
 introduz um novo modo de falha. No quórum padrão, uma janela de um passo dá
 resultado neutro no cômputo geral ($+3{,}7$\,s de atraso, $-3{,}9$\,s de indisponibilidade),
 com o sinal da diferença variando por grupo; a união de dois passos não mostra benefício
-sistemático aqui.
+sistemático.
 
 \textbf{Drift dessincronizado.} Quando os clientes sofrem drift em passos diferentes (cliente
 $i$ sofre drift no passo de produção $i$, sem rampa; 20 episódios), o gatilho
 coletivo dispara em 20 de 20 episódios no limiar do quórum (fração
-sinalizada 0,30--0,40), corroborando alarmes que uma janela de um passo
-perderia. A política evita cerca de 81\% da indisponibilidade da linha de base (600\,s,
+sinalizada 0,30--0,40). A política evita cerca de 81\% da indisponibilidade da linha de base (600\,s,
 drift permanente) em três das quatro corrupções e 70\% no ruído
 Gaussiano (116\,s e 180\,s de indisponibilidade no braço reativo, respectivamente);
 como o drift é instantâneo e permanente, atraso converte-se em indisponibilidade
@@ -561,7 +560,7 @@ razão pela qual a adoção de $T=5$ foi uma decisão de custo.
 As conclusões sobre indisponibilidade são robustas a uma rodada $10\times$ mais longa:
 ao recalcular-se a indisponibilidade \emph{a posteriori} a partir das séries registradas---atribuindo a
 acurácia pré-retreinamento ao intervalo $[t_d,t_d+d]$, usando o primeiro registro
-pós-retreinamento em diante e aplicando a regra de orçamento do controlador---, verifica-se que
+pós-retreinamento em diante e aplicando a regra de orçamento---, verifica-se que
 uma rodada de 80\,s, dominada pela comunicação, ainda corta a indisponibilidade média
 de 507,5\,s (linha de base) para 122,2\,s (76\%). A ordenação por grupo,
 o caso de indisponibilidade zero na névoa e o comportamento limitado pela detecção no ruído
