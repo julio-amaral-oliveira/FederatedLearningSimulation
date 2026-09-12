@@ -31,8 +31,8 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \begin{abstract}
 Federated learning (FL) models deployed in production face concept drift:
 the data distribution shifts after deployment, and model quality degrades
-until a retraining action is taken; in real deployments the shift is often
-gradual, the fraction of corrupted inputs rising slowly over a transition
+until a retraining action is taken; in real deployments the shift need not be
+abrupt: the fraction of corrupted inputs can rise slowly over a transition
 interval whose duration is the drift width.
 We study reactive retraining in synchronous FL as the drift
 transition lengthens from abrupt to gradual. Each client monitors its
@@ -76,8 +76,8 @@ concept drift degrades the served model's quality until a retraining action
 is taken, and detecting it---usually without labels at inference
 time---is a prerequisite for triggering it. A common simplification
 in the literature is to inject drift abruptly: the distribution switches at
-a single instant. In practice, however, the shift is often gradual: new
-data appears mixed with old data, and the proportion of shifted inputs
+a single instant. In practice, however, the shift is not necessarily abrupt: in
+gradual drift, new data appears mixed with old data, and the proportion of shifted inputs
 grows slowly over a transition interval whose duration is the drift width
 used in the drift-detection literature
 \cite{poenaru2022,cerqueira2026}. We model this continuum as a linear ramp
@@ -86,8 +86,8 @@ of monitoring ticks \cite{cerqueira2026}. Our grid spans short ramps
 (the abrupt regime) and a long ramp in which the detector
 operates mid-transition.
 
-Our reactive policy follows the architecture that the FL drift literature
-converged to: \emph{local detection, central decision}
+Our reactive policy follows the predominant architecture in the FL drift literature:
+\emph{local detection, central decision}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
 zhou2026,casado2022,panchal2023,chen2026}. Each client runs an uncertainty
 drift
@@ -162,7 +162,7 @@ Stallmann et al. use a global fuzzy-clustering detector
 \cite{stallmann2024}, and Adaptive-FedAVG forgoes detection altogether,
 adapting the server-side learning rate to raise the plasticity of the
 learning phase
-\cite{canonaco2021}. Our design follows the consensus; the specific
+\cite{canonaco2021}. Our design follows this predominant pattern; the specific
 signal, however, is label-free uncertainty (Section IV-A).
 
 \subsection{Label-free drift detection}

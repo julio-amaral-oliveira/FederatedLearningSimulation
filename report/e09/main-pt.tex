@@ -36,8 +36,8 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \begin{abstract}
 Modelos de aprendizado federado (FL) implantados em ambientes reais enfrentam concept drift:
 a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
-até que uma ação de retreinamento seja adotada; em implantações reais a mudança é com
-frequência gradual, com a fração de entradas degradadas crescendo lentamente ao longo de um intervalo
+até que uma ação de retreinamento seja adotada; em implantações reais a mudança nem sempre é
+abrupta: a fração de entradas degradadas pode crescer lentamente ao longo de um intervalo
 de transição cuja duração é a largura do drift.
 Estudamos o retreinamento reativo em FL síncrono à medida que a
 transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
@@ -80,8 +80,8 @@ concept drift compromete a qualidade do modelo em serviço até que uma ação d
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
 inferência---é um pré-requisito para dispará-la. Uma simplificação comum
 na literatura é injetar o drift de forma abrupta: a distribuição muda em um
-único instante. Na prática, contudo, a mudança é com frequência gradual: dados novos
-passam a coexistir com os antigos, e a proporção de entradas deslocadas
+único instante. Na prática, contudo, a mudança nem sempre é abrupta: no drift gradual,
+dados novos passam a coexistir com os antigos, e a proporção de entradas deslocadas
 cresce lentamente ao longo de um intervalo de transição cuja duração é a largura do drift
 usada na literatura de detecção de drift
 \cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo como uma rampa linear
@@ -90,8 +90,8 @@ de passos de monitoramento \cite{cerqueira2026}. Nossa grade abrange rampas curt
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
 
-Nossa política reativa segue a arquitetura para a qual a literatura de drift em FL
-convergiu: \emph{detecção local, decisão central}
+Nossa política reativa segue a arquitetura predominante na literatura de drift em FL:
+\emph{detecção local, decisão central}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
 zhou2026,casado2022,panchal2023,chen2026}. Cada cliente executa um detector de drift por
 incerteza (UDD) \cite{baier2023}: Monte Carlo (MC) dropout \cite{gal2016}
@@ -124,7 +124,7 @@ detector por cliente compartilhando o modelo global, estendendo o detector
 centralizado de Baier et al.~\cite{baier2023}; (iv) uma \textbf{infraestrutura experimental
 auditável} que pareia a variante reativa com uma baseline
 sem retreinamento a partir do mesmo checkpoint, estado aleatório, fluxo e
-horizonte, validada antes da publicação; e (v) uma
+horizonte; e (v) uma
 \textbf{caracterização empírica do drift gradual} ao longo de 60 episódios
 pareados.
 
@@ -157,16 +157,15 @@ se cancelam. FLARE \cite{chow2023}, FLAME \cite{mavromatis2024},
 FL-MalDrift \cite{patel2026}, DriftGuard \cite{han2026}, FedDAA
 \cite{fu2025}, FedPLC \cite{zhou2026},
 FELK/FL-HVD \cite{chen2026} e
-Casado et al.~\cite{casado2022} seguem detecção local com decisão
-central: nove dos doze trabalhos de FL com concept drift que revisamos o fazem.
-As três exceções: o FLASH detecta drift no servidor
+Casado et al.~\cite{casado2022} seguem detecção local como decisão
+central.
+Em outros trabalhos: o FLASH detecta drift no servidor
 a partir da magnitude das atualizações agregadas de parâmetros \cite{panchal2023};
 Stallmann et al.\ usam um detector global por agrupamento fuzzy
 \cite{stallmann2024}; e o Adaptive-FedAVG dispensa por completo a detecção,
 adaptando a taxa de aprendizado no servidor para aumentar a plasticidade da
 fase de aprendizado
-\cite{canonaco2021}. Nossa arquitetura segue o consenso; o sinal específico,
-porém, é incerteza sem rótulos (Seção IV-A).
+\cite{canonaco2021}. Nossa arquitetura segue esse padrão predominante.
 
 \subsection{Detecção de drift sem rótulos}
 O detector de drift por incerteza (UDD) de Baier et al.~\cite{baier2023} é o
@@ -248,7 +247,7 @@ que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
 Ambas as variantes compartilham o mesmo estado aleatório, início da operação e horizonte $H$;
 a baseline registra, como contrafactual, o momento em que a política
 \emph{teria} disparado.
-% Inicio da revisao
+
 \section{Método Proposto}
 \subsection{Detecção local por incerteza (UDD por cliente)}
 Cada cliente $c$ executa um detector local sobre o modelo global compartilhado:
