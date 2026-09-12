@@ -93,7 +93,7 @@ opera em meio à transição.
 Nossa política reativa segue a arquitetura predominante na literatura de drift em FL:
 \emph{detecção local, decisão central}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
-zhou2026,casado2022,panchal2023,chen2026}. Cada cliente executa um detector de drift por
+zhou2026,casado2022,chen2026}. Cada cliente executa um detector de drift por
 incerteza (UDD) \cite{baier2023}: Monte Carlo (MC) dropout \cite{gal2016}
 ao longo de $T$ forward passes estocásticos, entropia média de Shannon e um teste de janela
 adaptativa ADWIN \cite{bifet2007} por cliente.
@@ -368,7 +368,8 @@ antes do drift) e a acurácia final sob degradação.
 A detecção teve êxito em 59 de 60 episódios (14 de 15 no cenário de ruído
 Gaussiano); a única falha ocorreu no ruído Gaussiano, na rampa de 100\,s, com a
 seed 42.
-O atraso cresce com a duração da rampa para as três degradações visuais,
+O atraso cresce com a duração da rampa para as três degradações visuais
+(Tabela~\ref{tab:delay}),
 em consonância com a análise do ADWIN para mudança gradual com inclinação constante
 \cite{bifet2007}; o ruído Gaussiano não segue a tendência.
 
@@ -424,7 +425,8 @@ Ruído Gaussiano & 130 / 558 & 178 / 526 & 112 / 448\\
 desvio-padrão do downtime de até 184\,s, intervalo 38--540\,s); degradações visuais têm desvio-padrão
 $\le$6\,s (atraso) e $\le$10\,s (downtime).}
 \end{table}
-A política reativa reduz o downtime médio nos 12 grupos, de
+A política reativa reduz o downtime médio nos 12 grupos
+(Tabela~\ref{tab:downtime}), de
 408--562\,s para 0--178\,s, com 59 vitórias nos 60 episódios pareados.
 O cenário de fog
 com rampa de 200\,s atinge \textbf{downtime zero} com $\tau=0{,}5$
@@ -533,7 +535,7 @@ horizonte; a baseline segue caindo até cerca de 0,35.}
 \end{figure}
 
 \section{Discussão}
-O monitoramento não é gratuito: ao longo do episódio de 80 passos, o detector com $T=5$ custa cerca de 6,8\,TFLOPs
+O monitoramento não é gratuito: ao longo do episódio de 80 passos (60 de operação mais 20 de warm-up), o detector com $T=5$ custa cerca de 6,8\,TFLOPs
 (4\,000 forward passes em lote de 32, 50 por passo nos dez clientes) contra
 cerca de 8,0\,TFLOPs da rodada única de retreinamento. A razão é de
 0,85--0,96 conforme a contabilização, ou seja, o monitoramento responde por cerca de
