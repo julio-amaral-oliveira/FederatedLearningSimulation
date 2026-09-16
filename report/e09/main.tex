@@ -64,28 +64,31 @@ is taken, and detecting it---usually without labels at inference
 time---is a prerequisite for triggering it. The shift is not necessarily
 abrupt: in gradual drift, new data appears mixed with old data, and the
 proportion of shifted inputs grows slowly over a transition interval whose
-duration is the drift width used in the drift-detection literature
-\cite{poenaru2022,cerqueira2026}. We model this continuum as a linear ramp
+duration is the drift width \cite{poenaru2022,cerqueira2026}, a definition
+from the drift-detection literature (non-federated). We model this
+continuum as a linear ramp
 of the corrupted-data fraction from zero to one over a configurable number
 of monitoring ticks \cite{cerqueira2026}. Our grid spans short ramps
 (the abrupt regime) and a long ramp in which the detector
 operates mid-transition.
 
-Our reactive policy follows the predominant architecture in the FL drift literature:
+Our reactive policy follows the predominant architecture in the FL drift literature,
 \emph{local detection, central decision}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
-zhou2026,casado2022,panchal2023,chen2026}. Each client runs an uncertainty
-drift
-detector (UDD) \cite{baier2023}: Monte Carlo (MC) dropout \cite{gal2016}
-over $T$ stochastic forwards, mean Shannon entropy, and an ADWIN adaptive
-window test \cite{bifet2007} per client.
-The server collects the per-client alarms over a sliding window of two
-monitoring ticks and triggers when the fraction of distinct flagged clients
-reaches a quorum. The triggered action is a single global retraining round
-on the mixture each client currently serves, in line with the explicit
-retraining budgets of DriftGuard \cite{han2026} and ShiftEx
-\cite{bhope2025} and Modyn's trigger/data-selection separation
-\cite{bother2025}.
+zhou2026,casado2022,panchal2023,chen2026}, but differs along the path from the
+local signal to retraining. The uncertainty detector is federated: each client
+runs UDD \cite{baier2023}---Monte Carlo (MC) dropout \cite{gal2016} over $T$
+stochastic forwards, mean Shannon entropy, and an ADWIN adaptive window test
+\cite{bifet2007}---on the shared global model, rather than in its original
+centralized setting. On the server, the decision reacts neither to individual
+alarms nor to an aggregate test: it requires a quorum of distinct flagged
+clients within a two-tick window, a policy absent from the reviewed
+literature, where the closest case, FL-MalDrift's participation gate
+\cite{patel2026}, regulates client participation rather than the trigger.
+Once triggered, retraining is a single global round on the data each client
+currently serves, in line with the explicit retraining budgets of DriftGuard
+\cite{han2026} and ShiftEx \cite{bhope2025} and Modyn's trigger/data-selection
+separation \cite{bother2025}.
 
 The primary metric is the service \emph{downtime}: the cumulative virtual
 time in which the corrupted accuracy of the served model stays below a
@@ -120,7 +123,7 @@ in which different clients drift at different times, are studied by
 Jothimurugesan et al.~\cite{jothimurugesan2023}. Gradual drift, the regime
 studied here, mixes the new concept with the old one with a growing
 proportion over time \cite{casado2022}; the transition duration is the
-drift width
+drift width of the drift-detection (non-federated) literature
 \cite{poenaru2022,cerqueira2026}.
 
 Our scope is delimited to drifts accompanied by a change in

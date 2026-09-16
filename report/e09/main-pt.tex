@@ -67,30 +67,34 @@ retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
 inferência---é um pré-requisito para dispará-la. A mudança nem sempre é
 abrupta: no drift gradual, dados novos passam a coexistir com os antigos, e
 a proporção de entradas deslocadas cresce lentamente ao longo de um intervalo
-de transição cuja duração é a largura do drift usada na literatura de
-detecção de drift \cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo
+de transição cuja duração é a largura do drift
+\cite{poenaru2022,cerqueira2026}, uma definição da literatura de detecção de
+drift (não federada). Modelamos esse contínuo
 como uma rampa linear da fração de dados degradados de zero a um ao longo de
 um número configurável de passos de monitoramento \cite{cerqueira2026}. Nossa
 grade abrange rampas curtas
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
 
-Nossa política reativa segue a arquitetura predominante na literatura de drift em FL:
+Nossa política reativa segue a arquitetura predominante na literatura de drift em FL,
 \emph{detecção local, decisão central}
 \cite{jothimurugesan2023,chow2023,mavromatis2024,patel2026,han2026,fu2025,
-zhou2026,casado2022,chen2026}. Cada cliente executa um detector de drift por
-incerteza (UDD) \cite{baier2023}: Monte Carlo (MC) dropout \cite{gal2016}
-ao longo de $T$ forward passes estocásticos, entropia média de Shannon e um teste de janela
-adaptativa ADWIN \cite{bifet2007} por cliente.
-O servidor coleta os alarmes por cliente ao longo de uma janela deslizante de dois
-passos de monitoramento e dispara quando a fração de clientes distintos sinalizados
-atinge um quórum. A ação disparada é uma única rodada global de retreinamento
-sobre os dados que cada cliente serve no momento, em consonância com os orçamentos
-explícitos de retreinamento do DriftGuard \cite{han2026} e do ShiftEx
+zhou2026,casado2022,chen2026}, mas difere na detecção local e no disparo pois o detector de incerteza é federado e, portanto, cada cliente executa o UDD
+\cite{baier2023}---Monte Carlo (MC) dropout \cite{gal2016} ao longo de $T$
+forward passes estocásticos, entropia média de Shannon e um teste de janela
+adaptativa ADWIN \cite{bifet2007}---sobre o modelo global compartilhado, em
+vez da configuração centralizada original. No servidor, a decisão não reage a
+alarmes individuais, exigindo um quórum de clientes
+distintos sinalizados em uma janela de dois passos de monitoramento, política
+ausente na literatura revisada, em que o caso mais próximo, a barreira de
+participação do FL-MalDrift \cite{patel2026}, regula a participação de
+clientes, não o disparo. Uma vez disparado, o retreinamento é uma única rodada
+global sobre os dados que cada cliente serve no momento, em consonância com os
+orçamentos explícitos de retreinamento do DriftGuard \cite{han2026} e do ShiftEx
 \cite{bhope2025} e com a separação entre gatilho e seleção de dados do Modyn
 \cite{bother2025}.
 
-A métrica primária é o \emph{downtime} de serviço: o tempo
+Para avaliar nossa proposta, utilizamos como métrica primária o \emph{downtime} de serviço, ou seja, o tempo
 acumulado em que a acurácia do modelo em serviço sob degradação permanece abaixo de um
 limiar de qualidade $\tau$.
 Até onde sabemos, nenhum trabalho na literatura revisada de drift em FL quantifica
@@ -123,7 +127,7 @@ nos quais clientes diferentes sofrem drift em momentos diferentes, são estudado
 Jothimurugesan et al.~\cite{jothimurugesan2023}. O drift gradual, regime
 estudado aqui, combina o conceito novo com o antigo em proporção crescente
 ao longo do tempo \cite{casado2022}; a duração da transição é a
-largura do drift
+largura do drift, definida na literatura de detecção de drift (não federada)
 \cite{poenaru2022,cerqueira2026}.
 
 Nosso escopo limita-se a drifts acompanhados de mudança em
