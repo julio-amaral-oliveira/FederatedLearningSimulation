@@ -31,36 +31,23 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \begin{abstract}
 Federated learning (FL) models deployed in production face concept drift:
 the data distribution shifts after deployment, and model quality degrades
-until a retraining action is taken; in real deployments the shift need not be
-abrupt: the fraction of corrupted inputs can rise slowly over a transition
+until a retraining action is taken. In real deployments the shift need not be
+abrupt: the fraction of corrupted inputs rises slowly over a transition
 interval whose duration is the drift width.
 We study reactive retraining in synchronous FL as the drift
 transition lengthens from abrupt to gradual. Each client monitors its
-unlabeled input stream with a local
-uncertainty-based detector (Monte Carlo dropout, Shannon entropy, and an
-ADWIN adaptive-window test); the server aggregates the local alarms over a
-short tick window and triggers at most once a single retraining round on
-each client's current mixture. The primary metric is the
+unlabeled input stream with a local uncertainty-based detector, and the server
+aggregates the alarms over a short tick window to trigger a single retraining
+round on each client's current mixture. The primary metric is the
 service downtime, the cumulative virtual time in which the served-model
-accuracy stays below a quality threshold. In 60 paired episodes (four
-calibrated corruptions, five seeds, three ramp durations of 50--200\,s)
-over a fixed 600\,s horizon, against a paired never-retraining
-baseline, detection succeeds in 59 of 60 episodes (14 of 15 in the
-Gaussian-noise scenario); the detection delay grows with the ramp duration
-for the three visual corruptions (98--140\,s) and reaches 256\,s for
-Gaussian noise; the reactive policy reduces the mean downtime from
-408--562\,s in the baseline to 0--178\,s, reaching zero downtime at
-$\tau=0.5$ in the longest-ramp fog scenario; and long ramps preserve
-clean-set accuracy for the visual corruptions (1--2 points loss instead of
-9--21). Within the
-exercised regime (CIFAR-10, IID partition, ten clients, a single drift and
-at most one retraining round), a reactive label-free policy is effective
-against a never-retraining baseline; detection latency is
-scenario-dependent, Gaussian noise being the hardest case; a no-quorum
-variant detects about 14\,s earlier with lower downtime, the measured
-price of the quorum's unquantified false-alarm protection; the collective
-trigger detects all staggered drift episodes with zero false alarms on
-drift-free streams.
+accuracy stays below a quality threshold. In paired experiments against a
+never-retraining baseline, the reactive policy detects almost every episode and
+reduces downtime substantially, eliminating it in the best case; long ramps
+also preserve clean-set accuracy better. The collective trigger responds under
+drift---including staggered drift---and stays silent on drift-free streams,
+while Gaussian noise is the hardest case, with the longest detection latency.
+Within the exercised regime, a reactive label-free policy is effective, and
+detection latency is scenario-dependent.
 \end{abstract}
 
 \begin{IEEEkeywords}

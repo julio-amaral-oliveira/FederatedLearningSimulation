@@ -34,35 +34,23 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \begin{abstract}
 Modelos de aprendizado federado (FL) implantados em ambientes reais enfrentam concept drift:
 a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
-até que uma ação de retreinamento seja adotada; em implantações reais a mudança nem sempre é
-abrupta: a fração de entradas degradadas pode crescer lentamente ao longo de um intervalo
+até que uma ação de retreinamento seja adotada. Em implantações reais a mudança nem sempre é
+abrupta: a fração de entradas degradadas cresce lentamente ao longo de um intervalo
 de transição cuja duração é a largura do drift.
 Estudamos o retreinamento reativo em FL síncrono à medida que a
 transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
-fluxo de entrada não rotulado com um detector local
-baseado em incerteza (Monte Carlo dropout, entropia de Shannon e um
-teste de janela adaptativa ADWIN); o servidor agrega os alarmes locais ao longo de uma
-curta janela de passos de monitoramento e dispara no máximo uma única vez uma rodada de retreinamento sobre
-os dados correntes de cada cliente. A métrica primária é o
+fluxo de entrada não rotulado com um detector local baseado em incerteza, e o servidor
+agrega os alarmes ao longo de uma curta janela de passos para disparar uma rodada de
+retreinamento sobre os dados correntes de cada cliente. A métrica primária é o
 downtime de serviço, o tempo acumulado em que a
-acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Os experimentos usam 60
-episódios pareados (quatro
-degradações calibradas, cinco seeds, três durações de rampa de 50--200\,s)
-sobre um horizonte fixo de 600\,s, contra uma baseline pareada sem retreinamento.
-A detecção tem êxito em 59 de 60 episódios (14 de 15 no
-cenário de ruído Gaussiano); o atraso de detecção cresce com a duração da rampa
-para as três degradações visuais (98--140\,s) e chega a 256\,s para
-o ruído Gaussiano; a política reativa reduz o downtime médio de
-408--562\,s na baseline para 0--178\,s, alcançando downtime zero em
-$\tau=0{,}5$ no cenário de fog com rampa mais longa; e rampas longas preservam
-a acurácia no conjunto limpo para as degradações visuais (perda de 1--2 pontos em vez de
-9--21). No
-regime exercitado (CIFAR-10, partição IID, dez clientes, um único drift e
-no máximo uma rodada de retreinamento), uma política reativa sem rótulos é eficaz,
-em comparação com uma baseline sem retreinamento; a latência de detecção
-depende do cenário, e o ruído Gaussiano é o caso mais difícil;
-o gatilho coletivo detecta todos os episódios de staggered drift com zero alarmes falsos em
-fluxos sem drift.
+acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Em experimentos
+pareados contra uma baseline sem retreinamento, a política reativa detecta
+quase todos os episódios e reduz de forma significativa o downtime, anulando-o no melhor caso;
+rampas longas também preservam melhor a acurácia no conjunto limpo. O gatilho coletivo
+é disparado sob drift---inclusive staggered---oque não ocorre em fluxos sem drift,
+enquanto o ruído Gaussiano se mostra o cenário mais difícil, com a maior latência de
+detecção. No regime exercitado, uma política reativa sem rótulos é eficaz, e a latência
+de detecção depende do cenário.
 \end{abstract}
 
 \begin{IEEEkeywords}
