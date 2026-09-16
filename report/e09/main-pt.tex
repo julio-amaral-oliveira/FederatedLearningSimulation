@@ -16,11 +16,11 @@
 
 \begin{document}
 
-\title{Retreinamento Reativo em Aprendizado Federado sob Drift Gradual: Detecção Local por Incerteza e Decisão Coletiva por Quórum}
+\title{Retreinamento Reativo em Aprendizado Federado sob \textit{Concept Drift} Gradual: Detecção Local por Incerteza e Decisão Coletiva por Quórum}
 
 \author{
 \IEEEauthorblockN{Julio Amaral\IEEEauthorrefmark{1},
-Hugo César\IEEEauthorrefmark{2},
+Hugo César de Oliveira\IEEEauthorrefmark{2},
 Miguel Elias M. Campista\IEEEauthorrefmark{2},
 Luiz Fernando Bittencourt\IEEEauthorrefmark{1}}
 \IEEEauthorblockA{\IEEEauthorrefmark{1}Instituto de Computação, Universidade Estadual de Campinas (UNICAMP), Brasil\\
@@ -32,35 +32,37 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 \maketitle
 
 \begin{abstract}
-Modelos de aprendizado federado (FL) implantados em ambientes reais enfrentam concept drift:
-a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
-até que uma ação de retreinamento seja adotada. Em implantações reais a mudança nem sempre é
-abrupta, e a fração de entradas degradadas cresce lentamente ao longo de um
-intervalo de transição cuja duração é a largura do drift.
-Estudamos o retreinamento reativo em FL síncrono à medida que a
-transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
-fluxo de entrada não rotulado com um detector local baseado em incerteza, e o servidor
-agrega os alarmes ao longo de uma curta janela de passos para disparar uma rodada de
-retreinamento sobre os dados correntes de cada cliente. A métrica primária é o
-downtime de serviço, o tempo acumulado em que a
-acurácia do modelo em serviço permanece abaixo de um limiar de qualidade. Em experimentos
-pareados contra uma baseline sem retreinamento, a política reativa detecta
-quase todos os episódios e reduz de forma significativa o downtime, anulando-o no melhor caso;
-rampas longas também preservam melhor a acurácia no conjunto limpo. O gatilho coletivo
-é disparado sob drift---inclusive staggered---oque não ocorre em fluxos sem drift,
-enquanto o ruído Gaussiano se mostra o cenário mais difícil, com a maior latência de
-detecção. No regime exercitado, uma política reativa sem rótulos é eficaz, e a latência
-de detecção depende do cenário.
+Modelos de Aprendizado Federado (\textit{Federated Learning} -- FL) empregados em ambientes
+reais enfrentam desvio de conceito (\textit{concept drift}): a distribuição dos dados muda
+após a implantação, levando à deterioração da qualidade do modelo até que seja adotada
+uma ação de retreinamento. Em cenários reais, a mudança nem sempre é abrupta: a fração
+de entradas degradadas cresce lentamente ao longo de um intervalo de transição cuja
+duração é a largura do \textit{drift}.
+Este trabalho propõe uma política de decisão coletiva por quórum para disparar o retreinamento
+reativo sob drift gradual: cada cliente monitora seu fluxo de entrada não rotulado com um
+detector local baseado em incerteza, e o servidor só dispara uma rodada de retreinamento sobre
+os dados correntes quando uma fração mínima de clientes distintos sinaliza alarme dentro de uma
+curta janela de passos. A regra exige corroboração---um falso positivo local isolado não
+basta---e acumula alarmes espalhados no tempo, o que é decisivo sob drift staggered.
+Em experimentos pareados contra uma baseline sem retreinamento, a política detecta
+quase todos os episódios e reduz de forma significativa o downtime de serviço, o tempo
+acumulado em que a acurácia do modelo em serviço permanece abaixo de um limiar de qualidade,
+anulando-o no melhor caso; rampas longas também preservam melhor a acurácia no conjunto limpo.
+O gatilho coletivo dispara em todos os episódios de drift staggered e permanece silencioso
+em fluxos sem drift, enquanto o ruído Gaussiano se mostra o cenário mais difícil, com a maior
+latência de detecção. Além da política de decisão, o trabalho contribui com a métrica de
+downtime de serviço, com uma implementação federada do detector de incerteza e com uma
+infraestrutura experimental auditável, ao longo de 60 episódios pareados. No regime exercitado,
+uma política reativa sem rótulos é eficaz, e a latência de detecção depende do cenário.
 \end{abstract}
 
 \begin{IEEEkeywords}
-aprendizado federado, concept drift, detecção de drift, retreinamento reativo,
-detecção não supervisionada, downtime de serviço.
+aprendizado federado, \textit{concept drift}, detecção de \textit{drift}, retreinamento reativo,
+decisão coletiva por quórum, detecção não supervisionada, indisponibilidade de serviço
 \end{IEEEkeywords}
 
 \section{Introdução}
-\IEEEPARstart{A}{prendizado} federado (FL) treina um modelo compartilhado a partir de dados que
-permanecem distribuídos entre os clientes \cite{mcmahan2017}. Uma vez implantado, o
+O Aprendizado Federado (\textit{Federated Learning} -- FL) treina um modelo compartilhado a partir de dados que permanecem distribuídos entre os clientes para preservação de privacidade~\cite{mcmahan2017}. Uma vez implantado, o
 modelo é servido em um ambiente cuja distribuição de dados pode mudar; tal
 concept drift compromete a qualidade do modelo em serviço até que uma ação de
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
