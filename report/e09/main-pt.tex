@@ -221,23 +221,21 @@ $100$, $200$\,s com $\Delta t=10$\,s).
 \textbf{Limiar de qualidade e downtime.} Seja $a(v)$ a acurácia do
 modelo em serviço em um conjunto de teste com a fração corrente $f(v)$. O limiar de
 qualidade $\tau$ define o estado do serviço, no qual o modelo está indisponível
-quando $a(v)<\tau$. O downtime ao longo de um horizonte fixo $[v_0,v_0+H]$ é
+quando $a(v)<\tau$. Como a acurácia é avaliada apenas em instantes discretos,
+o downtime ao longo de $[v_0,v_0+H]$ é a soma da duração de cada intervalo entre
+avaliações consecutivas sempre que a acurácia medida no início do intervalo é inferior a $\tau$. Formalmente,
 \begin{equation}
 D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 \mathbf{1}\big[a(v_i)<\tau\big] ,
 \label{eq:downtime}
 \end{equation}
-em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$. A
-integral em escada usa a última qualidade conhecida, sem interpolação, e
-inclui o intervalo final até o horizonte. Os instantes de avaliação
-compreendem fronteiras dos passos, o instante de conclusão do retreinamento e o
-horizonte.
-
-\textbf{Avaliação pareada.} A política reativa é comparada com uma baseline
-que observa o mesmo fluxo a partir do mesmo checkpoint e nunca retreina.
-Ambas as variantes compartilham o mesmo estado aleatório, início da operação e horizonte $H$;
-a baseline registra, como contrafactual, o momento em que a política
-\emph{teria} disparado.
+em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$.
+A acurácia mantém o último valor medido até a próxima avaliação e, no
+intervalo final, até o horizonte $v_0+H$. Essas avaliações ocorrem nas
+fronteiras dos passos de monitoramento (a cada $\Delta t$ segundos), no
+instante em que o retreinamento termina (uma avaliação extra que registra a
+recuperação logo após a rodada, mesmo que o término caia entre duas
+fronteiras) e no horizonte $v_0+H$.
 
 \section{Método Proposto}
 \subsection{Detecção local por incerteza (UDD por cliente)}
@@ -321,7 +319,10 @@ severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
 A grade do estudo é o produto cartesiano das quatro degradações calibradas,
 cinco seeds ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos),
 totalizando 60 episódios pareados com horizonte de operação fixo de $H=600$\,s.
-A Tabela~\ref{tab:setup} lista a configuração fixa.
+Cada episódio pareia a política reativa com uma baseline no mesmo fluxo e
+checkpoint que nunca retreina; as duas variantes compartilham o estado
+aleatório, o início da operação e o horizonte $H$, e a baseline registra,
+como contrafactual, o momento em que a política \emph{teria} disparado. A Tabela~\ref{tab:setup} lista a configuração fixa.
 
 \begin{table}[!t]
 \centering
