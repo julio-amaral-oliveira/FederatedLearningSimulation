@@ -65,14 +65,14 @@ modelo é servido em um ambiente cuja distribuição de dados pode mudar; tal
 concept drift compromete a qualidade do modelo em serviço até que uma ação de
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
 inferência---é um pré-requisito para dispará-la. A mudança nem sempre é
-abrupta: no drift gradual, dados novos passam a coexistir com os antigos, e
+abrupta. Por exemplo, no drift gradual, dados novos passam a coexistir com os antigos, e
 a proporção de entradas deslocadas cresce lentamente ao longo de um intervalo
 de transição cuja duração é a largura do drift
 \cite{poenaru2022,cerqueira2026}, uma definição da literatura de detecção de
 drift (não federada). Modelamos esse contínuo
 como uma rampa linear da fração de dados degradados de zero a um ao longo de
-um número configurável de passos de monitoramento \cite{cerqueira2026}. Nossa
-grade abrange rampas curtas
+um número configurável de passos de monitoramento \cite{cerqueira2026}. Nosso
+estudo abrange rampas curtas
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
 
@@ -120,9 +120,10 @@ pareados.
 \section{Contextualização e Trabalhos Relacionados}
 \subsection{Concept drift em aprendizado federado}
 Concept drift é a mudança na distribuição dos dados ao longo do tempo
-\cite{criado2022,mahdi2025}; a taxonomia distingue drift virtual (só
-$P(X)$ muda) de drift real (a condicional $P(Y\mid X)$ muda), bem como
-drifts abruptos, graduais e recorrentes \cite{mahdi2025}. Staggered drifts,
+\cite{criado2022,mahdi2025}; com entradas $X$ e rótulos $Y$, a taxonomia
+distingue drift virtual (muda apenas a distribuição das entradas, $P(X)$) de
+drift real (muda a condicional dos rótulos dada a entrada, $P(Y\mid X)$), bem
+como drifts abruptos, graduais e recorrentes \cite{mahdi2025}. Staggered drifts,
 nos quais clientes diferentes sofrem drift em momentos diferentes, são estudados por
 Jothimurugesan et al.~\cite{jothimurugesan2023}. O drift gradual, regime
 estudado aqui, combina o conceito novo com o antigo em proporção crescente
