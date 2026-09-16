@@ -39,21 +39,25 @@ uma ação de retreinamento. Em cenários reais, a mudança nem sempre é abrupt
 de entradas degradadas cresce lentamente ao longo de um intervalo de transição cuja
 duração é a largura do \textit{drift}.
 Este trabalho propõe uma política de decisão coletiva por quórum para disparar o retreinamento
-reativo sob drift gradual: cada cliente monitora seu fluxo de entrada não rotulado com um
-detector local baseado em incerteza, e o servidor só dispara uma rodada de retreinamento sobre
-os dados correntes quando uma fração mínima de clientes distintos sinaliza alarme dentro de uma
-curta janela de passos. A regra exige corroboração---um falso positivo local isolado não
-basta---e acumula alarmes espalhados no tempo, o que é decisivo sob drift staggered.
-Em experimentos pareados contra uma baseline sem retreinamento, a política detecta
-quase todos os episódios e reduz de forma significativa o downtime de serviço, o tempo
-acumulado em que a acurácia do modelo em serviço permanece abaixo de um limiar de qualidade,
-anulando-o no melhor caso; rampas longas também preservam melhor a acurácia no conjunto limpo.
-O gatilho coletivo dispara em todos os episódios de drift staggered e permanece silencioso
-em fluxos sem drift, enquanto o ruído Gaussiano se mostra o cenário mais difícil, com a maior
-latência de detecção. Além da política de decisão, o trabalho contribui com a métrica de
-downtime de serviço, com uma implementação federada do detector de incerteza e com uma
-infraestrutura experimental auditável, ao longo de 60 episódios pareados. No regime exercitado,
-uma política reativa sem rótulos é eficaz, e a latência de detecção depende do cenário.
+reativo sob drift gradual. Cada cliente monitora um fluxo de imagens não rotuladas com um
+detector local baseado em incerteza, que emite um alarme ao identificar mudança na distribuição.
+O servidor acompanha os alarmes a cada passo de monitoramento e mantém, ao longo dos passos
+recentes, os clientes distintos que sinalizaram mudança: o retreinamento sobre os dados
+correntes só é disparado quando a fração desses clientes atinge um quórum mínimo, ainda que os
+alarmes venham de passos diferentes. A regra exige corroboração---um falso positivo local
+isolado não basta---e acumula alarmes espalhados no tempo, o que é decisivo sob drift staggered.
+A avaliação usa imagens CIFAR-10 sob quatro degradações visuais, com cinco seeds e três durações
+de rampa (50--200\,s), totalizando 60 episódios que comparam a variante reativa com uma baseline
+sem retreinamento. As métricas são o downtime de serviço---o tempo acumulado em que a acurácia do
+modelo em serviço permanece abaixo de um limiar de qualidade---e o atraso de detecção. A política
+detecta o drift em 59 de 60 episódios e reduz o downtime médio de 408--562\,s para 0--178\,s,
+anulando-o no melhor caso; rampas longas também preservam melhor a acurácia no conjunto limpo. O
+gatilho coletivo não dispara em 15 controles sem drift (zero falsos positivos) e é acionado em
+todos os episódios de drift staggered, enquanto o ruído Gaussiano se mostra o cenário mais
+difícil.
+O trabalho contribui ainda com a métrica de downtime de serviço, um detector de incerteza
+federado e uma infraestrutura experimental auditável. No regime exercitado, uma política
+reativa sem rótulos é eficaz, e a latência de detecção depende do cenário.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -87,7 +91,7 @@ forward passes estocásticos, entropia média de Shannon e um teste de janela
 adaptativa ADWIN \cite{bifet2007}---sobre o modelo global compartilhado, em
 vez da configuração centralizada original. No servidor, a decisão não reage a
 alarmes individuais, exigindo um quórum de clientes
-distintos sinalizados em uma janela de dois passos de monitoramento, política
+distintos sinalizados ao longo de dois passos consecutivos, política
 ausente na literatura revisada, em que o caso mais próximo, a barreira de
 participação do FL-MalDrift \cite{patel2026}, regula a participação de
 clientes, não o disparo. Uma vez disparado, o retreinamento é uma única rodada
@@ -106,7 +110,7 @@ lacuna na Seção II-E.
 Nossas contribuições são: (i) uma \textbf{métrica de downtime de serviço} para FL sob
 drift, calculada como integral em escada sobre um horizonte fixo; (ii) uma
 \textbf{política coletiva por quórum} que agrega alarmes sem rótulos por cliente
-ao longo de uma curta janela de passos, ausente na literatura revisada e
+ao longo de alguns passos, ausente na literatura revisada e
 mais próxima da barreira de participação do FL-MalDrift \cite{patel2026}, cuja
 latência de detecção caracterizamos por meio de
 ablações de janela e sob staggered drift;
