@@ -64,15 +64,14 @@ permanecem distribuídos entre os clientes \cite{mcmahan2017}. Uma vez implantad
 modelo é servido em um ambiente cuja distribuição de dados pode mudar; tal
 concept drift compromete a qualidade do modelo em serviço até que uma ação de
 retreinamento seja adotada, e detectá-lo---em geral sem rótulos no momento da
-inferência---é um pré-requisito para dispará-la. Uma simplificação comum
-na literatura é injetar o drift de forma abrupta: a distribuição muda em um
-único instante. Na prática, contudo, a mudança nem sempre é abrupta: no drift gradual,
-dados novos passam a coexistir com os antigos, e a proporção de entradas deslocadas
-cresce lentamente ao longo de um intervalo de transição cuja duração é a largura do drift
-usada na literatura de detecção de drift
-\cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo como uma rampa linear
-da fração de dados degradados de zero a um ao longo de um número configurável
-de passos de monitoramento \cite{cerqueira2026}. Nossa grade abrange rampas curtas
+inferência---é um pré-requisito para dispará-la. A mudança nem sempre é
+abrupta: no drift gradual, dados novos passam a coexistir com os antigos, e
+a proporção de entradas deslocadas cresce lentamente ao longo de um intervalo
+de transição cuja duração é a largura do drift usada na literatura de
+detecção de drift \cite{poenaru2022,cerqueira2026}. Modelamos esse contínuo
+como uma rampa linear da fração de dados degradados de zero a um ao longo de
+um número configurável de passos de monitoramento \cite{cerqueira2026}. Nossa
+grade abrange rampas curtas
 (o regime abrupto) e uma rampa longa na qual o detector
 opera em meio à transição.
 
