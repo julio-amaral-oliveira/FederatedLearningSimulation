@@ -35,8 +35,8 @@ hugocesar@gta.ufrj.br, miguel@gta.ufrj.br}
 Modelos de aprendizado federado (FL) implantados em ambientes reais enfrentam concept drift:
 a distribuição dos dados muda após a implantação, e a qualidade do modelo se deteriora
 até que uma ação de retreinamento seja adotada. Em implantações reais a mudança nem sempre é
-abrupta: a fração de entradas degradadas cresce lentamente ao longo de um intervalo
-de transição cuja duração é a largura do drift.
+abrupta, e a fração de entradas degradadas cresce lentamente ao longo de um
+intervalo de transição cuja duração é a largura do drift.
 Estudamos o retreinamento reativo em FL síncrono à medida que a
 transição do drift se alonga do regime abrupto ao gradual. Cada cliente monitora seu
 fluxo de entrada não rotulado com um detector local baseado em incerteza, e o servidor
@@ -133,8 +133,8 @@ largura do drift, definida na literatura de detecção de drift (não federada)
 
 Nosso escopo limita-se a drifts acompanhados de mudança em
 $P(X)$ (covariate shift, com rótulos preservados). É o pressuposto sob o qual
-a detecção sem rótulos é estruturalmente possível: métodos sem rótulos são
-funções determinísticas das entradas, de modo que uma mudança restrita a $P(Y\mid X)$
+a detecção sem rótulos é estruturalmente possível, pois métodos sem rótulos
+são funções determinísticas das entradas, de modo que uma mudança restrita a $P(Y\mid X)$
 não produz sinal observável --- um ponto cego medido por Solozobov
 \cite{solozobov2026} e declarado por Baier et al.~\cite{baier2023}.
 
@@ -167,14 +167,15 @@ incerteza do modelo, e sabe-se que estimadores de incerteza perdem confiabilidad
 \cite{ovadia2019}. O D3M \cite{nguyen2025} é um método complementar sem rótulos,
 baseado em discordância entre modelos, com garantias quanto a falsos positivos sob o
 pressuposto de covariate shift. O PUDD \cite{lu2025} é igualmente
-complementar: aplica um teste qui-quadrado de Pearson a um índice de incerteza de
-predição, cujo nível de significância controla a taxa de falsos positivos --- ao
+complementar, pois aplica um teste qui-quadrado de Pearson a um índice de
+incerteza de predição, cujo nível de significância controla a taxa de falsos positivos --- ao
 contrário da etapa ADWIN do UDD, que acompanha a média.
 
 \subsection{Orquestração e orçamentos de retreinamento}
 O DriftGuard \cite{han2026} formaliza a decisão de retreinamento como uma tupla
-$\pi^t=(\mathrm{Trig},S,\theta)$: se deve retreinar, quais dispositivos devem
-participar e quais parâmetros devem ser atualizados, e relata reduções de custo de
+$\pi^t=(\mathrm{Trig},S,\theta)$, em que $\mathrm{Trig}$ indica se deve
+retreinar, $S$ quais dispositivos devem participar e $\theta$ quais parâmetros
+devem ser atualizados; relata reduções de custo de
 retreinamento de 80--83\%. O Modyn \cite{bother2025} separa políticas de gatilho
 (tempo, volume, desempenho, drift) de políticas de seleção de dados; seu gatilho de
 drift usa MMD (com KS entre as estatísticas candidatas) e um limiar
@@ -202,8 +203,8 @@ distinta do nosso tempo de operação abaixo do limiar de qualidade.
 Consideramos FL síncrono com $C$ clientes e tempo $v$, o
 relógio abstrato do nosso simulador. Um modelo é treinado em dados limpos durante $R$
 rodadas e entra em operação no instante $v_0$. Os dados de inferência chegam em
-passos de monitoramento de $\Delta t$ segundos: um lote sem rótulos por cliente, a cada
-passo.
+passos de monitoramento de $\Delta t$ segundos, um lote sem rótulos por cliente a
+cada passo.
 
 \textbf{Modelo de drift gradual.} Uma degradação aplicada às entradas $X$ (rótulos
 preservados) é injetada com uma fração degradada $f(v)$ que cresce linearmente
@@ -219,14 +220,14 @@ $100$, $200$\,s com $\Delta t=10$\,s).
 
 \textbf{Limiar de qualidade e downtime.} Seja $a(v)$ a acurácia do
 modelo em serviço em um conjunto de teste com a fração corrente $f(v)$. O limiar de
-qualidade $\tau$ define o estado do serviço: o modelo está indisponível quando
-$a(v)<\tau$. O downtime ao longo de um horizonte fixo $[v_0,v_0+H]$ é
+qualidade $\tau$ define o estado do serviço, no qual o modelo está indisponível
+quando $a(v)<\tau$. O downtime ao longo de um horizonte fixo $[v_0,v_0+H]$ é
 \begin{equation}
 D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 \mathbf{1}\big[a(v_i)<\tau\big] ,
 \label{eq:downtime}
 \end{equation}
-em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$: a
+em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$. A
 integral em escada usa a última qualidade conhecida, sem interpolação, e
 inclui o intervalo final até o horizonte. Os instantes de avaliação
 compreendem fronteiras dos passos, o instante de conclusão do retreinamento e o
@@ -268,15 +269,17 @@ detectado a acurácia na conclusão da rodada já atinge $\tau$, de modo que o
 tempo até a recuperação equivale à duração do retreinamento.
 
 \subsection{Avaliação sobre os dados correntes}
-A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$: no início da operação o teste tem fração zero, e só se torna totalmente degradado quando a rampa
+A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$. No início da operação o teste tem fração zero, e só se torna totalmente degradado quando a rampa
 termina; um teste totalmente degradado superestimaria a queda de acurácia durante
 a rampa. A composição usa uma permutação determinística com seed por episódio, de modo que
 ambas as variantes são avaliadas sobre o tensor idêntico em cada instante.
 
 \subsection{Calibração de severidade}
-Todas as severidades de $1$--$5$
-são avaliadas no conjunto de teste degradado, e a menor severidade cuja
-acurácia cai estritamente dentro de $(0{,}25;\,0{,}50)$ é selecionada. O limite inferior
+Cada degradação é parametrizada por uma severidade inteira, de 1 (mais leve)
+a 5 (mais forte). A calibração parte de um checkpoint limpo e avalia todas as
+severidades de $1$--$5$ no conjunto de teste degradado; a
+menor severidade cuja acurácia cai estritamente dentro de $(0{,}25;\,0{,}50)$
+é selecionada. O limite inferior
 mantém o modelo bem acima do acaso (0,10 para dez classes), de modo que a recuperação é
 alcançável com pouco orçamento de retreino; o limite superior garante que a
 degradação empurre o serviço para abaixo de $\tau$.
@@ -420,12 +423,12 @@ A política reativa reduz o downtime médio nos 12 grupos
 408--562\,s para 0--178\,s, com 59 vitórias nos 60 episódios pareados.
 O cenário de fog
 com rampa de 200\,s atinge \textbf{downtime zero} com $\tau=0{,}5$
-(Fig.~\ref{fig:fog}): o disparo ocorre com o progresso do drift em 0,69, quando a
+(Fig.~\ref{fig:fog}); o disparo ocorre com o progresso do drift em 0,69, quando a
 acurácia ainda é de 0,568 (acima de $\tau$); a rodada única mantém a acurácia
 acima de $\tau$ (acurácia final sob degradação de 0,71).
 
 O contraste entre a variante reativa e a baseline mantém a
-mesma ordem ao variar o limiar de qualidade: para
+mesma ordem ao variar o limiar de qualidade. Para
 $\tau \in \{0{,}40;\,0{,}45;\,0{,}50;\,0{,}55\}$ a variante reativa nunca supera sua
 baseline pareada em nenhuma das 48 células, embora as magnitudes sejam
 específicas de $\tau$ (o contraste médio encolhe cerca de 47\% com $\tau=0{,}40$; o
@@ -448,7 +451,7 @@ os detectores locais são independentes. O disparo
 ocorre no mínimo do quórum (0,30, três clientes distintos na
 janela de dois passos) em 21 de 59 episódios; o ruído Gaussiano dispara no
 mínimo em todos os episódios detectados da rampa de 100\,s. A
-rampa longa espalha os alarmes: a fração sinalizada na decisão cai
+rampa longa espalha os alarmes, e a fração sinalizada na decisão cai
 com a duração da rampa (fog $0{,}88\rightarrow0{,}42$, frosted-glass
 $0{,}90\rightarrow0{,}56$, motion blur $0{,}66\rightarrow0{,}54$).
 
@@ -470,7 +473,7 @@ um para um (116 $\approx$ 108 + 8\,s).
 
 \subsection{Taxa de falsos positivos em fluxos sem drift}
 Executamos 15 episódios de controle (cinco seeds vezes três cronogramas de rampa) sem
-degradação: cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
+degradação. Cada cliente monitora um fluxo limpo pelo horizonte completo de 600\,s.
 O gatilho coletivo nunca dispara---nenhum dos 15 episódios registra uma
 decisão de retreinamento---e os detectores locais emitem zero alarmes nas
 9\,000 avaliações cliente-passo.
@@ -501,12 +504,12 @@ Ruído Gaussiano & $-0{,}084\pm0{,}013$ & $-0{,}066\pm0{,}034$ & $-0{,}072\pm0{,
 \end{table}
 
 Primeiro, \emph{rampas longas preservam a acurácia no conjunto limpo}
-(Tabela~\ref{tab:retention}): com rampa de 200\,s
+(Tabela~\ref{tab:retention}). Com rampa de 200\,s,
 o conjunto de retreinamento mantém cerca de 30\% de dados limpos e a perda de acurácia
 limpa cai para 1--2 pontos (contra 9--21 em rampas curtas) para fog,
 frosted-glass e motion blur; o ruído Gaussiano não se beneficia
 (progresso do drift de 0,97 no disparo). Segundo, \emph{a recuperação
-não é temporária}: nenhum episódio volta a cruzar $\tau$ dentro do horizonte; o
+não é temporária}, pois nenhum episódio volta a cruzar $\tau$ dentro do horizonte; o
 modelo retreinado generaliza para o regime totalmente degradado. Em 9 dos 20
 episódios com rampa de 200\,s (todas as cinco execuções de fog, três de frosted-glass e uma
 de motion blur), a acurácia nunca cai abaixo de $\tau$.
@@ -525,7 +528,7 @@ horizonte; a baseline segue caindo até cerca de 0,35.}
 \end{figure}
 
 \section{Discussão}
-O monitoramento não é gratuito: ao longo do episódio de 80 passos (60 de operação mais 20 de warm-up), o detector com $T=5$ custa cerca de 6,8\,TFLOPs
+O monitoramento não é gratuito. Ao longo do episódio de 80 passos (60 de operação mais 20 de warm-up), o detector com $T=5$ custa cerca de 6,8\,TFLOPs
 (4\,000 forward passes em lote de 32, 50 por passo nos dez clientes) contra
 cerca de 8,0\,TFLOPs da rodada única de retreinamento. A razão é de
 0,85--0,96 conforme a contabilização, ou seja, o monitoramento responde por cerca de
@@ -556,7 +559,7 @@ folga entre disparo e horizonte, cerca de 140\,s nesta grade.
 \subsection{Ruído Gaussiano é o cenário limitante}
 O ruído Gaussiano é o único cenário com detecção incompleta.
 Com rampa de 100\,s e seed 42,
-a política nunca dispara: só quatro dos dez clientes emitem alarme em
+a política nunca dispara, pois só quatro dos dez clientes emitem alarme em
 todo o episódio, nunca três dentro da mesma janela de dois passos (fração
 máxima sinalizada de 0,20 em passos esparsos); as outras quatro seeds detectam em
 120--210\,s. Como a janela e o
@@ -572,7 +575,7 @@ A Fig.~\ref{fig:gaussian} mostra a seed que falhou.
 \centering
 \includegraphics[width=0.85\linewidth]{figures/fig_gaussian_ramp10.png}
 \caption{Ruído Gaussiano, rampa de 100\,s, cinco seeds pareadas. A seed 42 nunca
-dispara: sua trajetória (azul sólida) não se recupera, enquanto as outras
+dispara. Sua trajetória (azul sólida) não se recupera, enquanto as outras
 quatro seeds se recuperam para cerca de 0,68.}
 \label{fig:gaussian}
 \end{figure}
