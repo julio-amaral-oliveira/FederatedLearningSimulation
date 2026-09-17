@@ -11,16 +11,27 @@
   \renewcommand{\figurename}{Fig.}%
   \renewcommand{\IEEEkeywordsname}{Palavras-chave}%
 }
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{hyperref}
 \hypersetup{hidelinks}
+\floatname{algorithm}{Algoritmo}
+\algrenewcommand\algorithmicwhile{\textbf{enquanto}}
+\algrenewcommand\algorithmicfor{\textbf{para}}
+\algrenewcommand\algorithmicdo{\textbf{faça}}
+\algrenewcommand\algorithmicend{\textbf{fim}}
+\algrenewcommand\algorithmicif{\textbf{se}}
+\algrenewcommand\algorithmicthen{\textbf{então}}
 
 \begin{document}
 
 \title{Retreinamento Reativo em Aprendizado Federado sob \textit{Concept Drift} Gradual: Detecção Local por Incerteza e Decisão Coletiva por Quórum}
 
 \author{
-\IEEEauthorblockN{Julio Vinicius Amaral Oliveira\IEEEauthorrefmark{1},
-Hugo César de Oliveira\IEEEauthorrefmark{2}, Miguel Elias M. Campista\IEEEauthorrefmark{2}, Luiz Fernando Bittencourt\IEEEauthorrefmark{1}}
+\IEEEauthorblockN{Julio Vinicius Amaral Oliveira\IEEEauthorrefmark{1},\\
+Hugo César de Oliveira\IEEEauthorrefmark{2},\\
+Miguel Elias M. Campista\IEEEauthorrefmark{2},\\
+Luiz Fernando Bittencourt\IEEEauthorrefmark{1}}
 \IEEEauthorblockA{\IEEEauthorrefmark{1}Instituto de Computação, Universidade Estadual de Campinas (UNICAMP), Brasil\\
 j230537@dac.unicamp.br, bit@unicamp.br}
 \IEEEauthorblockA{\IEEEauthorrefmark{2}Universidade Federal do Rio de Janeiro (UFRJ), Brasil\\
@@ -83,22 +94,45 @@ D \;=\; \sum_{i=1}^{m} (v_{i+1}-v_i)\cdot
 em que $v_1,\dots,v_m$ são os instantes de avaliação e $v_{m+1}=v_0+H$. A acurácia mantém o último valor medido até a próxima avaliação e, no intervalo final, até o horizonte $v_0+H$. Essas avaliações ocorrem nas fronteiras dos passos de monitoramento (a cada $\Delta t$ segundos), no instante em que o retreinamento termina (uma avaliação extra que registra a recuperação logo após a rodada, mesmo que o término caia entre duas fronteiras) e no horizonte $v_0+H$.
 
 \section{Método Proposto}
-\subsection{Detecção local por incerteza (UDD por cliente)}
-Cada cliente $c$ executa um detector local sobre o modelo global compartilhado: (1) o modelo é posto em modo de avaliação com as camadas de dropout reativadas; (2) $T=5$ forward passes estocásticos produzem probabilidades por classe; (3) calcula-se a entropia média de Shannon $H=-\sum_k p_k\log p_k$ sobre o lote; (4) o escalar alimenta um ADWIN por cliente com $\delta=0{,}002$ \cite{bifet2007,baier2023}. Nossa implementação do ADWIN testa janelas de ao menos 20 observações, porque alimentamos o ADWIN com a entropia média de cada lote, uma vez por passo em cada cliente, e não com um fluxo de instâncias. Cada detector recebe 20 passos de warm-up em dados limpos antes do início da operação, calibrando-o sem alimentar a política coletiva.
+A política reativa combina treino limpo, monitoramento local sem rótulos e decisão coletiva (quórum). Fazendo com que o servidor dispare o retreinamento quando os alarmes atingem o quórum mínimo. O Algoritmo~\ref{alg:reactive} resume o fluxo; os parâmetros estão na Seção~\ref{sec:setup}.
 
-\subsection{Política coletiva por quórum}
-A cada passo de operação, o servidor recebe as flags de alarme por cliente e mantém uma janela deslizante dos últimos dois passos. A fração sinalizada é o número de clientes \emph{distintos} sinalizados na janela dividido pelo número total de clientes. Quando a fração atinge o quórum $\theta=0{,}30$ (3 de 10 clientes), o servidor dispara. Dessa forma, um possível falso positivo local sob monitoramento contínuo \cite{poenaru2022} não basta para iniciar o retreinamento.
+\begin{algorithm}[!t]
+\footnotesize
+\caption{Retreinamento reativo com detecção local por incerteza e decisão coletiva por quórum.}
+\label{alg:reactive}
+\begin{algorithmic}[1]
+\State \textbf{Entrada:} $C$ clientes; $R$ rodadas limpas;$T$ MC dropouts ; sensibilidade $\delta$; quórum $\theta$; janela $W$; orçamento $K$; treino $N$; teste $M$
+\State servidor treina o modelo global ($R$ rodadas); cada cliente inicializa e calibra seu detector com dados limpos
+\While{o serviço está em operação}
+  \For{cada cliente $c$ em paralelo}
+     \State recebe um lote sem rótulos e estima a entropia média com MC dropout ($T$ passagens); emite alarme se o ADWIN sinaliza mudança
+  \EndFor
+  \If{a fração de clientes distintos com alarme na janela $W$ atinge o quórum $\theta$}
+     \State dispara $K$ rodada(s) de retreinamento global sobre os dados correntes
+  \EndIf
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
 
-\subsection{Retreinamento reativo sobre os dados correntes}
-Quando a política dispara no instante $t_d$, o conjunto de treinamento de cada cliente é substituído por um conjunto com fração degradada $f(t_d)$ e uma única rodada síncrona de FL é executada com todos os clientes. Cada cliente detém 5\,000 imagens de treinamento (uma divisão IID do conjunto de treinamento de 50\,000 imagens) com fração degradada $f(t_d)$. Em todo episódio detectado a acurácia na conclusão da rodada já atinge $\tau$, de modo que o tempo até a recuperação equivale à duração do retreinamento.
+\subsection{Detecção local por incerteza (UDD por cliente)} Cada cliente $c$ executa um detector local sobre o modelo global compartilhado: (1) o modelo é posto em modo de avaliação com as camadas de dropout reativadas; (2) $T$ forward passes estocásticos produzem probabilidades por classe; (3) calcula-se a entropia média de Shannon $H=-\sum_k p_k\log p_k$ sobre o lote; (4) o escalar alimenta um ADWIN por cliente com sensibilidade $\delta$ \cite{bifet2007,baier2023}. O ADWIN compara a média de duas subjanelas do fluxo e só sinaliza quando há observações suficientes para a comparação. Como cada cliente fornece uma única observação por passo---a entropia média do lote---, esse histórico mínimo custa vários passos. Por isso, cada detector passa por passos de warm-up em dados limpos antes da operação, e os alarmes desse período não entram na decisão coletiva.
 
-\subsection{Avaliação sobre os dados correntes}
-A série de acurácia é medida no conjunto de teste completo (10\,000 imagens) com a fração corrente $f(v)$. No início da operação o teste tem fração zero, e só se torna totalmente degradado quando a rampa termina; um teste totalmente degradado superestimaria a queda de acurácia durante a rampa. A composição usa uma permutação determinística com seed por episódio, de modo que ambas as variantes são avaliadas sobre o tensor idêntico em cada instante.
+\subsection{Política coletiva por quórum} A cada passo de operação, o servidor recebe as flags de alarme por cliente e mantém uma janela deslizante dos últimos $W$ passos, registrando quais clientes sinalizaram em cada um. A fração sinalizada é o número de clientes \emph{distintos} com pelo menos um alarme na janela dividido pelo número total de clientes. Quando a fração atinge o quórum $\theta$, o servidor dispara o retreinamento no instante $t_d$. Dessa forma, um possível falso positivo local sob monitoramento contínuo \cite{poenaru2022} não basta para iniciar o retreinamento.
+
+\subsection{Retreinamento reativo sobre os dados correntes} No instante $t_d$, o conjunto de treinamento de cada cliente é substituído por um conjunto com a fração degradada do instante do disparo, $f(t_d)$ (Eq.~\eqref{eq:ramp}), e um orçamento de $K$ rodada(s) síncrona(s) de FL é executado com todos os clientes. Cada cliente detém uma fração IID do conjunto de treinamento de $N$ imagens ($N/C$ imagens), nessa fração degradada.
+
+\subsection{Avaliação sobre os dados correntes} A série de acurácia é medida no conjunto de teste de $M$ imagens com a fração corrente $f(v)$; no início o teste é limpo e só se torna totalmente degradado quando a rampa termina. A escolha de quais imagens são degradadas segue uma permutação determinística, de modo que ambos avaliam exatamente as mesmas imagens em cada instante.
 
 \subsection{Calibração de severidade}
-Cada degradação é parametrizada por uma severidade inteira, de 1 (mais leve) a 5 (mais forte). A calibração parte de um checkpoint limpo e avalia todas as severidades de $1$--$5$ no conjunto de teste degradado; a menor severidade cuja acurácia cai estritamente dentro de $(0{,}25;\,0{,}50)$ é selecionada. O limite inferior mantém o modelo bem acima do acaso (0,10 para dez classes), de modo que a recuperação é alcançável com pouco orçamento de retreino; o limite superior garante que a degradação empurre o serviço para abaixo de $\tau$.
+Cada degradação é parametrizada por uma severidade inteira e crescente, em que
+valores maiores correspondem a perturbações mais fortes. A calibração parte de
+um checkpoint limpo e avalia todas as severidades no conjunto de teste
+degradado; seleciona-se a menor severidade cuja acurácia cai estritamente
+dentro de uma faixa alvo. O limite inferior mantém o modelo bem acima do
+acaso, de modo que a recuperação é alcançável com pouco orçamento de retreino,
+e o limite superior garante que a degradação empurre o serviço para abaixo de
+$\tau$.
 
-\section{Configuração Experimental}
+\section{Configuração Experimental}\label{sec:setup}
 \subsection{Conjunto de dados e degradações}
 Usamos CIFAR-10 com partição IID entre 10 clientes e as 10 classes completas em todas as fases. Quatro degradações visuais são implementadas diretamente sobre tensores---ruído Gaussiano, frosted-glass blur, motion blur e fog---com severidades inteiras de $1$--$5$, geradores por seed e formas e rótulos preservados. Elas são \emph{inspiradas} no benchmark CIFAR-10-C \cite{hendrycks2019}; o ruído Gaussiano adiciona perturbações com desvios-padrão por severidade de 0,08--0,24; o frosted-glass blur permuta pixels em uma vizinhança $3\times3$ e combina-os com um borrão Gaussiano (força 0,2--1,0); o motion blur faz convolução com um kernel diagonal de largura 5--15; o fog combina a imagem com um mapa de ruído fractal de quatro oitavas.
 \subsection{Resultado da calibração}
@@ -119,7 +153,9 @@ Fog & 4 & 0,4875\\
 \bottomrule
 \end{tabular}
 \end{table}
-severidades da Tabela~\ref{tab:calibration} (procedimento na Seção IV-E).
+severidades da Tabela~\ref{tab:calibration}. Para cada degradação, foram
+avaliadas as severidades de $1$--$5$ e selecionada a menor com acurácia
+estritamente dentro de $(0{,}25;\,0{,}50)$ (procedimento na Seção IV-E).
 
 \subsection{Grade}
 A grade do estudo é o produto cartesiano das quatro degradações calibradas, cinco seeds ($42$--$46$) e três durações de rampa ($5$, $10$, $20$ passos), totalizando 60 episódios pareados com horizonte de operação fixo de $H=600$\,s. Cada episódio pareia a política reativa com uma baseline no mesmo fluxo e checkpoint que nunca retreina; as duas variantes compartilham o estado aleatório, o início da operação e o horizonte $H$, e a baseline registra, como contrafactual, o momento em que a política \emph{teria} disparado. A Tabela~\ref{tab:setup} lista a configuração fixa.
@@ -134,6 +170,7 @@ A grade do estudo é o produto cartesiano das quatro degradações calibradas, c
 Parâmetro & Valor\\
 \midrule
 Conjunto de dados & CIFAR-10, IID, 10 clientes\\
+Treino / teste & 50\,000 / 10\,000 imagens (5\,000 por cliente)\\
 Rodadas iniciais (limpas) & 20\\
 Passos de warm-up (limpos) & 20\\
 Duração do passo & 10\,s\\
@@ -141,7 +178,7 @@ Tamanho de lote / épocas & 32 / 1\\
 Modelo & CNN 2,2M (4 conv, 2 fc)\\
 Otimizador & Adam, lr $10^{-3}$\\
 Velocidade / timeout & uniforme (p75; rodada $\approx$ 8\,s)\\
-Detector & ADWIN $\delta=0{,}002$; MC dropout $T=5$\\
+Detector & ADWIN $\delta=0{,}002$, mín. 20 obs.; MC dropout $T=5$\\
 Quórum / janela & 0,30 / 2 passos\\
 Orçamento de retreinamento & 1 rodada\\
 Limiar de qualidade $\tau$ & 0,50\\
@@ -211,8 +248,10 @@ O contraste entre a variante reativa e a baseline mantém a mesma ordem ao varia
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_fog_ramp20.pdf}
-\caption{Fog, rampa de 200\,s, cinco seeds pareadas. Acima: acurácia sob degradação ao longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias); $\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. Abaixo: acurácia final sob degradação, downtime e clean retention; a variante reativa nunca cai abaixo de $\tau$ (downtime zero).}
+\includegraphics[width=\linewidth]{figures/fig_fog_ramp20_traj.pdf}
+\caption{Fog, rampa de 200\,s, cinco seeds pareadas. Acurácia sob degradação ao
+longo do tempo simulado (sólida: reativo, tracejada: baseline; linhas grossas: médias);
+$\tau=0{,}5$ tracejada; faixas sombreadas: a rodada de retreinamento. A variante reativa nunca cai abaixo de $\tau$ (downtime zero).}
 \label{fig:fog}
 \end{figure}
 
@@ -250,7 +289,7 @@ Primeiro, \emph{rampas longas preservam a acurácia no conjunto limpo} (Tabela~\
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_motion_ramp20.pdf}
+\includegraphics[width=\linewidth]{figures/fig_motion_ramp20_traj.pdf}
 \caption{Motion blur, rampa de 200\,s, cinco seeds pareadas. A variante reativa recupera-se em uma rodada e permanece acima de $\tau$ durante a maior parte do horizonte; a baseline segue caindo até cerca de 0,35.}
 \label{fig:motion}
 \end{figure}
@@ -265,7 +304,7 @@ O ruído Gaussiano é o único cenário com detecção incompleta. Com rampa de 
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_gaussian_ramp10.pdf}
+\includegraphics[width=\linewidth]{figures/fig_gaussian_ramp10_traj.pdf}
 \caption{Ruído Gaussiano, rampa de 100\,s, cinco seeds pareadas. A seed 42 nunca dispara. Sua trajetória (azul sólida) não se recupera, enquanto as outras quatro seeds se recuperam para cerca de 0,68.}
 \label{fig:gaussian}
 \end{figure}
