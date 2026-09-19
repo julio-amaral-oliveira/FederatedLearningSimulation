@@ -22,6 +22,10 @@ _SEED_DIRECTORY = re.compile(r"seed_(\d+)$")
 _ARM_FILES = {"agent": False, "baseline": True}
 _PAIR_FIELDS = ("corruption", "severity", "tau", "horizon")
 
+# Embed TrueType fonts in vector exports (PDF/SVG) so the text stays crisp
+# under arbitrary zoom instead of pixelating like a rasterized PNG.
+plt.rcParams["pdf.fonttype"] = 42
+
 
 class ScenarioError(ValueError):
     """A scenario directory does not contain a compatible paired seed group."""
@@ -436,8 +440,9 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
 
     axis.set_xlim(start, end)
     axis.set_ylim(0, 1)
-    axis.set_ylabel("Accuracy")
-    axis.set_xlabel("Simulated time (s)")
+    axis.set_ylabel("Accuracy", fontsize=14)
+    axis.set_xlabel("Simulated time (s)", fontsize=14)
+    axis.tick_params(labelsize=13)
     axis.yaxis.set_major_formatter(PercentFormatter(1.0))
     axis.grid(True, alpha=0.2)
     if onset > start:
@@ -447,7 +452,7 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
             "training",
             transform=axis.get_xaxis_transform(),
             ha="left",
-            fontsize=9,
+            fontsize=13,
         )
     warmup_label = (
         f"warm-up ({sample.warmup_ticks} ticks)"
@@ -461,7 +466,7 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         warmup_label,
         transform=axis.get_xaxis_transform(),
         ha="right",
-        fontsize=9,
+        fontsize=13,
     )
     axis.text(
         onset + gap,
@@ -469,7 +474,7 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         "drift onset",
         transform=axis.get_xaxis_transform(),
         ha="left",
-        fontsize=9,
+        fontsize=13,
     )
     axis.text(
         end,
@@ -477,7 +482,7 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         "horizon",
         transform=axis.get_xaxis_transform(),
         ha="right",
-        fontsize=9,
+        fontsize=13,
     )
 
     seed_handles = [
@@ -555,10 +560,10 @@ def _plot_trajectories(axis, pairs: Sequence[SeedPair], colors: Sequence[Any]) -
         handles=[*seed_handles, *style_handles],
         loc="lower right",
         ncol=2,
-        fontsize=8,
+        fontsize=12,
     )
     axis.add_artist(first_legend)
-    axis.legend(handles=semantic_handles, loc="upper right", fontsize=8)
+    axis.legend(handles=semantic_handles, loc="upper right", fontsize=12)
 
 
 def _plot_grouped_bars(
@@ -619,14 +624,15 @@ def _plot_grouped_bars(
     axis.axvline(0, color="#777777", linewidth=0.8, alpha=0.55)
     axis.set_yticks([*y, mean_row], [*[f"Seed {pair.seed}" for pair in pairs], "Mean"])
     axis.invert_yaxis()
-    axis.set_title(title, fontsize=10)
+    axis.set_title(title, fontsize=14)
+    axis.tick_params(labelsize=13)
     axis.grid(axis="x", alpha=0.2)
     if percent:
         axis.xaxis.set_major_formatter(
             PercentFormatter(1.0, decimals=percent_decimals)
         )
     else:
-        axis.set_xlabel("Seconds")
+        axis.set_xlabel("Seconds", fontsize=14)
     if x_limits is None:
         axis.margins(x=0.12)
     else:
@@ -638,7 +644,7 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
         raise ScenarioError("cannot plot an empty seed group")
     color_map = plt.get_cmap("tab10")
     colors = [color_map(index % 10) for index in range(len(pairs))]
-    figure = plt.figure(figsize=(15, 10), constrained_layout=True)
+    figure = plt.figure(figsize=(15, 8), constrained_layout=True)
     grid = figure.add_gridspec(2, 3, height_ratios=(2.15, 1.0))
     trajectory_axis = figure.add_subplot(grid[0, :])
     bottom_axes = [figure.add_subplot(grid[1, index]) for index in range(3)]
@@ -682,7 +688,7 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
         label += " — oracle-trigger control"
     figure.suptitle(
         f"Drift comparison — {label} — {len(pairs)} paired seeds",
-        fontsize=15,
+        fontsize=19,
         fontweight="bold",
     )
     figure.legend(
@@ -701,6 +707,7 @@ def build_figure(pairs: Sequence[SeedPair]) -> Figure:
         ],
         loc="outside lower center",
         ncol=2,
+        fontsize=12,
         frameon=False,
     )
     return figure
