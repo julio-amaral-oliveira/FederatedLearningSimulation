@@ -148,7 +148,7 @@ def build_trajectory_figure(pairs: Sequence[SeedPair]) -> Figure:
 
     tau_label = f"{sample.tau:g}"
     handles = [
-        Line2D([0], [0], color=AGENT_MEAN_COLOR, linewidth=1.5, label="ReaQI (mean)"),
+        Line2D([0], [0], color=AGENT_MEAN_COLOR, linewidth=1.5, label="ReacQD (mean)"),
         Line2D(
             [0],
             [0],
